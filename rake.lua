@@ -4,6 +4,8 @@ local lp = Players.LocalPlayer
 
 local tList, tempObj = {}, {}
 
+local vs = "1.2.0"
+
 local workspace, Drawing, WorldToScreen, ipairs, pairs, task =
     workspace, Drawing, WorldToScreen, ipairs, pairs, task
 
@@ -221,8 +223,7 @@ local espObj = {
     Scrap5 = {Type="Model",Root="Scrap",Text="Scrap 5",Color=Color3.fromHex("#ffd000")},
 
     RakeTrapModel = {Type="Model",Root="HitBox",Text="Trap",Color=Color3.fromHex("#ffcbcb")},
-    Box = {Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#6560ff")},
-    SupplyCrate = {Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#8682ff")}
+    Box = {Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#6560ff")}
 }
 
 local function updPos()
@@ -230,7 +231,6 @@ local function updPos()
         for _, v in ipairs(tList) do
             if v.name then v.name.Visible = false end
             if v.dist then v.dist.Visible = false end
-            if v.hp then v.hp.Visible = false end
         end
         return
     end
@@ -252,7 +252,6 @@ local function updPos()
         if not o or not o.Parent then
             if v.name then v.name:Remove() end
             if v.dist then v.dist:Remove() end
-            if v.hp then v.hp:Remove() end
             tList[i] = tList[#tList]
             tList[#tList] = nil
             tempObj[v.Address] = nil
@@ -284,21 +283,9 @@ local function updPos()
                 v.dist.Position = Vector2.new(screenPos.X, screenPos.Y + 2 + yOffset)
                 v.dist.Text = studs .. " studs"
                 v.dist.Visible = true
-
-                if v.hp and v.model then
-                    local hum = v.model:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        v.hp.Text = math.floor(hum.Health) .. " HP"
-                        v.hp.Position = Vector2.new(screenPos.X, screenPos.Y + 17 + yOffset)
-                        v.hp.Visible = true
-                    else
-                        v.hp.Visible = false
-                    end
-                end
             else
                 v.name.Visible = false
                 v.dist.Visible = false
-                if v.hp then v.hp.Visible = false end
             end
         end
     end
@@ -343,26 +330,12 @@ local function addObj(v)
         Visible = false
     }
 
-    local hp = nil
-    if v.Name == "Rake" then
-        hp = newText{
-            Text = "400 HP",
-            Color = Color3.fromHex("#fc5555"),
-            Outline = true,
-            Center = true,
-            Size = 15,
-            Font = Drawing.Fonts.System,
-            Visible = false
-        }
-    end
-
     tempObj[v.Address] = true
     tList[#tList + 1] = {
         object = r,
         model = v,
         name = name,
         dist = dist,
-        hp = hp,
         Address = v.Address
     }
 end
@@ -507,7 +480,6 @@ spawn(function()
                 for _, v in ipairs(tList) do
                     if v.name then v.name.Visible = false end
                     if v.dist then v.dist.Visible = false end
-                    if v.hp then v.hp.Visible = false end
                 end
             end
         else
@@ -565,7 +537,4 @@ spawn(function()
         task.wait(0.1)
     end
 end)
-
-
-local vs = "2.1"
-print(("F1 to toggle | Version %s"):format(vs))
+print(("saint | version %s"):format(vs))
