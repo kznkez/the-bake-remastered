@@ -146,4 +146,5 @@ spawn(function() while true do updObj(); task.wait(0.5) end end)
 spawn(function() while true do updPos() if iskeypressed(0x70) then if not keyHeld.f1 then keyHeld.f1=true; toggle.esp=not toggle.esp; for _,v in ipairs(tList)do v.name.Visible=false; v.dist.Visible=false end end else keyHeld.f1=false end if iskeypressed(0x71) then if not keyHeld.f2 then keyHeld.f2=true; toggle.hud=not toggle.hud; for _,o in ipairs(hudObjects)do o.Visible=toggle.hud end local aa=0 for bn,l in pairs(powerLines)do local vv=pwrValue:FindFirstChild(bn); l.Visible=toggle.hud and vv and vv.Value or false; if l.Visible then aa=aa+1 end end pwrLabel.Visible=toggle.hud and aa>0; upPwrPos() local cc=0 for i,entry in ipairs(modList)do local p=Players:FindFirstChild(entry) if p then cc=cc+1; modLines[i].Text=p.Name; modLines[i].Visible=toggle.hud else modLines[i].Visible=false end end modLabel.Visible=toggle.hud and cc>0; upStaffPos() end else keyHeld.f2=false end task.wait() end end)
 
 print(("saint | version %s"):format(vs))
+print("leave a star on the thread so i can post updates there :)")
 print("F1 to toggle ESP, F2 to toggle HUD.")
