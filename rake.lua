@@ -94,7 +94,7 @@ local function addObj(v)
  local recAddr=safeAddress(modelRec or object)
  if not recAddr or tempObj[recAddr] then return end
  local name=newText{Text=entry.Text,Color=entry.Color,Outline=true,Center=true,Size=14,Font=FONT,Visible=false}
- local dist=newText{Text="0 studs",Color=Color3.fromHex("#969696"),Outline=true,Center=true,Size=12,Font=FONT,Visible=false}
+ local dist=newText{Text="0 studs",Color=Color3.fromHex("#cacaca"),Outline=true,Center=true,Size=12,Font=FONT,Visible=false}
  tempObj[recAddr]=true
  tList[#tList+1]={object=object,model=modelRec or object.Parent,name=name,dist=dist,Address=recAddr}
 end
@@ -122,7 +122,7 @@ spawn(function()
  while true do
   if cam.ViewportSize~=last then last=cam.ViewportSize; updHudPos() end
   local t=TimerValue.Value; timerText.Text=fmt(t); timerText.Color=t<=15 and Color3.fromHex("#c44b4b") or Color3.fromHex("#ffffff")
-  if StationPower and StationPower.Value==false then ppmsText.Text="BLACKOUT"; ppmsText.Color=Color3.fromHex("#ffe7c7") else ppmsText.Text=string.format("%.2f",PPMS.Value); ppmsText.Color=Color3.fromHex("#ffffff") end
+  if StationPower and StationPower.Value==false then ppmsText.Text="Blackout"; ppmsText.Color=Color3.fromHex("#ffe7c7") else ppmsText.Text=string.format("%.2f",PPMS.Value); ppmsText.Color=Color3.fromHex("#ffffff") end
   timerLabel.Position=timerText.Position+Vector2.new(0,18); ppmsLabel.Position=ppmsText.Position+Vector2.new(0,18)
   task.wait(0.2)
  end
