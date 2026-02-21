@@ -1,5 +1,5 @@
 local Players,ReplicatedStorage=game:GetService("Players"),game:GetService("ReplicatedStorage")
-local lp=Players.LocalPlayer; local vs="2.0.0"
+local lp=Players.LocalPlayer; local vs="1.9.0"
 local workspace,Drawing,WorldToScreen,ipairs,pairs,task=workspace,Drawing,WorldToScreen,ipairs,pairs,task
 local toggle={esp=true,hud=true}; local keyHeld={f1=false,f2=false}
 local function newText(p)local t=Drawing.new("Text");for k,v in pairs(p)do t[k]=v end;return t end
@@ -45,7 +45,7 @@ local function updHudPos()
  timerText.Position=c+Vector2.new(-140,-30); ppmsText.Position=c+Vector2.new(140,-30); targetPlayerText.Position=c+Vector2.new(0,-30)
  timerLabel.Position=timerText.Position+Vector2.new(0,18); ppmsLabel.Position=ppmsText.Position+Vector2.new(0,18); targetTitle.Position=targetPlayerText.Position+Vector2.new(0,18)
  radioTitle.Position=l+Vector2.new(-1,140)
- for i=1,7 do local y=l.Y+(i-1)*LINE_H; radLine[i].name.Position=Vector2.new(l.X,y); radLine[i].msg.Position=Vector2.new(l.X+60,y) end
+ for i=1,7 do local y=l.Y+(i-1)*LINE_H; radLine[i].name.Position=Vector2.new(l.X,y); radLine[i].msg.Position=Vector2.new(l.X+70,y) end
 end
 local function upPwrPos()
  local _,_,r=anc(); powerTitle.Position=r-Vector2.new(50,0)
@@ -57,10 +57,10 @@ updHudPos(); upPwrPos()
 
 local tList,tempObj={},{}
 local espObj={
- FlareGunPickUp={Type="Model",Root="FlareGun",Text="Flare",Color=Color3.fromHex("#f05757")},
+ FlareGunPickUp={Type="Model",Root="FlareGun",Text="Flare Gun",Color=Color3.fromHex("#f05757")},
  Rake={Type="Model",Root="Head",Text="Rake",Color=Color3.fromHex("#e63a3a"),offY=75},
  BaseCampMSG={Type="BasePart",Text="Camp",Color=Color3.fromHex("#c6f1c8")},
- SafehouseMSG={Type="BasePart",Text="Home",Color=Color3.fromHex("#c6f1c8")},
+ SafehouseMSG={Type="BasePart",Text="House",Color=Color3.fromHex("#c6f1c8")},
  StationMSG={Type="BasePart",Text="Power",Color=Color3.fromHex("#c6f1c8")},
  ShopMSG={Type="BasePart",Text="Shop",Color=Color3.fromHex("#c6f1c8")},
  ObservationTowerMSG={Type="BasePart",Text="Tower",Color=Color3.fromHex("#c6f1c8")},
@@ -70,7 +70,8 @@ local espObj={
  Scrap4={Type="Model",Root="Scrap",Text="Scrap 4",Color=Color3.fromHex("#ecca30")},
  Scrap5={Type="Model",Root="Scrap",Text="Scrap 5",Color=Color3.fromHex("#ffd000")},
  RakeTrapModel={Type="Model",Root="HitBox",Text="Trap",Color=Color3.fromHex("#ffb3b3")},
- Box={Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#85e2ff")}
+ Box={Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#85e2ff")},
+ SupplyCrate={Type="Model",Root="HitBox",Text="Crate",Color=Color3.fromHex("#85e2ff")}
 }
 
 local function fmt(s) s=math.max(0,math.floor(s)); return ("%d:%02d"):format(math.floor(s/60),s%60) end
@@ -91,39 +92,38 @@ end
 
 local function addObj(v)
  if not v then return end
- local model = getModelFromInstance(v)
- local addrKey = (model and safeAddress(model)) or safeAddress(v)
+ local model=getModelFromInstance(v)
+ local addrKey=(model and safeAddress(model)) or safeAddress(v)
  if addrKey and tempObj[addrKey] then return end
- local entry=nil
- local object=nil
- local modelForRecord=model
+ local entry,object,modelForRecord=nil,nil,model
  if model and espObj[model.Name] then entry=espObj[model.Name] end
  if not entry then
-  for name,e in pairs(espObj) do
+  for name,e in pairs(espObj)do
    if e.Type=="BasePart" and v:IsA("BasePart") and name==v.Name then entry=e; object=v; if not modelForRecord and v.Parent and v.Parent:IsA("Model") then modelForRecord=v.Parent end; break end
    if e.Root then
     if model then
-     local found = model:FindFirstChild(e.Root, true)
-     if found and found:IsA("BasePart") then entry=e; object=found; break end
+     local found=model:FindFirstChild(e.Root,true)
+     if found and found:IsA("BasePart")then entry=e; object=found; break end
     else
      if v:IsA("BasePart") and v.Parent and v.Parent:IsA("Model") then
-      local found = v.Parent:FindFirstChild(e.Root, true)
-      if found and found:IsA("BasePart") then entry=e; object=found; modelForRecord=v.Parent; break end
+      local found=v.Parent:FindFirstChild(e.Root,true)
+      if found and found:IsA("BasePart")then entry=e; object=found; modelForRecord=v.Parent; break end
      end
     end
    end
   end
  end
  if not entry then return end
+ if model and model.Name=="SupplyCrate" and not modelForRecord:FindFirstChild(entry.Root) then
+  local innerBox=model:FindFirstChild("Box")
+  if innerBox and innerBox:IsA("Model") then modelForRecord=innerBox end
+ end
  if not object then
-  if entry.Type=="BasePart" then
-   if v:IsA("BasePart") then object=v end
-  else
-   if modelForRecord then object = modelForRecord:FindFirstChild(entry.Root, true) end
-  end
+  if entry.Type=="BasePart" then if v:IsA("BasePart")then object=v end
+  else if modelForRecord then object=modelForRecord:FindFirstChild(entry.Root,true) end end
  end
  if not object then return end
- local recordAddr = (modelForRecord and safeAddress(modelForRecord)) or safeAddress(object)
+ local recordAddr=(modelForRecord and safeAddress(modelForRecord)) or safeAddress(object)
  if not recordAddr or tempObj[recordAddr] then return end
  local name=newText{Text=entry.Text,Color=entry.Color,Outline=true,Center=true,Size=14,Font=FONT,Visible=false}
  local dist=newText{Text="0 studs",Color=Color3.fromHex("#969696"),Outline=true,Center=true,Size=12,Font=FONT,Visible=false}
@@ -133,24 +133,18 @@ end
 
 local function updObj()
  local f=workspace:FindFirstChild("Filter")
- if f then local s=f:FindFirstChild("ScrapSpawns") if s then for _,spawn in pairs(s:GetChildren()) do if spawn.Name:match("ItemSpawn") then for _,v in pairs(spawn:GetChildren())do addObj(v) end end end end
+ if f then local s=f:FindFirstChild("ScrapSpawns") if s then for _,spawn in pairs(s:GetChildren())do if spawn.Name:match("ItemSpawn")then for _,v in pairs(spawn:GetChildren())do addObj(v) end end end end
  local l=f:FindFirstChild("LocationPoints") if l then for _,p in pairs(l:GetChildren())do addObj(p) end end end
- for _,v in pairs(workspace:GetChildren()) do if v.Name=="FlareGunPickUp" or v.Name=="Rake" then addObj(v) end end
- local d=workspace:FindFirstChild("Debris") if d then local t=d:FindFirstChild("Traps") if t then for _,v in pairs(t:GetChildren())do addObj(v) end end local c=d:FindFirstChild("SupplyCrates") if c then for _,v in pairs(c:GetChildren())do addObj(v) end end end
+ for _,v in pairs(workspace:GetChildren())do if v.Name=="FlareGunPickUp" or v.Name=="Rake" then addObj(v) end end
+ local d=workspace:FindFirstChild("Debris") if d then local t=d:FindFirstChild("Traps") if t then for _,v in pairs(t:GetChildren())do addObj(v) end end local c=d:FindFirstChild("SupplyCrates") if c then for _,v in pairs(c:GetChildren())do addObj(v) end end for _,m in pairs(d:GetChildren())do if m:IsA("Model")then addObj(m) end end end
 end
 
 if workspace and workspace.DescendantAdded and type(workspace.DescendantAdded.Connect)=="function" then
- workspace.DescendantAdded:Connect(function(desc)
-  pcall(function()
-   if not desc then return end
-   addObj(desc)
-   if desc.Parent then addObj(desc.Parent) end
-  end)
- end)
+ workspace.DescendantAdded:Connect(function(desc) pcall(function() if not desc then return end addObj(desc) if desc.Parent then addObj(desc.Parent) end end) end)
 end
 
 local function updPos()
- if not toggle.esp then for _,v in ipairs(tList) do if v.name then v.name.Visible=false end; if v.dist then v.dist.Visible=false end end return end
+ if not toggle.esp then for _,v in ipairs(tList)do if v.name then v.name.Visible=false end; if v.dist then v.dist.Visible=false end end return end
  local rx,ry,rz
  local char=lp.Character if char then local hrp=char:FindFirstChild("HumanoidRootPart") if hrp then local p=hrp.Position; rx,ry,rz=p.X,p.Y,p.Z end end
  for i=#tList,1,-1 do local v=tList[i]; local o=v.object if not o or not o.Parent then if v.name then v.name:Remove() end; if v.dist then v.dist:Remove() end; if v.Address then tempObj[v.Address]=nil end; tList[i]=tList[#tList]; tList[#tList]=nil else local pos3=o.Position; local screenPos,onScreen=WorldToScreen(pos3) if onScreen then local studsDist=0 if rx then studsDist=math.sqrt((pos3.X-rx)^2+(pos3.Y-ry)^2+(pos3.Z-rz)^2) end local studs=math.floor(studsDist) local yOffset=0 if v.model and v.model.Name and espObj[v.model.Name] then yOffset=espObj[v.model.Name].offY or 0 end v.name.Position=Vector2.new(screenPos.X,screenPos.Y-12+yOffset); v.name.Visible=true v.dist.Position=Vector2.new(screenPos.X,screenPos.Y+2+yOffset); v.dist.Text=studs.." studs"; v.dist.Visible=true else v.name.Visible=false; v.dist.Visible=false end end end
@@ -175,8 +169,8 @@ spawn(function()
   timerText.Text=fmt(t)
   if t<=15 then timerText.Color=Color3.fromHex("#c44b4b") else timerText.Color=Color3.fromHex("#ffffff") end
   if StationPower and typeof(StationPower.Value)=="boolean" and not StationPower.Value then
-   ppmsText.Text="NO POWER"
-   ppmsText.Color=Color3.fromHex("#c44b4b")
+   ppmsText.Text="BLACKOUT"
+   ppmsText.Color=Color3.fromHex("#ffe7c7")
   else
    ppmsText.Text=string.format("%.2f",PPMS.Value)
    ppmsText.Color=Color3.fromHex("#ffffff")
@@ -216,5 +210,5 @@ end)
 spawn(function() while true do updObj(); task.wait(0.5) end end)
 
 print(("saint | version %s"):format(vs))
-print("last updated: 02/20/2026. star this so i can put changelogs on the thread :)")
+print("last updated 02/21. star this script so i can put changelogs there :)")
 print("F1 to toggle ESP, F2 to toggle HUD.")
