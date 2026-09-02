@@ -1,110 +1,396 @@
-local Players = game:GetService("Players") local ReplicatedStorage = game:GetService("ReplicatedStorage") local lp = Players.LocalPlayer local vs = "2.0 [05/17]" local workspace = workspace local Drawing = Drawing local WorldToScreen = WorldToScreen local ipairs = ipairs local pairs = pairs local task = task local toggle = { esp = true, hud = true } local keyHeld = { f1 = false, f2 = false, f3 = false, f4 = false } local FONT = Drawing.Fonts.UI local function newText(props) local ok, o = pcall(function() return Drawing.new("Text") end) if not ok or not o then return nil end for k, v in pairs(props or {}) do o[k] = v end return o end local function T(p) if not p then p = {} end p.Font = FONT p.Outline = true return newText(p) end local TimerValue = ReplicatedStorage:WaitForChild("Timer") local pwrValue = ReplicatedStorage:WaitForChild("PowerValues") local PPMS = pwrValue:WaitForChild("PPMS") local RadioChannel = ReplicatedStorage:WaitForChild("RadioChannel") local StationPower = ReplicatedStorage:WaitForChild("StationPower") 
-local pSM = {UsingSHDoor = "house_door_locked", UsingSHLight = "house_lights_on", UsingTowerLight = "tower_lights_on", UsingTowerRadar = "tower_radar_on"} local cam = workspace.CurrentCamera local function anc() local v = cam.ViewportSize return Vector2.new(v.X / 2, v.Y - 80), Vector2.new(70, v.Y - 240), Vector2.new(v.X - 200, v.Y - 100) end
+local version="3.0"
+local players=game:GetService("Players")
+local replicatedstorage=game:GetService("ReplicatedStorage")
+local workspace=game:GetService("Workspace")
+local lp=players.LocalPlayer
+local camera=workspace.CurrentCamera
+local font=Drawing.Fonts.UI
+local stud_to_meter=1/3.5714285714
+local world_scan_interval,hud_update_interval,status_update_interval=1,0.1,0.25
+local ring_fade_distance,ring_segments,crate_show_distance,max_tracked_objects=40,16,30,256
+local toggle={esp=true,hud=true}
+local keyheld={f1=false,f2=false,f3=false,f4=false}
 
-local timerText = T({ Center = true, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "0:00", Visible = true })
-local scrapText = T({ Center = true, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "0", Visible = true })
-local targetPlayerText = T({ Center = true, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "none", Visible = true })
-local timerLabel = T({ Center = true, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "timer", Visible = true })
-local scrapLabel = T({ Center = true, Size = 13, Color = Color3.fromHex("#fff89a"), Text = "scrap", Visible = true })
-local targetTitle = T({ Center = true, Size = 13, Color = Color3.fromHex("#ff9090"), Text = "target", Visible = true })
+local function clamp(value,minimum,maximum)return math.max(minimum,math.min(maximum,value))end
+local function wait_for_child(parent,name,timeout)
+    local started=tick()
+    local child=parent:FindFirstChild(name)
+    while not child do
+        if timeout and tick()-started>=timeout then return nil end
+        task.wait(0.1)
+        child=parent:FindFirstChild(name)
+    end
+    return child
+end
+local function wait_for_camera(timeout)
+    local started=tick()
+    local cam=workspace.CurrentCamera
+    while not cam do
+        if timeout and tick()-started>=timeout then return nil end
+        task.wait(0.1)
+        cam=workspace.CurrentCamera
+    end
+    return cam
+end
+if not camera then camera=wait_for_camera(15)end
+if not camera or not lp then return end
+local timer_value=wait_for_child(replicatedstorage,"Timer",15)
+local power_values=wait_for_child(replicatedstorage,"PowerValues",15)
+if not timer_value or not power_values then return end
 
-local pwrLabel = T({ Center = false, Size = 13, Color = Color3.fromHex("#ffe0b8"), Text = "power_activity", Visible = false })
-local powerLines = {} local pwrLH = 18 for k, v in pairs(pSM) do powerLines[k] = T({ Center = false, Size = 13, Color = Color3.fromHex("#ffffff"), Text = v, Visible = false }) end
-local radioTitle = T({ Center = false, Size = 13, Color = Color3.fromHex("#dbffde"), Text = "radio_channel", Visible = true }) local radLine = {} local LINE_H = 18 for i = 1, 7 do radLine[i] = { name = T({ Center = false, Size = 13, Color = Color3.fromHex("#b6b6b6"), Text = "", Visible = true }), msg = T({ Center = false, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "", Visible = true }) } end
-local rakeRoofTitle = T({ Center = true, Size = 13, Color = Color3.fromHex("#f5d3ff"), Text = "roof", Visible = false }) local rakeRoofValue = T({ Center = true, Size = 13, Color = Color3.fromHex("#ebebeb"), Text = "", Visible = false }) local rakeRoofModel, rakeRoofHealth, rakeRoofConn = nil, nil, nil
+local function new_text(text,color,centered,visible,outline)
+    local d=Drawing.new("Text")
+    d.Text=text or "";d.Color=color or Color3.fromHex("#ffffff");d.Center=centered==true;d.Visible=visible==true;d.Outline=outline~=false;d.Font=font
+    return d
+end
+local function new_square(color,transparency)
+    local d=Drawing.new("Square")
+    d.Color=color;d.Transparency=transparency;d.Filled=true;d.Visible=false;d.Position=Vector2.new(0,0);d.Size=Vector2.new(1,1)
+    return d
+end
+local function new_line(color)
+    local d=Drawing.new("Line")
+    d.Color=color;d.Transparency=1;d.Visible=false;d.From=Vector2.new(0,0);d.To=Vector2.new(0,0);d.Thickness=2
+    return d
+end
+local function remove_drawing(d)
+    if not d then return end
+    pcall(function()d.Visible=false;d:Remove()end)
+end
+local function hide_drawing(d)if d then d.Visible=false end end
+local function anchors()
+    local v=camera.ViewportSize
+    return Vector2.new(v.X/2,v.Y-80),Vector2.new(v.X-200,v.Y-100)
+end
 
-local hudObjects = { timerText, scrapText, targetPlayerText, timerLabel, scrapLabel, targetTitle, radioTitle } for i = 1, 7 do hudObjects[#hudObjects + 1] = radLine[i].name hudObjects[#hudObjects + 1] = radLine[i].msg end
+local timer_text=new_text("0:00",Color3.fromHex("#ffffff"),true,true)
+local scrap_text=new_text("0",Color3.fromHex("#ffffff"),true,true)
+local target_text=new_text("none",Color3.fromHex("#ffffff"),true,true)
+local timer_label=new_text("timer",Color3.fromHex("#ffffff"),true,true)
+local scrap_label=new_text("scrap",Color3.fromHex("#fff89a"),true,true)
+local target_label=new_text("target",Color3.fromHex("#ff9090"),true,true)
+local power_label=new_text("power_activity",Color3.fromHex("#ffe0b8"),false,false)
+local roof_label=new_text("roof",Color3.fromHex("#f5d3ff"),true,false)
+local roof_health_text=new_text("",Color3.fromHex("#ebebeb"),true,false)
+local power_entries={{valuename="UsingSHDoor",label="house_door_locked"},{valuename="UsingSHLight",label="house_lights_on"},{valuename="UsingTowerLight",label="tower_lights_on"},{valuename="UsingTowerRadar",label="tower_radar_on"}}
+local power_lines={}
+for i=1,#power_entries do power_lines[i]=new_text(power_entries[i].label,Color3.fromHex("#ffffff"),false,false)end
+local hud_objects={timer_text,scrap_text,target_text,timer_label,scrap_label,target_label}
 
-local function upPwrPos() local _, _, r = anc() pwrLabel.Position = r - Vector2.new(50, 0) local off = 0 for _, line in pairs(powerLines) do if line.Visible then off += 1 line.Position = pwrLabel.Position - Vector2.new(0, off * pwrLH) end end end
+local function update_power_positions()
+    local _,right=anchors()
+    local x,y,n=right.X-50,right.Y,0
+    power_label.Position=Vector2.new(x,y)
+    for i=1,#power_lines do
+        local line=power_lines[i]
+        if line.Visible then n=n+1;line.Position=Vector2.new(x,y-n*18)end
+    end
+end
+local function update_hud_positions()
+    local center=anchors()
+    local y=center.Y-150
+    timer_text.Position=Vector2.new(center.X-100,y)
+    target_text.Position=Vector2.new(center.X,y)
+    scrap_text.Position=Vector2.new(center.X+100,y)
+    timer_label.Position=Vector2.new(timer_text.Position.X,y+18)
+    target_label.Position=Vector2.new(target_text.Position.X,y+18)
+    scrap_label.Position=Vector2.new(scrap_text.Position.X,y+18)
+    update_power_positions()
+end
+update_hud_positions()
 
-local modLH = 18 local modList = { "Aitareis", "Mr68Moth", "ZZZXIIIXZZZ", "TZZV", "RlFLEM4N", "FelixVenue", "DeliverCreations", "z_papermoon", "r3shape", "ARRYvvv" } 
-local modLabel = T({ Center = false, Size = 13, Color = Color3.fromHex("#ff97f6"), Text = "staff_detected", Visible = false }) local modLines = {} for i = 1, #modList do modLines[i] = T({ Center = false, Size = 13, Color = Color3.fromHex("#ffffff"), Text = "", Visible = false }) end
+local crate_names={FirstAidKit="medkit",Vitamins="vitamin",UV_Lamp="uv_lamp",StunStick="stun",Vest="vest",Tracker="tracker"}
+local crate_colors={FirstAidKit=Color3.fromHex("#dbffde"),Vitamins=Color3.fromHex("#d1d3ff"),UV_Lamp=Color3.fromHex("#e694ff"),StunStick=Color3.fromHex("#ffed9d"),Vest=Color3.fromHex("#9fd4ff"),Tracker=Color3.fromHex("#cdceff")}
+local crate_text_color=Color3.fromHex("#ffffff")
+local crate_bg_color=Color3.fromHex("#000000")
+local crate_bg_transparency=0.3
+local crate_col_spacing,crate_row_spacing,crate_y_offset=55,16,70
+local crate_pad_x,crate_pad_y=28,10
+local crate_bg_width=crate_col_spacing*2+crate_pad_x*2
+local esp_config={
+    FlareGunPickUp={rootname="FlareGun",text="flare",color=Color3.fromHex("#ff6b6b"),ringradius=2.2,ringyoffset=1},
+    BaseCampMSG={directpart=true,text="base",color=Color3.fromHex("#ffffff"),noring=true},
+    SafehouseMSG={directpart=true,text="home",color=Color3.fromHex("#ffffff"),textyoffset=25,noring=true},
+    StationMSG={directpart=true,text="station",color=Color3.fromHex("#ffffff"),noring=true},
+    ShopMSG={directpart=true,text="shop",color=Color3.fromHex("#ffffff"),noring=true},
+    ObservationTowerMSG={directpart=true,text="tower",color=Color3.fromHex("#ffffff"),noring=true},
+    Scrap1={rootname="Scrap",text="scrap_1",color=Color3.fromHex("#a79266"),ringradius=2.2,ringyoffset=1},
+    Scrap2={rootname="Scrap",text="scrap_2",color=Color3.fromHex("#c9aa68"),ringradius=2.2,ringyoffset=1},
+    Scrap3={rootname="Scrap",text="scrap_3",color=Color3.fromHex("#dfb65d"),ringradius=2.2,ringyoffset=1},
+    Scrap4={rootname="Scrap",text="scrap_4",color=Color3.fromHex("#ecca30"),ringradius=2.2,ringyoffset=1},
+    Scrap5={rootname="Scrap",text="scrap_5",color=Color3.fromHex("#ffd000"),ringradius=2.2,ringyoffset=1},
+    RakeTrapModel={rootname="HitBox",text="trap",color=Color3.fromHex("#ffc6c6"),ringradius=2.2,ringyoffset=0},
+    Box={rootname="HitBox",text="supply",color=Color3.fromHex("#e4c3ff"),ringradius=6,ringyoffset=3.2,crate=true},
+    SupplyCrate={rootname="HitBox",text="supply",color=Color3.fromHex("#e4c3ff"),ringradius=6,ringyoffset=3.2,crate=true}
+}
+local tracked={}
+local tracked_by_address={}
 
-local function upStaffPos() local _, _, r = anc() modLabel.Position = r - Vector2.new(50, 120) local off = 0 for i = 1, #modLines do local line = modLines[i] if line.Visible then off = off + 1 line.Position = modLabel.Position - Vector2.new(0, off * modLH) end end end
+local function nearest_model(instance)
+    local current=instance
+    while current do if current:IsA("Model")then return current end;current=current.Parent end
+end
+local function find_descendant(parent,name)
+    if not parent then return nil end
+    local direct=parent:FindFirstChild(name)
+    if direct then return direct end
+    local descendants=parent:GetDescendants()
+    for i=1,#descendants do if descendants[i].Name==name then return descendants[i]end end
+end
+local function find_class(parent,classname)
+    if not parent then return nil end
+    local direct=parent:FindFirstChildWhichIsA(classname)
+    if direct then return direct end
+    local descendants=parent:GetDescendants()
+    for i=1,#descendants do if descendants[i]:IsA(classname)then return descendants[i]end end
+end
+local function scrap_config_name(modelname)
+    local n=tonumber(string.match(tostring(modelname),"^Scrap(%d+)"))
+    local name=n and "Scrap"..tostring(n) or nil
+    return name and esp_config[name] and name or nil
+end
+local function get_config(instance,model)
+    local config=esp_config[instance.Name]
+    if config and config.directpart and instance:IsA("BasePart")then return instance.Name,config end
+    if model then
+        config=esp_config[model.Name]
+        if config and not config.directpart then return model.Name,config end
+        local name=scrap_config_name(model.Name)
+        if name then return name,esp_config[name]end
+    end
+end
+local function resolve_part(instance,model,configname,config)
+    if config.directpart then return instance:IsA("BasePart")and instance or nil,model end
+    local recordmodel=model
+    if configname=="SupplyCrate" and recordmodel and not find_descendant(recordmodel,config.rootname)then
+        local box=recordmodel:FindFirstChild("Box")
+        if box and box:IsA("Model")then recordmodel=box end
+    end
+    local part=recordmodel and find_descendant(recordmodel,config.rootname)
+    return part and part:IsA("BasePart")and part or nil,recordmodel
+end
+local function find_items(model)
+    if not model then return nil end
+    local box=model
+    if box.Name~="Box" then local inner=box:FindFirstChild("Box");if inner and inner:IsA("Model")then box=inner end end
+    return box:FindFirstChild("Items_Folder")
+end
+local function ensure_labels(record)
+    if record.name and record.distance then return end
+    record.name=new_text(record.config.text,record.config.color,true,false)
+    record.distance=new_text("0m",Color3.fromHex("#c9c9c9"),true,false)
+end
+local function ensure_ring(record)
+    if record.config.noring or record.ring then return end
+    record.ring={}
+    for i=1,ring_segments do record.ring[i]=new_line(record.config.color)end
+end
+local function hide_ring(record)if record.ring then for i=1,#record.ring do hide_drawing(record.ring[i])end end end
+local function ensure_crate(record)
+    if not record.config.crate or record.items then return end
+    record.bg=new_square(crate_bg_color,crate_bg_transparency);record.items={}
+    for i=1,6 do record.items[i]=new_text("",crate_text_color,true,false,false)end
+end
+local function hide_record(record)
+    hide_drawing(record.name);hide_drawing(record.distance);hide_ring(record);hide_drawing(record.bg)
+    if record.items then for i=1,#record.items do hide_drawing(record.items[i])end end
+end
+local function remove_record(record)
+    remove_drawing(record.name);remove_drawing(record.distance)
+    if record.ring then for i=1,#record.ring do remove_drawing(record.ring[i])end end
+    remove_drawing(record.bg)
+    if record.items then for i=1,#record.items do remove_drawing(record.items[i])end end
+end
+local function add_object(instance)
+    if not instance or #tracked>=max_tracked_objects then return end
+    local model=nearest_model(instance)
+    local configname,config=get_config(instance,model)
+    if not config then return end
+    local part,recordmodel=resolve_part(instance,model,configname,config)
+    if not part then return end
+    local source=recordmodel or part
+    local address=source.Address
+    if not address or tracked_by_address[address]then return end
+    local record={address=address,object=part,model=recordmodel or part.Parent,configname=configname,config=config,folder=config.crate and find_items(recordmodel)or nil}
+    tracked_by_address[address]=record;tracked[#tracked+1]=record
+end
+local function remove_tracked(i)
+    local record=tracked[i]
+    if not record then return end
+    remove_record(record);tracked_by_address[record.address]=nil;tracked[i]=tracked[#tracked];tracked[#tracked]=nil
+end
 
-local function updHudPos() local c, l = anc() local spacing = 100 timerText.Position = c + Vector2.new(-8.7 * spacing, -200) targetPlayerText.Position = c + Vector2.new(-7.7 * spacing, -200) 
-scrapText.Position = c + Vector2.new(-6.7 * spacing, -200) timerLabel.Position = timerText.Position + Vector2.new(0, 18) scrapLabel.Position = scrapText.Position + Vector2.new(0, 18) 
-targetTitle.Position = targetPlayerText.Position + Vector2.new(0, 18) radioTitle.Position = l + Vector2.new(-1, 138) 
-for i = 1, 7 do local y = l.Y + (i - 1) * LINE_H radLine[i].name.Position = Vector2.new(l.X, y + 12) radLine[i].msg.Position = Vector2.new(l.X + 70, y + 12)
-end upPwrPos() upStaffPos() end updHudPos() upPwrPos() upStaffPos()
+local function scan_world()
+    local filter=workspace:FindFirstChild("Filter")
+    if filter then
+        local spawns=filter:FindFirstChild("ScrapSpawns")
+        if spawns then
+            local spawnchildren=spawns:GetChildren()
+            for i=1,#spawnchildren do
+                local spawnpoint=spawnchildren[i]
+                if string.match(spawnpoint.Name,"ItemSpawn")then local children=spawnpoint:GetChildren();for j=1,#children do add_object(children[j])end end
+            end
+        end
+        local points=filter:FindFirstChild("LocationPoints")
+        if points then local children=points:GetChildren();for i=1,#children do add_object(children[i])end end
+    end
+    local children=workspace:GetChildren()
+    for i=1,#children do if children[i].Name=="FlareGunPickUp"then add_object(children[i])end end
+    local debris=workspace:FindFirstChild("Debris")
+    if debris then
+        local traps=debris:FindFirstChild("Traps")
+        if traps then local c=traps:GetChildren();for i=1,#c do add_object(c[i])end end
+        local crates=debris:FindFirstChild("SupplyCrates")
+        if crates then local c=crates:GetChildren();for i=1,#c do add_object(c[i])end end
+    end
+end
+local function viewer_position()
+    local character=lp.Character
+    local root=character and character:FindFirstChild("HumanoidRootPart")
+    return root and root:IsA("BasePart")and root.Position or camera.Position
+end
+local function distance_meters(a,b)
+    local x,y,z=b.X-a.X,b.Y-a.Y,b.Z-a.Z
+    return math.sqrt(x*x+y*y+z*z)*stud_to_meter
+end
+local function update_crate(record,screen,meters,yoffset)
+    if not record.config.crate then return end
+    if not record.folder then record.folder=find_items(record.model)end
+    if meters>crate_show_distance or not record.folder then
+        hide_drawing(record.bg);if record.items then for i=1,#record.items do hide_drawing(record.items[i])end end;return
+    end
+    ensure_crate(record)
+    local children=record.folder:GetChildren()
+    local visible=math.min(#children,#record.items)
+    for i=1,#record.items do
+        local d,child=record.items[i],children[i]
+        if child then
+            local n=i-1;local row=math.floor(n/3);local col=n%3
+            d.Text=crate_names[child.Name]or child.Name;d.Color=crate_colors[child.Name]or crate_text_color
+            d.Position=Vector2.new(screen.X+(col-1)*crate_col_spacing,screen.Y-12+yoffset+row*crate_row_spacing+crate_y_offset);d.Visible=true
+        else d.Visible=false end
+    end
+    if visible>0 then
+        local rows=math.max(1,math.ceil(visible/3));local firsty=screen.Y-12+yoffset+crate_y_offset;local miny=firsty-8-crate_pad_y
+        record.bg.Size=Vector2.new(crate_bg_width,(rows-1)*crate_row_spacing+16+crate_pad_y*2);record.bg.Position=Vector2.new(screen.X-crate_bg_width/2,miny);record.bg.Visible=true
+    else record.bg.Visible=false end
+end
+local function update_ring(record,world,meters)
+    if record.config.noring then return end
+    if meters>=ring_fade_distance then hide_ring(record);return end
+    ensure_ring(record)
+    local y=world.Y-(record.config.ringyoffset or 0);local radius=record.config.ringradius or 2;local alpha=clamp(1-meters/ring_fade_distance,0,1);local step=2*math.pi/ring_segments
+    for i=1,ring_segments do
+        local a=(i-1)*step;local b=i*step
+        local sa,ona=WorldToScreen(Vector3.new(world.X+math.cos(a)*radius,y,world.Z+math.sin(a)*radius))
+        local sb,onb=WorldToScreen(Vector3.new(world.X+math.cos(b)*radius,y,world.Z+math.sin(b)*radius))
+        local line=record.ring[i]
+        if toggle.esp and ona and onb then line.From=sa;line.To=sb;line.Color=record.config.color;line.Transparency=alpha;line.Visible=true else line.Visible=false end
+    end
+end
+local function render_record(record,viewer)
+    local object=record.object
+    if not object or not object.Parent then return false end
+    local world=object.Position
+    local screen,on=WorldToScreen(world)
+    if not on then hide_record(record);return true end
+    local meters=distance_meters(viewer,world);local yoffset=record.config.textyoffset or 0
+    ensure_labels(record)
+    record.name.Position=Vector2.new(screen.X,screen.Y-12+yoffset);record.name.Visible=toggle.esp
+    record.distance.Position=Vector2.new(screen.X,screen.Y+0.7+yoffset);record.distance.Text=tostring(math.floor(meters)).."m";record.distance.Visible=toggle.esp
+    update_crate(record,screen,meters,yoffset);update_ring(record,world,meters)
+    return true
+end
 
-local tList = {} local tempObj = {}
+local rake_target=nil
+local rake_roof=nil
+local rake_health=nil
+local function refresh_rake()
+    local rake=workspace:FindFirstChild("Rake")
+    rake_target=rake and rake:FindFirstChild("TargetVal")or nil
+    local map=workspace:FindFirstChild("Map");local safehouse=map and map:FindFirstChild("SafeHouse");local rakebreak=safehouse and find_descendant(safehouse,"RakeBreak");local breakmodel=rakebreak and find_descendant(rakebreak,"BreakModel");local health=breakmodel and find_descendant(breakmodel,"Health")
+    if breakmodel and health and health:IsA("IntValue")then rake_roof=breakmodel;rake_health=health;roof_health_text.Text=tostring(health.Value).."/30" else rake_roof=nil;rake_health=nil end
+end
+local function character_from_part(part)
+    local current=part
+    while current do if current:FindFirstChild("Humanoid")then return current end;current=current.Parent end
+end
+local function update_roof()
+    if not toggle.esp or not rake_roof or not rake_health then roof_label.Visible=false;roof_health_text.Visible=false;return end
+    local part=find_class(rake_roof,"BasePart")
+    if not part then roof_label.Visible=false;roof_health_text.Visible=false;return end
+    local screen,on=WorldToScreen(part.Position)
+    if not on then roof_label.Visible=false;roof_health_text.Visible=false;return end
+    roof_health_text.Text=tostring(rake_health.Value).."/30";roof_label.Position=Vector2.new(screen.X,screen.Y-15);roof_health_text.Position=Vector2.new(screen.X,screen.Y-3);roof_label.Visible=true;roof_health_text.Visible=true
+end
+local function update_power()
+    local any=false
+    for i=1,#power_entries do
+        local entry=power_entries[i];local value=power_values:FindFirstChild(entry.valuename);local active=value and value.Value==true
+        power_lines[i].Visible=toggle.hud and active or false;if power_lines[i].Visible then any=true end
+    end
+    power_label.Visible=toggle.hud and any;update_power_positions()
+end
+local function update_target()
+    local target=rake_target and rake_target.Value or nil
+    if target and typeof(target)=="Instance"and target:IsA("BasePart")then local character=character_from_part(target);target_text.Text=character and character.Name or "unknown" else target_text.Text="none" end
+end
+local function update_scrap()
+    local backpack=lp:FindFirstChild("Backpack")or lp:FindFirstChild("backpack");local folder=backpack and backpack:FindFirstChild("ScrapFolder");local points=folder and folder:FindFirstChild("Points")
+    scrap_text.Text=points and points:IsA("IntValue")and tostring(points.Value)or"0"
+end
+local function update_timer()
+    local timer=math.max(0,math.floor(tonumber(timer_value.Value)or 0));timer_text.Text=string.format("%d:%02d",math.floor(timer/60),timer%60);timer_text.Color=timer<=15 and Color3.fromHex("#fc8f8f")or Color3.fromHex("#ffffff")
+end
+local function update_hud_visibility()
+    for i=1,#hud_objects do hud_objects[i].Visible=toggle.hud end
+    update_power()
+end
+local function teleport_scrap()
+    local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart")
+    if not root or not root:IsA("BasePart")then return end
+    for i=1,#tracked do local record=tracked[i];if record.configname and string.match(record.configname,"^Scrap%d+$")then local destination=record.model and find_class(record.model,"BasePart");if destination then root.Position=destination.Position;return end end end
+end
+local function teleport_flare()
+    local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart")
+    if not root or not root:IsA("BasePart")then return end
+    for i=1,#tracked do local record=tracked[i];if record.configname=="FlareGunPickUp"then root.Position=record.object.Position;return end end
+end
+local function update_keys()
+    local f1,f2,f3,f4=iskeypressed(0x70),iskeypressed(0x71),iskeypressed(0x72),iskeypressed(0x73)
+    if f1 and not keyheld.f1 then toggle.esp=not toggle.esp;if not toggle.esp then for i=1,#tracked do hide_record(tracked[i])end;roof_label.Visible=false;roof_health_text.Visible=false end end
+    if f2 and not keyheld.f2 then toggle.hud=not toggle.hud;update_hud_visibility()end
+    if f3 and not keyheld.f3 then teleport_scrap()end
+    if f4 and not keyheld.f4 then teleport_flare()end
+    keyheld.f1,keyheld.f2,keyheld.f3,keyheld.f4=f1,f2,f3,f4
+end
+local function render_esp()
+    update_keys()
+    if not toggle.esp then return end
+    local viewer=viewer_position();local i=#tracked
+    while i>=1 do local record=tracked[i];local ok,alive=pcall(function()return render_record(record,viewer)end);if not ok or not alive then remove_tracked(i)end;i=i-1 end
+    update_roof()
+end
 
-local crateColSpacing,crateRowSpacing = 55,16 local crateItemsYOffset = 70 local crateItemColor = Color3.fromHex("#ffffff") local crateBgColor = Color3.fromHex("#000000") local crateBgOpacity = 0.3 local crateBgPadX = 28 local crateBgPadY = 10 local crateBgStaticWidth = (crateColSpacing * 2) + (crateBgPadX * 2) local crateShowDistance = 30 
-local crateItemDisplayNames = { FirstAidKit="medkit", Vitamins="vitamin", UV_Lamp="uv_lamp", StunStick="stun", Vest="vest", Tracker="tracker" } 
-local crateItemColors = { FirstAidKit=Color3.fromHex("#dbffde"),Vitamins=Color3.fromHex("#d1d3ffff"),UV_Lamp=Color3.fromHex("#e694ff"), StunStick=Color3.fromHex("#ffed9d"),Vest=Color3.fromHex("#9fd4ff"),Tracker=Color3.fromHex("#cdceff"),}
-
-local function newBg() local ok,b=pcall(function() return Drawing.new("Square") end) if not ok or not b then return nil end b.Filled=true; b.Transparency=crateBgOpacity; b.Color=crateBgColor; b.Visible=false; return b end
-
-local espObj = { FlareGunPickUp={Type="Model",Root="FlareGun",Text="flare",Color=Color3.fromHex("#ff6b6b"),ExactName=true}, BaseCampMSG={Type="BasePart",Text="base",Color=Color3.fromHex("#ffffff")}, 
-SafehouseMSG={Type="BasePart",Text="home",Color=Color3.fromHex("#ffffff"),offY=25}, StationMSG={Type="BasePart",Text="station",Color=Color3.fromHex("#ffffff")}, 
-ShopMSG={Type="BasePart",Text="shop",Color=Color3.fromHex("#ffffff")}, ObservationTowerMSG={Type="BasePart",Text="tower",Color=Color3.fromHex("#ffffff")}, 
-Scrap1={Type="Model",Root="Scrap",Text="scrap_1",Color=Color3.fromHex("#a79266")}, Scrap2={Type="Model",Root="Scrap",Text="scrap_2",Color=Color3.fromHex("#c9aa68")}, 
-Scrap3={Type="Model",Root="Scrap",Text="scrap_3",Color=Color3.fromHex("#dfb65d")}, Scrap4={Type="Model",Root="Scrap",Text="scrap_4",Color=Color3.fromHex("#ecca30")}, 
-Scrap5={Type="Model",Root="Scrap",Text="scrap_5",Color=Color3.fromHex("#ffd000")}, RakeTrapModel={Type="Model",Root="HitBox",Text="trap",Color=Color3.fromHex("#ffc6c6")}, 
-Box={Type="Model",Root="HitBox",Text="supply",Color=Color3.fromHex("#e4c3ff")}, SupplyCrate={Type="Model",Root="HitBox",Text="supply",Color=Color3.fromHex("#e4c3ff")} }
-
-local function fmt(s) s = math.max(0, math.floor(s)) return ("%d:%02d"):format(math.floor(s / 60), s % 60) end
-local function getModelFromInstance(i) if not i then return nil end if i:IsA("Model") then return i end if i:IsA("BasePart") and i.Parent and i.Parent:IsA("Model") then return i.Parent end return nil end
-local function safeAddress(i) if not i then return nil end if i.Address then return i.Address end return tostring(i) end
-local studConv = 1 / 3.5714285714
-
-local function updatePowerLinesVisibility() local anyVisible = false for bn, l in pairs(powerLines) do local vv = pwrValue:FindFirstChild(bn) l.Visible = toggle.hud and vv and vv.Value or false if l.Visible then anyVisible = true end end pwrLabel.Visible = toggle.hud and anyVisible upPwrPos() end
-
-local radQuality = 100 local scrapRadius = 2.2 local scrapRadOff = 1 local boxRadius = 6 local circleRadiusWorld = { Scrap1 = scrapRadius, Scrap2 = scrapRadius, Scrap3 = scrapRadius, Scrap4 = scrapRadius, Scrap5 = scrapRadius, FlareGunPickUp = scrapRadius, Box = boxRadius, SupplyCrate = boxRadius, RakeTrapModel = scrapRadius } local circleYOffset = { Scrap1 = scrapRadOff, Scrap2 = scrapRadOff, Scrap3 = scrapRadOff, Scrap4 = scrapRadOff, Scrap5 = scrapRadOff, FlareGunPickUp = scrapRadOff, Box = 3.2, SupplyCrate = 3.2, RakeTrapModel = 0 } local MSG_ENTRIES = { BaseCampMSG = true, SafehouseMSG = true, StationMSG = true, ShopMSG = true, ObservationTowerMSG = true } local fadeDistance = 40
-
-local function newLineSegment() local ok,l=pcall(function() return Drawing.new("Line") end) if not ok or not l then return nil end l.Visible=false; l.From=Vector2.new(0,0); l.To=Vector2.new(0,0); l.Thickness=2; return l end
-local function createFallbackRingSegments(n) local segs={} for i=1,n do local l=newLineSegment() if l then segs[#segs+1]=l end end return segs end
-local function removeCircleData(cd) if not cd then return end if cd.segs then for _,s in ipairs(cd.segs) do pcall(function() if s then s.Visible=false; s:Remove() end end) end cd.segs=nil end end
-local function hideCircleData(cd) if not cd then return end if cd.segs then for _,s in ipairs(cd.segs) do pcall(function() if s then s.Visible=false end end) end end end
-local function ensureCircleSegments(cd) if not cd then return end if cd.isMsg then return end if cd.segs==nil then cd.segs=createFallbackRingSegments(100) end end
-local function getViewerPos() local ch=lp and lp.Character; local hrp=ch and ch:FindFirstChild("HumanoidRootPart"); if hrp and hrp.Position then return hrp.Position end local ok,pos=pcall(function() return cam and cam.CFrame and cam.CFrame.Position end) if ok and pos then return pos end return Vector3.new(0,0,0) end
-
-local function addObj(v) if not v then return end local model=getModelFromInstance(v); local addr=(model and safeAddress(model)) or safeAddress(v) if addr and tempObj[addr] then return end local entry,object,modelRec,entryName = nil,nil,model,nil if model and espObj[model.Name] then local e = espObj[model.Name]; if not e.ExactName or model.Name=="FlareGunPickUp" then entry=e; entryName=model.Name end end if not entry and model then local scrapIdx=tostring(model.Name):match("^Scrap(%d+)") if scrapIdx then local key="Scrap"..tostring(tonumber(scrapIdx)) if espObj[key] then entry=espObj[key]; entryName=key end end end if not entry then for name,e in pairs(espObj) do if e.Root then local src = model or (v.Parent and v.Parent:IsA("Model") and v.Parent) if src then local f = src:FindFirstChild(e.Root, true) if f and f:IsA("BasePart") then entry=e; object=f; modelRec=src; entryName=name; break end end end end end if not entry then return end if model and model.Name=="SupplyCrate" and not model:FindFirstChild(entry.Root, true) then local inner=model:FindFirstChild("Box") if inner and inner:IsA("Model") then modelRec=inner end end object = object or (entry.Type=="BasePart" and v:IsA("BasePart") and v) or (modelRec and modelRec:FindFirstChild(entry.Root, true)) if not object then return end local recAddr = safeAddress(modelRec or object) if not recAddr then return end if tempObj[recAddr] then for _, existing in ipairs(tList) do if existing.Address == recAddr then if not existing.itemsFolder then
-local boxModel = modelRec if boxModel and boxModel.Name ~= "Box" then boxModel = boxModel:FindFirstChild("Box") end local itemsFolderNew = boxModel and boxModel:FindFirstChild("Items_Folder") if itemsFolderNew then existing.itemsFolder = itemsFolderNew existing.itemBG = existing.itemBG or newBg() existing.itemTexts = existing.itemTexts or {} local children = itemsFolderNew:GetChildren() for i = 1, #children do
-if not existing.itemTexts[i] then existing.itemTexts[i] = newText{Text = crateItemDisplayNames[children[i].Name] or children[i].Name, Color = crateItemColor, Outline=false, Center=true, Size=13, Font=FONT, Visible=false} end end for i = #children + 1, 6 do if not existing.itemTexts[i] then existing.itemTexts[i] = newText{Text = "", Color = crateItemColor, Outline=false, Center=true, Size=13, Font=FONT, Visible=false} end end end end break end end return end local off = entry.offY or 0
-local name = newText{Text=entry.Text,Color=entry.Color,Outline=true,Center=true,Size=13,Font=FONT,Visible=false} local dist = newText{Text="0m",Color=Color3.fromHex("#c9c9c9"),Outline=true,Center=true,Size=13,Font=FONT,Visible=false}
-
-local itemBG, itemTexts, itemsFolder = nil, nil, nil if entryName=="Box" or entryName=="SupplyCrate" or (modelRec and modelRec.Name=="Box") then local boxModel=modelRec if boxModel and boxModel.Name~="Box" then boxModel=boxModel:FindFirstChild("Box") end if boxModel then itemsFolder = boxModel:FindFirstChild("Items_Folder") if itemsFolder then itemBG = newBg() itemTexts = {} local children = itemsFolder:GetChildren() for i=1,#children do local child=children[i]; itemTexts[#itemTexts+1] = newText{Text = crateItemDisplayNames[child.Name] or child.Name, Color = crateItemColor, Outline=true, Center=true, Size=13, Font=FONT, Visible=false} end for i=#children+1,6 do itemTexts[#itemTexts+1]= newText{Text="",Color=crateItemColor,Outline=true,Center=true,Size=13,Font=FONT,Visible=false} end end end end
-
-tempObj[recAddr]=true tList[#tList+1] = { object=object, model = modelRec or object.Parent, name = name, dist = dist, Address = recAddr, offY = off, itemTexts = itemTexts, itemBG = itemBG, itemsFolder = itemsFolder } local worldRadius = 1.8 if entryName and circleRadiusWorld and circleRadiusWorld[entryName] then worldRadius = circleRadiusWorld[entryName] end local yoff = 1.0 if entryName and circleYOffset and circleYOffset[entryName] then yoff = circleYOffset[entryName] end local isMsg = entryName and MSG_ENTRIES and MSG_ENTRIES[entryName] local segs = (not isMsg) and createFallbackRingSegments(radQuality) or nil tList[#tList].circleData = {segs = segs, worldRadius = worldRadius, color = entry.Color or Color3.fromHex("#ffffff"), yOffset = yoff, isMsg = isMsg} end
-
-local function updObj() local f = workspace:FindFirstChild("Filter") if f then local s = f:FindFirstChild("ScrapSpawns") if s then for _, sp in pairs(s:GetChildren()) do if sp.Name:match("ItemSpawn") then for _, v in pairs(sp:GetChildren()) do addObj(v) end end end end local l = f:FindFirstChild("LocationPoints") if l then for _, p in pairs(l:GetChildren()) do addObj(p) end end end for _, v in pairs(workspace:GetChildren()) do if v.Name == "FlareGunPickUp" then addObj(v) end end local d = workspace:FindFirstChild("Debris") if d then local t = d:FindFirstChild("Traps") if t then for _, v in pairs(t:GetChildren()) do addObj(v) end end local c = d:FindFirstChild("SupplyCrates") if c then for _, v in pairs(c:GetChildren()) do addObj(v) end end end end
-
-local function updPos() if not toggle.esp then for _, v in ipairs(tList) do if v.name then v.name.Visible = false end if v.dist then v.dist.Visible = false end if v.circleData and v.circleData.segs then for _, s in ipairs(v.circleData.segs) do if s then s.Visible = false end end end if v.itemTexts then for _, it in ipairs(v.itemTexts) do if it then it.Visible = false end end end if v.itemBG then v.itemBG.Visible = false end end rakeRoofTitle.Visible = false rakeRoofValue.Visible = false return end
-
-local viewerPos = getViewerPos() for i = #tList, 1, -1 do local v = tList[i] local o = v.object if not o or not o.Parent then if v.name then v.name:Remove() end if v.dist then v.dist:Remove() end removeCircleData(v.circleData) if v.itemTexts then for _, it in ipairs(v.itemTexts) do if it then it:Remove() end end end if v.itemBG then pcall(function() v.itemBG.Visible = false; v.itemBG:Remove() end) end tempObj[v.Address] = nil tList[i] = tList[#tList] tList[#tList] = nil else local p = o.Position local s, on = WorldToScreen(p) if on then local studs = 0 if viewerPos then studs = math.sqrt((p.X - viewerPos.X) ^ 2 + (p.Y - viewerPos.Y) ^ 2 + (p.Z - viewerPos.Z) ^ 2) end local meters = studs * studConv local y = v.offY or 0 if v.name then v.name.Position = Vector2.new(s.X, s.Y - 12 + y); v.name.Visible = true end if v.dist then v.dist.Position = Vector2.new(s.X, s.Y + 0.7 + y); v.dist.Text = tostring(math.floor(meters)) .. "m"; v.dist.Visible = true end if v.itemTexts and v.itemsFolder then local children = v.itemsFolder:GetChildren() local anyVisible = false for idx = 1, #v.itemTexts do local it = v.itemTexts[idx] local child = children[idx] local i0 = idx - 1 local row = math.floor(i0 / 3) local col = i0 % 3 local xOffset = (col - 1) * crateColSpacing local yOffset = row * crateRowSpacing local textPos = Vector2.new(s.X + xOffset, s.Y - 12 + y + yOffset + crateItemsYOffset) if child and meters <= crateShowDistance and toggle.esp then it.Text = crateItemDisplayNames[child.Name] or child.Name it.Position = textPos it.Color = crateItemColors[child.Name] or crateItemColor it.Visible = true anyVisible = true else it.Visible = false end end if v.itemBG then if anyVisible then local minY = math.huge local maxY = -math.huge for _, it in ipairs(v.itemTexts) do if it and it.Visible then local pos = it.Position local bounds = it.TextBounds minY = math.min(minY, pos.Y - bounds.Y / 2) maxY = math.max(maxY, pos.Y + bounds.Y / 2) end end minY -= crateBgPadY maxY += crateBgPadY local bgH = maxY - minY v.itemBG.Size = Vector2.new(crateBgStaticWidth, bgH) v.itemBG.Position = Vector2.new( s.X - crateBgStaticWidth / 2, minY) v.itemBG.Visible = true else v.itemBG.Visible = false end end end
-
-local cd = v.circleData if cd and cd.segs then local segCount = #cd.segs local alpha = math.clamp(1 - (meters / fadeDistance), 0, 1) if alpha <= 0 then for j = 1, segCount do local seg = cd.segs[j] if seg then seg.Visible = false end end else local centerWorld = p - Vector3.new(0, cd.yOffset or 1.0, 0) for j = 1, segCount do local a1 = (j - 1) * (2 * math.pi / segCount) local a2 = (j) * (2 * math.pi / segCount) local w1 = centerWorld + Vector3.new(math.cos(a1) * cd.worldRadius, 0, math.sin(a1) * cd.worldRadius) local w2 = centerWorld + Vector3.new(math.cos(a2) * cd.worldRadius, 0, math.sin(a2) * cd.worldRadius) local sp1, on1 = WorldToScreen(w1) local sp2, on2 = WorldToScreen(w2) local seg = cd.segs[j] if on1 and on2 and toggle.esp then seg.From = sp1 seg.To = sp2 seg.Color = cd.color pcall(function() seg.Transparency = alpha end) local dx = sp2.X - sp1.X local dy = sp2.Y - sp1.Y local lens = math.max(1, math.floor((dx * dx + dy * dy) ^ 0.5 / 18)) seg.Thickness = math.clamp(lens, 2, 4) seg.Visible = true else if seg then seg.Visible = false end end end end end else if v.name then v.name.Visible = false end if v.dist then v.dist.Visible = false end if v.itemTexts then for _, it in ipairs(v.itemTexts) do if it then it.Visible = false end end end if v.itemBG then v.itemBG.Visible = false end if v.circleData and v.circleData.segs then for _, s in ipairs(v.circleData.segs) do if s then s.Visible = false end end end end end end
-
-if rakeRoofModel and rakeRoofHealth then local part = rakeRoofModel:FindFirstChildWhichIsA("BasePart", true) if part then local s, on = WorldToScreen(part.Position) if on then rakeRoofTitle.Position = Vector2.new(s.X, s.Y - 15) rakeRoofValue.Position = Vector2.new(s.X, s.Y - 3) rakeRoofTitle.Visible = toggle.esp rakeRoofValue.Visible = toggle.esp else rakeRoofTitle.Visible = false rakeRoofValue.Visible = false end else rakeRoofTitle.Visible = false rakeRoofValue.Visible = false end else rakeRoofTitle.Visible = false rakeRoofValue.Visible = false end end
-
-local function getCharacterFromPart(p) while p do if p:FindFirstChild("Humanoid") then return p end p = p.Parent end return nil end
-
-local RakeModel, TargetVal = nil, nil spawn(function() while true do local r = workspace:FindFirstChild("Rake", true) if r ~= RakeModel then RakeModel = r TargetVal = r and r:FindFirstChild("TargetVal") or nil elseif r then local tv = r:FindFirstChild("TargetVal") if tv ~= TargetVal then TargetVal = tv end end task.wait(0.5) end end)
-
-local playerChildConn, backpackChildConn = nil, nil local currentPoints, currentConn = nil, nil local function disconnectCurrent() if currentConn then pcall(function() currentConn:Disconnect() end) currentConn = nil end if backpackChildConn then pcall(function() backpackChildConn:Disconnect() end) backpackChildConn = nil end if playerChildConn then pcall(function() playerChildConn:Disconnect() end) playerChildConn = nil end end
-
-local function tryHookPoints() if not lp then return end local bp = lp:FindFirstChild("Backpack") or lp:FindFirstChild("backpack") if bp then local sf = bp:FindFirstChild("ScrapFolder") local pts = sf and sf:FindFirstChild("Points") if pts and pts:IsA("IntValue") then if pts ~= currentPoints then disconnectCurrent() currentPoints = pts scrapText.Text = tostring(pts.Value) local ok, conn = pcall(function() return pts:GetPropertyChangedSignal("Value"):Connect(function() scrapText.Text = tostring(pts.Value) end) end) if ok and conn then currentConn = conn end end else if not backpackChildConn then local ok, conn = pcall(function() return bp.ChildAdded:Connect(function(child) if child.Name == "ScrapFolder" then task.wait(0.02); tryHookPoints() end end) end) if ok and conn then backpackChildConn = conn end end end else if not playerChildConn then local ok, conn = pcall(function() return lp.ChildAdded:Connect(function(child) if child.Name == "Backpack" or child.Name == "backpack" then task.wait(0.02); tryHookPoints() end end) end) if ok and conn then playerChildConn = conn end end end end
-
-local function findChildRecursive(parent, name) for _, v in ipairs(parent:GetChildren()) do if v.Name == name then return v end local f = findChildRecursive(v, name) if f then return f end end return nil end
-
-local function deleteFallDamage() local evt = findChildRecursive(ReplicatedStorage, "FD_Event") if evt then pcall(function() evt:Destroy() end) end end deleteFallDamage()
-
-local function tryHookRakeBreak() local map = workspace:FindFirstChild("Map") local safehouse = map and map:FindFirstChild("SafeHouse") local rakeBreak = safehouse and safehouse:FindFirstChild("RakeBreak", true) local breakModel = rakeBreak and rakeBreak:FindFirstChild("BreakModel", true) local health = breakModel and breakModel:FindFirstChild("Health", true) if breakModel and health and health:IsA("IntValue") then if health ~= rakeRoofHealth then if rakeRoofConn then pcall(function() rakeRoofConn:Disconnect() end) rakeRoofConn = nil end rakeRoofModel = breakModel rakeRoofHealth = health rakeRoofValue.Text = tostring(health.Value) .. "/30" local ok, conn = pcall(function() return health:GetPropertyChangedSignal("Value"):Connect(function() rakeRoofValue.Text = tostring(health.Value) .. "/30" end) end) if ok and conn then rakeRoofConn = conn end end else if rakeRoofConn then pcall(function() rakeRoofConn:Disconnect() end) rakeRoofConn = nil end rakeRoofModel = nil rakeRoofHealth = nil end end
-
-local function teleportToScrap() local char = lp and lp.Character if not char then return end local hrp = char:FindFirstChild("HumanoidRootPart") if not hrp then return end for _, v in ipairs(tList) do if v.model and v.model.Name:match("^Scrap%d+") then local root = v.model:FindFirstChildWhichIsA("UnionOperation", true) or v.model:FindFirstChildWhichIsA("BasePart", true) if root then hrp.Position = root.Position; return end end end end
-
-local function teleportToFlare() local char = lp and lp.Character if not char then return end local hrp = char:FindFirstChild("HumanoidRootPart") if not hrp then return end for _, v in ipairs(tList) do if v.model and v.model.Name == "FlareGunPickUp" then local root = v.object and v.object:IsA("BasePart") and v.object or v.model:FindFirstChildWhichIsA("BasePart", true) if root then hrp.Position = root.Position; return end end end end
-
-spawn(function() while true do tryHookPoints() tryHookRakeBreak() task.wait(0.1) end end)
-
-spawn(function() local last = cam.ViewportSize while true do if cam.ViewportSize ~= last then last = cam.ViewportSize updHudPos() end local t = TimerValue.Value timerText.Text = fmt(t) timerText.Color = t <= 15 and Color3.fromHex("#fc8f8f") or Color3.fromHex("#ffffff") timerLabel.Position = timerText.Position + Vector2.new(0, 18) task.wait(0.1) end end)
-
-spawn(function() while true do for i = 1, 7 do local f = RadioChannel:FindFirstChild("Line" .. i) local n, m = "", "" if f then local nv = f:FindFirstChild("Name") local mg = f:FindFirstChild("Msg") if nv and nv.Value ~= nil then local s = tostring(nv.Value) n = (#s > 10 and s:sub(1, 10) or s) end if mg and mg.Value ~= nil then local s = tostring(mg.Value) m = (#s > 70 and s:sub(1, 70) .. "..." or s) end end radLine[i].name.Text = n radLine[i].msg.Text = m radLine[i].name.Visible = toggle.hud radLine[i].msg.Visible = toggle.hud end updatePowerLinesVisibility() local count = 0 for i, entry in ipairs(modList) do local p = Players:FindFirstChild(entry) if p then count = count + 1 modLines[i].Text = p.Name modLines[i].Visible = toggle.hud else modLines[i].Visible = false end end modLabel.Visible = toggle.hud and count > 0 upStaffPos() local h = TargetVal and TargetVal.Value if h and h:IsA("Part") then local c = getCharacterFromPart(h) targetPlayerText.Text = c and c.Name or "unknown" else targetPlayerText.Text = "none" end scrapText.Visible = toggle.hud scrapLabel.Visible = toggle.hud task.wait(0.5) end end)
-
-spawn(function() while true do updObj() task.wait(0.5) end end)
-
-spawn(function() while true do updPos() if iskeypressed(0x70) then if not keyHeld.f1 then keyHeld.f1 = true toggle.esp = not toggle.esp if not toggle.esp then for _, v in ipairs(tList) do if v.name then v.name.Visible = false end if v.dist then v.dist.Visible = false end if v.circleData then hideCircleData(v.circleData) end if v.itemTexts then for _, it in ipairs(v.itemTexts) do if it then it.Visible = false end end end if v.itemBG then v.itemBG.Visible = false end end else for _, v in ipairs(tList) do if v.name then v.name.Visible = true end if v.dist then v.dist.Visible = true end if v.circleData then ensureCircleSegments(v.circleData) end end end end else keyHeld.f1 = false end if iskeypressed(0x71) then if not keyHeld.f2 then keyHeld.f2 = true toggle.hud = not toggle.hud for _, o in ipairs(hudObjects) do if o then o.Visible = toggle.hud end end updatePowerLinesVisibility() end else keyHeld.f2 = false end if iskeypressed(0x72) then if not keyHeld.f3 then keyHeld.f3 = true; teleportToScrap() end else keyHeld.f3 = false end if iskeypressed(0x73) then if not keyHeld.f4 then keyHeld.f4 = true; teleportToFlare() end else keyHeld.f4 = false end task.wait() end end)
-
-print(("saint | version %s"):format(vs)) print("Keybinds are listed on the thread.")
+local last_x,last_y=camera.ViewportSize.X,camera.ViewportSize.Y
+spawn(function()
+    while true do
+        local v=camera.ViewportSize
+        if v.X~=last_x or v.Y~=last_y then last_x,last_y=v.X,v.Y;update_hud_positions()end
+        update_timer();task.wait(hud_update_interval)
+    end
+end)
+spawn(function()while true do update_scrap();update_power();update_target();task.wait(status_update_interval)end end)
+spawn(function()
+    while true do
+        pcall(function()scan_world();refresh_rake()end)
+        task.wait(world_scan_interval)
+    end
+end)
+spawn(function()
+    while true do
+        pcall(render_esp)
+        task.wait()
+    end
+end)
+print("binds are on thread | version "..version)
