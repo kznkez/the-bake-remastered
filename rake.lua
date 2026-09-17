@@ -20,7 +20,11 @@ toggle.clientgcnames={"vars","canMove","can_jump","can_jump2","lastJump","handli
 toggle.clientgc={cache={},bykey={},valid=false,scanning=false,nextapply=0,nextscan=0,scanfailures=0,applyfailures=0,misses=0,recoveries=0,stableat=nil,lastscan=0,character=lp and lp.Character or nil,characterkey=nil,rescanat=nil,maxstamina=100}
 toggle.nofall={size=Vector3.new(100000,100000,100000),originals=setmetatable({},{__mode="k"}),nextapply=0}
 toggle.zoom={thirdperson=false,amount=10,min=0,max=0,originalmin=nil,originalmax=nil,memoryvalid=false,directvalid=false,nextapply=0,minoffset=0x36C,maxoffset=0x368}
-toggle.white=Color3.fromHex("#ffffff");toggle.ringrgbcolor=Color3.fromHex("#d8d8d8")
+toggle.shiftlockstate={offset=nil,active=false,nextapply=0}
+toggle.instacrate=false;toggle.instacratestate={nextapply=0,lastbox=nil,lastopen=0,range=25,unlockoffset=nil,patched=setmetatable({},{__mode="k"})}
+toggle.offseturl="https://offsets.ntgetwritewatch.workers.dev/offsets.hpp"
+toggle.offsettext=nil;toggle.offsetloaded=false;toggle.offsetretry=0
+toggle.white=Color3.fromHex("#ffffff");toggle.ringrgbcolor=Color3.fromHex("#d8d8d8");toggle.warningred=Color3.fromHex("#ff3b3b");toggle.infoorange=Color3.fromHex("#f2a93b");toggle.permissionblue=Color3.fromHex("#66ccff");toggle.ringunit={}
  toggle.playerdisplayname=lp and lp.Name or"player"
 pcall(function()
     local address=lp and lp.Address;local value=type(address)=="number"and address>0 and memory_read("string",address+0x138)or nil
@@ -73,10 +77,10 @@ local colorentries={
     {name="flare",cfgs={"FlareGunPickUp"}},{name="scrap 1",cfgs={"Scrap1"}},{name="scrap 2",cfgs={"Scrap2"}},{name="scrap 3",cfgs={"Scrap3"}},{name="scrap 4",cfgs={"Scrap4"}},{name="scrap 5",cfgs={"Scrap5"}},{name="trap",cfgs={"RakeTrapModel"}},{name="supply",cfgs={"Box","SupplyCrate"}},
     {name="base",cfgs={"BaseCampMSG"}},{name="house",cfgs={"SafehouseMSG"}},{name="station",cfgs={"StationMSG"}},{name="shop",cfgs={"ShopMSG"}},{name="tower",cfgs={"ObservationTowerMSG"}}
 }
-local defaultbinds={menu=0x43,esp=0x70,hud=0x71,scrap=0x72,flare=0x73,thirdperson=0x74}
-local keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,thirdperson=defaultbinds.thirdperson}
-local bindorder={"menu","esp","hud","scrap","flare","thirdperson"}
-local bindlabels={menu="menu",esp="esp toggle",hud="hud toggle",scrap="tp to scrap",flare="tp to flare",thirdperson="third person"}
+local defaultbinds={menu=0x43,esp=0x70,hud=0x71,scrap=0x72,flare=0x73}
+local keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare}
+local bindorder={"menu","esp","hud","scrap","flare"}
+local bindlabels={menu="menu",esp="esp toggle",hud="hud toggle",scrap="tp to scrap",flare="tp to flare"}
 local keyoptions,keynames,keywas={},{},{}
 local function addkey(code,name)keyoptions[#keyoptions+1]={code=code,name=name};keynames[code]=name;keywas[code]=false end
 addkey(0x08,"backspace");addkey(0x09,"tab");addkey(0x0D,"enter");addkey(0x10,"shift");addkey(0x11,"ctrl");addkey(0x12,"alt");addkey(0x1B,"escape");addkey(0x20,"space")
@@ -87,7 +91,11 @@ for i=0,11 do addkey(0x70+i,"F"..tostring(i+1))end
 addkey(0xBA,";");addkey(0xBB,"=");addkey(0xBC,",");addkey(0xBD,"-");addkey(0xBE,".");addkey(0xBF,"/");addkey(0xC0,"`");addkey(0xDB,"[");addkey(0xDC,"\\");addkey(0xDD,"]");addkey(0xDE,"'")
 local function clamp(value,minv,maxv)return math.max(minv,math.min(maxv,value))end
 toggle.pixel=function(value)return math.floor((tonumber(value)or 0)+0.5)end
-toggle.setpos=function(d,x,y)local px,py=toggle.pixel(x),toggle.pixel(y);local p=d and d.Position;if d and(not p or p.X~=px or p.Y~=py)then d.Position=Vector2.new(px,py)end end
+toggle.setpos=function(d,x,y)
+    if not d then return end
+    x=tonumber(x)or 0;y=tonumber(y)or 0;local p=d.Position
+    if not p or math.abs(p.X-x)>=0.7 or math.abs(p.Y-y)>=0.7 then local px,py=toggle.pixel(x),toggle.pixel(y);if not p or p.X~=px or p.Y~=py then d.Position=Vector2.new(px,py)end end
+end
 toggle.setprop=function(d,key,value)if d and d[key]~=value then d[key]=value end end
 local function waitchild(parent,name,timeout)
     local start=tick()
@@ -129,6 +137,88 @@ toggle.memorywrite=function(kind,address,value)
 end
 toggle.instanceaddress=function(object)
     local ok,address=pcall(function()return object and object.Address end);return ok and type(address)=="number"and address>0 and address or nil
+end
+toggle.offsetstructvalue=function(structname,name)
+    local source=toggle.offsettext;if type(source)~="string"then return nil end
+    local block=string.match(source,"struct%s+"..structname.."%s*:%s*[%w_:]+%s*{(.-)%s*};");if type(block)~="string"then return nil end
+    local value=string.match(block,"%s"..name.."%s*=%s*(0x[%da-fA-F]+)");return value and tonumber(value)or nil
+end
+toggle.offsetvalue=function(name)return toggle.offsetstructvalue("Player",name)end
+toggle.loadoffsets=function(force)
+    local now=tick();if not force and toggle.offsetloaded and toggle.shiftlockstate.offset and toggle.instacratestate.unlockoffset then return true end;if not force and now<(toggle.offsetretry or 0)then return false end
+    local ok,source=pcall(function()return game:HttpGet(toggle.offseturl)end)
+    if not ok or type(source)~="string"or #source<100 then toggle.offsetretry=now+10;return false end
+    toggle.offsettext=source
+    local minimum=toggle.offsetvalue("CameraMinZoomDistance");local maximum=toggle.offsetvalue("CameraMaxZoomDistance");local shiftlock=toggle.offsetvalue("DevEnableMouseLock");local unlockvalue=toggle.offsetstructvalue("DoubleConstrainedValue","Value")
+    local minimumok=type(minimum)=="number"and minimum>0 and minimum<0x10000;local maximumok=type(maximum)=="number"and maximum>0 and maximum<0x10000;local shiftlockok=type(shiftlock)=="number"and shiftlock>0 and shiftlock<0x10000;local unlockok=type(unlockvalue)=="number"and unlockvalue>0 and unlockvalue<0x10000
+    if minimumok then toggle.zoom.minoffset=minimum end;if maximumok then toggle.zoom.maxoffset=maximum end;if shiftlockok then toggle.shiftlockstate.offset=shiftlock end;if unlockok then toggle.instacratestate.unlockoffset=unlockvalue end
+    toggle.offsetloaded=minimumok and maximumok and shiftlockok and unlockok;toggle.offsetretry=toggle.offsetloaded and 0 or now+10
+    return toggle.offsetloaded
+end
+toggle.applyshiftlock=function()
+    local state=toggle.shiftlockstate;if not state.active then return false end;local now=tick();if now<(state.nextapply or 0)then return true end;state.nextapply=now+0.1;if not state.offset then toggle.loadoffsets(false)end
+    local address=toggle.instanceaddress(lp);if not address or not state.offset then return false end
+    local applied=false;for i=0,8 do applied=toggle.memorywrite("byte",address+state.offset+i,1)or applied end;return applied
+end
+toggle.fastcrateprompt=function(prompt)
+    if not prompt then return false end
+    local ok=pcall(function()
+        if not prompt:IsA("ProximityPrompt")then assert(false,"bad prompt")end
+        prompt.Enabled=true;prompt.HoldDuration=0;prompt.RequiresLineOfSight=false;prompt.ClickablePrompt=true;prompt.MaxActivationDistance=toggle.instacratestate.range
+        prompt:SetAttribute("ODistance",toggle.instacratestate.range)
+        prompt:SetAttribute("Busy",false);prompt:SetAttribute("Busy2",false);prompt:SetAttribute("Unavailable",false);prompt:SetAttribute("Unavailable2",false)
+    end)
+    return ok
+end
+toggle.findcrateprompt=function(root)
+    if not root then return nil end
+    local prompt=root:FindFirstChild("ProximityPrompt")or root:FindFirstChildWhichIsA("ProximityPrompt");if prompt then return prompt end
+    local ok,descendants=pcall(function()return root:GetDescendants()end);if not ok or type(descendants)~="table"then return nil end
+    for i=1,#descendants do local object=descendants[i];local isprompt=false;pcall(function()isprompt=object:IsA("ProximityPrompt")end);if isprompt then return object end end
+end
+toggle.writecrateunlock=function(unlock)
+    if not unlock then return false end
+    local direct=pcall(function()unlock.Value=100 end);local state=toggle.instacratestate
+    if not state.unlockoffset then toggle.loadoffsets(false)end
+    local address=toggle.instanceaddress(unlock);local offset=state.unlockoffset;if not address or not offset then return direct end
+    local target=address+offset;local current=toggle.memoryread("double",target)
+    if type(current)~="number"or current~=current or math.abs(current)>1000000000 then return direct end
+    local wrote=true;if math.abs(current-100)>0.0001 then wrote=toggle.memorywrite("double",target,100)end
+    if not wrote then return direct end
+    local verified=toggle.memoryread("double",target);return type(verified)=="number"and math.abs(verified-100)<0.0001 or direct
+end
+toggle.fastdrop=function(box)
+    if not box then return nil end
+    local gui=box:FindFirstChild("GUIPart");local prompt=toggle.findcrateprompt(gui);if not prompt then prompt=toggle.findcrateprompt(box)end
+    local promptok=toggle.fastcrateprompt(prompt);local unlock=box:FindFirstChild("UnlockValue");local unlockok=toggle.writecrateunlock(unlock)
+    return gui,prompt,promptok,unlockok
+end
+toggle.dropboxes=function(root)
+    local boxes,seen={},{};if not root then return boxes end
+    local function add(object)if object and not seen[object]and object.Name=="Box"then seen[object]=true;boxes[#boxes+1]=object end end
+    add(root:FindFirstChild("Box"));local children=root:GetChildren();for i=1,#children do local child=children[i];add(child);if child.Name~="Box"then add(child:FindFirstChild("Box"))end end
+    if #boxes==0 then local ok,descendants=pcall(function()return root:GetDescendants()end);if ok and type(descendants)=="table"then for i=1,#descendants do add(descendants[i])end end end
+    return boxes
+end
+toggle.applyinstacrate=function(force)
+    if not toggle.instacrate then return false end
+    local state=toggle.instacratestate;local now=tick();if not force and now<(state.nextapply or 0)then return true end;state.nextapply=now+0.35
+    local debris=ws:FindFirstChild("Debris");local crates=debris and(debris:FindFirstChild("SupplyCrates")or debris:FindFirstChild("SupplyCreates"));if not crates then return false end
+    if not state.unlockoffset then toggle.loadoffsets(false)end
+    local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart");if not root or not root:IsA("BasePart")then state.lastbox=nil;return false end
+    local boxes=toggle.dropboxes(crates);local nearest,nearestdistance,nearestunlock=nil,math.huge,false
+    for i=1,#boxes do
+        local box=boxes[i];local gui,prompt,promptok,unlockok=toggle.fastdrop(box);state.patched[box]=promptok and unlockok
+        local part=gui and gui:IsA("BasePart")and gui or box:FindFirstChildWhichIsA("BasePart")
+        if part then local delta=part.Position-root.Position;local distance=math.sqrt(delta.X*delta.X+delta.Y*delta.Y+delta.Z*delta.Z);if distance<nearestdistance then nearest,nearestdistance,nearestunlock=box,distance,unlockok end end
+    end
+    if not nearest or nearestdistance>state.range then state.lastbox=nil;return false end
+    if not nearestunlock then return false end
+    if not force and state.lastbox==nearest and now-(state.lastopen or 0)<0.8 then return true end
+    local remote;local remoteok=pcall(function()remote=game.ReplicatedStorage:FindFirstChild("SupplyClientEvent")end);if not remoteok or not remote then return false end
+    local opened=pcall(function()game.ReplicatedStorage.SupplyClientEvent:FireServer("Open",true)end)
+    if opened then state.lastbox=nearest;state.lastopen=now end
+    return opened
 end
 toggle.clientgc.characterkey=toggle.instanceaddress(toggle.clientgc.character)or toggle.clientgc.character
 toggle.validzoom=function(minimum,maximum)
@@ -183,6 +273,7 @@ toggle.applynofall=function(enabled,force)
     end
     local restored=false;for haystack,size in pairs(state.originals)do local ok=pcall(function()haystack.Size=size end);restored=ok or restored end;return restored
 end
+toggle.loadoffsets(true)
 toggle.capturezoom()
 toggle.indexclientgc=function(cache)
     local indexed={};for i=1,#cache do local entry=cache[i];if type(entry)=="table"and type(entry.key)=="string"then local list=indexed[entry.key];if not list then list={};indexed[entry.key]=list end;list[#list+1]=entry end end;toggle.clientgc.bykey=indexed
@@ -259,7 +350,7 @@ local function remove(d)
     if not d then return end
     pcall(function()d.Visible=false;d:Remove()end)
 end
-local function hide(d)if d then d.Visible=false end end
+local function hide(d)if d and d.Visible then d.Visible=false end end
 toggle.setvisible=function(d,value)if d and d.Visible~=(value==true)then d.Visible=value==true end end
 local function anchors()
     local v=cam.ViewportSize
@@ -300,7 +391,14 @@ local function bindlog(text)
     end)
 end
 local barseg,rgbwidth,rgbspeed,rgbspread=72,420,0.6,0.28
-local function rgb(offset)return Color3.fromHSV(((toggle.rgbphase or((tick()*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1)))+(offset or 0))%1,0.68,1)end
+local function rgb(offset)
+    offset=offset or 0
+    local frame=toggle.gradientcache and toggle.gradientcache.frame or-1
+    if offset==0 and toggle.rgbbaseframe==frame and toggle.rgbbase then return toggle.rgbbase end
+    local value=Color3.fromHSV(((toggle.rgbphase or((tick()*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1)))+offset)%1,0.68,1)
+    if offset==0 then toggle.rgbbaseframe=frame;toggle.rgbbase=value end
+    return value
+end
 local rgbline={}
 for i=1,barseg do rgbline[i]=newline(Color3.fromHSV((i-1)/barseg*rgbspread,0.68,1));rgbline[i].Thickness=2 end
 local themes={
@@ -337,9 +435,9 @@ for _,d in ipairs({menubg,menutop,menuside,menuchrome.content,menuchrome.divider
 local tabbg,tabtext,tabborder={},{},{}
 for i=1,#tabnames do tabbg[i]=setz(newsquare(Color3.fromHex("#202330"),1),112);tabborder[i]=setz(newborder(Color3.fromHex("#272c35"),1),113);tabtext[i]=setz(newtext(tabnames[i],Color3.fromHex("#ffffff"),true,false),121);tabtext[i].Size=13 end
 local itembg,itemlabel,itemvalue,itemmark,itemline,itemtrack,itemfill,itemborder,markborder,trackborder={},{},{},{},{},{},{},{},{},{}
-toggle.menuinfo={items={},layouts={},tooltip={bg=setz(newsquare(Color3.fromHex("#16161e"),1),190),outer=setz(newborder(Color3.fromHex("#000000"),1),194),middle=setz(newborder(Color3.fromHex("#555555"),1),193),inner=setz(newborder(Color3.fromHex("#000000"),1),192),badge=setz(newtext("[unstable]",Color3.fromHex("#ff3b3b"),false,false),195),text=setz(newtext("",Color3.fromHex("#ffffff"),false,false),195)}}
+toggle.menuinfo={items={},layouts={},tooltip={bg=setz(newsquare(Color3.fromHex("#16161e"),1),190),outer=setz(newborder(Color3.fromHex("#000000"),1),194),middle=setz(newborder(Color3.fromHex("#f2a93b"),1),193),inner=setz(newborder(Color3.fromHex("#000000"),1),192),badge=setz(newtext("[information]",Color3.fromHex("#f2a93b"),false,false),195),text=setz(newtext("",Color3.fromHex("#ffffff"),false,false),195)}}
 for i=1,menustate.maxitems do
-    itembg[i]=setz(newsquare(Color3.fromHex("#202330"),1),110);itemborder[i]=setz(newborder(Color3.fromHex("#272c35"),1),111);itemlabel[i]=setz(newtext("",Color3.fromHex("#ffffff"),false,false),121);itemvalue[i]=setz(newtext("",Color3.fromHex("#ffffff"),false,false),121);toggle.menuinfo.items[i]=setz(newtext("[i]",Color3.fromHex("#f2a93b"),false,false),122);itemmark[i]=setz(newsquare(Color3.fromHex("#7aa2f7"),1),116);markborder[i]=setz(newborder(Color3.fromHex("#343b46"),1),114);itemline[i]=setz(newline(Color3.fromHex("#787c99")),112);itemline[i].Thickness=1;itemtrack[i]=setz(newsquare(Color3.fromHex("#343b58"),1),114);itemfill[i]=setz(newsquare(Color3.fromHex("#7aa2f7"),1),115);trackborder[i]=setz(newborder(Color3.fromHex("#343b46"),1),118)
+    itembg[i]=setz(newsquare(Color3.fromHex("#202330"),1),110);itemborder[i]=setz(newborder(Color3.fromHex("#272c35"),1),111);itemlabel[i]=setz(newtext("",Color3.fromHex("#ffffff"),false,false),121);itemvalue[i]=setz(newtext("",Color3.fromHex("#ffffff"),false,false),121);toggle.menuinfo.items[i]=setz(newtext("[?]",Color3.fromHex("#f2a93b"),false,false),122);itemmark[i]=setz(newsquare(Color3.fromHex("#7aa2f7"),1),116);markborder[i]=setz(newborder(Color3.fromHex("#343b46"),1),114);itemline[i]=setz(newline(Color3.fromHex("#787c99")),112);itemline[i].Thickness=1;itemtrack[i]=setz(newsquare(Color3.fromHex("#343b58"),1),114);itemfill[i]=setz(newsquare(Color3.fromHex("#7aa2f7"),1),115);trackborder[i]=setz(newborder(Color3.fromHex("#343b46"),1),118)
 end
 local sectionframes={}
 local function getsectionframe(index)
@@ -396,7 +494,7 @@ toggle.ease=function(current,target,speed)
     return current+(target-current)*adjusted
 end
 toggle.colormix=function(a,b,amount)
-    amount=clamp(amount,0,1);return Color3.new(a.R+(b.R-a.R)*amount,a.G+(b.G-a.G)*amount,a.B+(b.B-a.B)*amount)
+    amount=clamp(amount,0,1);if amount<=0 then return a elseif amount>=1 then return b end;return Color3.new(a.R+(b.R-a.R)*amount,a.G+(b.G-a.G)*amount,a.B+(b.B-a.B)*amount)
 end
 toggle.accentvisual=function()
     if toggle.barrgb then return color("accent")end
@@ -412,14 +510,24 @@ toggle.layoutgradient=function(lines,x,y,w)
     local step=w/#lines;for i=1,#lines do local d=lines[i];d.From=Vector2.new(x+(i-1)*step,y);d.To=Vector2.new(x+i*step,y)end
 end
 toggle.paintgradient=function(lines,on,alpha)
-    local count=#lines;for i=1,count do local d=lines[i];if on then toggle.setprop(d,"Color",toggle.barrgb and rgb((i-1)/math.max(1,count-1)*rgbspread)or toggle.accentvisual());toggle.setprop(d,"Transparency",alpha or 1)end;toggle.setvisible(d,on)end
+    local desired=on==true;if not desired and lines._paintvisible==false then return end;local visibilitychanged=lines._paintvisible~=desired;lines._paintvisible=desired
+    local count=#lines;local colors=nil
+    if on and toggle.barrgb then
+        local state=toggle.gradientcache;local set=state.sets[count]
+        if not set then set={frame=-1};state.sets[count]=set end
+        if set.frame~=state.frame then for i=1,count do set[i]=rgb((i-1)/math.max(1,count-1)*rgbspread)end;set.frame=state.frame end
+        colors=set
+    end
+    local accent=on and not toggle.barrgb and toggle.accentvisual()or nil
+    for i=1,count do local d=lines[i];if desired then toggle.setprop(d,"Color",colors and colors[i]or accent);toggle.setprop(d,"Transparency",alpha or 1)end;if visibilitychanged then toggle.setvisible(d,desired)end end
 end
+toggle.gradientcache={frame=0,sets={}}
 picker.gradient=toggle.makegradient(48,221)
 local function inside(px,py,x,y,w,h)return px>=x and px<=x+w and py>=y and py<=y+h end
 toggle.tooltipupdate=function()
     local active=nil;local layouts=toggle.menuinfo.layouts;if toggle.menu and not menustate.minimized and not pickerentry and not dropdownkind then for i=1,#menuitems do local info=layouts[i];if info and info.visible and inside(mouse.X,mouse.Y,info.x,info.y,info.w,info.h)then active=info;break end end end
     local tip=toggle.menuinfo.tooltip;local visible=active~=nil;for _,d in pairs(tip)do toggle.setvisible(d,visible)end;if not visible then return end
-    local unstable=active.unstable==true;local shown,longest,lines=toggle.wraptooltip(active.text,34);local width=math.max(unstable and 134 or 126,longest*7+16);local extra=unstable and 14 or 0;local height=lines*14+13+extra;local x=clamp(mouse.X+13,2,math.max(2,cam.ViewportSize.X-width-2));local y=clamp(mouse.Y+16,2,math.max(2,cam.ViewportSize.Y-height-2));tip.outer.Position=Vector2.new(x,y);tip.outer.Size=Vector2.new(width,height);tip.middle.Position=Vector2.new(x+1,y+1);tip.middle.Size=Vector2.new(width-2,height-2);tip.inner.Position=Vector2.new(x+2,y+2);tip.inner.Size=Vector2.new(width-4,height-4);tip.bg.Position=Vector2.new(x+3,y+3);tip.bg.Size=Vector2.new(width-6,height-6);tip.badge.Visible=unstable;tip.badge.Position=Vector2.new(x+8,y+7);tip.badge.Text="[unstable]";tip.badge.Color=Color3.fromHex("#ff3b3b");tip.badge.Outline=themes[themeindex].light~=true;tip.badge.Transparency=guiopacity;tip.text.Position=Vector2.new(x+8,y+7+extra);tip.text.Text=shown;tip.text.Color=color("text");tip.text.Outline=themes[themeindex].light~=true;tip.bg.Color=color("bg");tip.outer.Color=themes.borderblack;tip.middle.Color=color("outline");tip.inner.Color=themes.borderblack;tip.bg.Transparency=guiopacity;tip.outer.Transparency=guiopacity;tip.middle.Transparency=0.85*guiopacity;tip.inner.Transparency=guiopacity;tip.text.Transparency=guiopacity
+    local unstable=active.unstable==true or active.warning==true;local permission=active.permission==true;local badge=unstable and"[unstable]"or permission and"[permission]"or"[information]";local badgecolor=unstable and toggle.warningred or permission and toggle.permissionblue or toggle.infoorange;local shown,longest,lines=toggle.wraptooltip(active.text,34);local width=math.max(134,longest*7+16);local extra=14;local height=lines*14+13+extra;local x=clamp(mouse.X+13,2,math.max(2,cam.ViewportSize.X-width-2));local y=clamp(mouse.Y+16,2,math.max(2,cam.ViewportSize.Y-height-2));tip.outer.Position=Vector2.new(x,y);tip.outer.Size=Vector2.new(width,height);tip.middle.Position=Vector2.new(x+1,y+1);tip.middle.Size=Vector2.new(width-2,height-2);tip.inner.Position=Vector2.new(x+2,y+2);tip.inner.Size=Vector2.new(width-4,height-4);tip.bg.Position=Vector2.new(x+3,y+3);tip.bg.Size=Vector2.new(width-6,height-6);tip.badge.Visible=true;tip.badge.Position=Vector2.new(x+8,y+7);tip.badge.Text=badge;tip.badge.Color=badgecolor;tip.badge.Outline=themes[themeindex].light~=true;tip.badge.Transparency=guiopacity;tip.text.Position=Vector2.new(x+8,y+7+extra);tip.text.Text=shown;tip.text.Color=color("text");tip.text.Outline=themes[themeindex].light~=true;tip.bg.Color=color("bg");tip.outer.Color=themes.borderblack;tip.middle.Color=badgecolor;tip.inner.Color=themes.borderblack;tip.bg.Transparency=guiopacity;tip.outer.Transparency=guiopacity;tip.middle.Transparency=0.85*guiopacity;tip.inner.Transparency=guiopacity;tip.text.Transparency=guiopacity
 end
 local function entrycfg(index)
     if index=="accent"then return themes.accentstyle elseif index=="themebg"then return toggle.themestyles.background elseif index=="themetop"then return toggle.themestyles.topbar elseif index=="themeborder"then return toggle.themestyles.border elseif index=="themeoutline"then return toggle.themestyles.outline elseif index=="themetext"then return toggle.themestyles.text elseif index=="distance"then return toggle.distancestyle elseif index=="rake"then return toggle.rakestyle elseif index=="rakehealth"then return toggle.rakehealthstyle elseif index=="rakebar"then return toggle.rakebarstyle elseif index=="roof"then return roofstyle elseif index=="hudtimer"then return toggle.hudstyles.timer elseif index=="hudtarget"then return toggle.hudstyles.target elseif index=="hudscrap"then return toggle.hudstyles.scrap elseif index=="hudpower"then return toggle.hudstyles.power elseif index=="cooldownlabel"then return toggle.cooldownstyle elseif index=="cooldownvalue"then return toggle.cooldownvaluestyle elseif index=="ppmslabel"then return toggle.ppmslabelstyle elseif index=="ppmsvalue"then return toggle.ppmsvaluestyle elseif index=="valuetimer"then return toggle.hudvalues.timer elseif index=="valuetarget"then return toggle.hudvalues.target elseif index=="valuescrap"then return toggle.hudvalues.scrap elseif index=="valuepower"then return toggle.hudvalues.power elseif index=="timerwarning"then return toggle.hudvalues.warning elseif type(index)=="string"and string.match(index,"^volt%d$")then return toggle.voltmeterstyles[tonumber(string.sub(index,5))] elseif type(index)=="string"and string.sub(index,1,6)=="crate_"then return toggle.cratestyles[string.sub(index,7)]end
@@ -460,10 +568,10 @@ local function currentitems()
             section("distance esp",1),{id="distance",kind="toggle",label="distance",on=toggle.distance,col=1},{id="distancepositionselect",kind="dropdown",label="label position",value=toggle.distanceposition,col=1},{id="distanceminimum",kind="toggle",label="minimum distance",on=toggle.distanceminimum,col=1},{id="distancemin",kind="slider",label="show distance after",value=toggle.distancemin,min=0,max=100,display=tostring(toggle.distancemin).."m",col=1},
             section("rake esp",1),{id="rakename",kind="toggle",label="rake name",on=toggle.rakename,col=1},{id="rakehealth",kind="toggle",label="rake health",on=toggle.rakehealth,col=1},{id="rakedistance",kind="toggle",label="rake distance",on=toggle.rakedistance,col=1},{id="rakenameinput",kind="text",label="custom name",value=toggle.rakenamecapture and toggle.rakenamevalue.."_"or toggle.rakenamevalue,col=1},{id="healthbased",kind="toggle",label="health-based color",on=toggle.healthbased,col=1},{id="rakehealthformatselect",kind="dropdown",label="health style",value=toggle.rakehealthformat,col=1},{id="rakenamey",kind="slider",label="name Y offset",value=toggle.rakenamey,min=-100,max=100,display=tostring(toggle.rakenamey).."px",col=1},{id="rakehealthy",kind="slider",label="health Y offset",value=toggle.rakehealthy,min=-100,max=100,display=tostring(toggle.rakehealthy).."px",col=1},{id="rakebarwidth",kind="slider",label="health bar width",value=toggle.rakebarwidth,min=30,max=200,display=tostring(toggle.rakebarwidth).."px",col=1},
             section("timer hud",1),{id="hudtimer",kind="toggle",label="timer hud",on=toggle.hudelements.timer,col=1},{id="timerformatselect",kind="dropdown",label="timer style",value=toggle.timerformat,col=1},{id="timerwarningenabled",kind="toggle",label="timer warn color",on=toggle.timerwarningenabled,col=1},{id="timerwarning",kind="slider",label="warning time",value=toggle.timerwarning,min=10,max=45,display=tostring(toggle.timerwarning).."s",col=1},
-            section("client",2),{id="noJumpCooldown",kind="toggle",label="no jump cooldown",on=toggle.client.noJumpCooldown,info="may briefly lag when first enabled while game data is scanned",warning=true,unstable=true,col=2},{id="infiniteStamina",kind="toggle",label="infinite stamina",on=toggle.client.infiniteStamina,info="may briefly lag when first enabled while game data is scanned",warning=true,unstable=true,col=2},{id="noFall",kind="toggle",label="no fall damage",on=toggle.client.noFall,col=2},{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,info="equip an item after toggling to update the zoom",col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},
+            section("client",2),{id="noJumpCooldown",kind="toggle",label="no jump cooldown",on=toggle.client.noJumpCooldown,info="may briefly lag when first enabled while game data is scanned",warning=true,unstable=true,col=2},{id="infiniteStamina",kind="toggle",label="infinite stamina",on=toggle.client.infiniteStamina,info="may briefly lag when first enabled while game data is scanned",warning=true,unstable=true,col=2},{id="noFall",kind="toggle",label="no fall damage",on=toggle.client.noFall,col=2},{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,info="equip an item after toggling to update the zoom",col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="action",label="enable shift lock",info="switch the movement mode in Roblox settings until it works",col=2},
             section("player hud",2),{id="hudtarget",kind="toggle",label="rake target",on=toggle.hudelements.target,col=2},{id="hudscrap",kind="toggle",label="scrap value",on=toggle.hudelements.scrap,col=2},
-            section("world objects",2),{id="flares",kind="toggle",label="flare gun",on=espgroups.flares,col=2},{id="traps",kind="toggle",label="rake trap",on=espgroups.traps,col=2},
-            section("power hud",2),{id="hudpower",kind="toggle",label="power remaining",on=toggle.hudelements.power,col=2},{id="powerdecimal",kind="toggle",label="decimal value",on=toggle.powerdecimal,col=2},
+            section("world objects",2),{id="flares",kind="toggle",label="flare gun",on=espgroups.flares,col=2},{id="traps",kind="toggle",label="rake trap",on=espgroups.traps,col=2},{id="instacrate",kind="toggle",label="insta-open crate",on=toggle.instacrate,info="requires hybrid mode",permission=true,col=2},
+            section("power hud",2),{id="hudpower",kind="toggle",label="power remaining",on=toggle.hudelements.power,info="requires unsafe LuaU mode enabled",permission=true,col=2},{id="powerdecimal",kind="toggle",label="decimal value",on=toggle.powerdecimal,col=2},
             section("power usage",2),{id="poweractivity",kind="toggle",label="activity panel",on=toggle.poweractivity,col=2},{id="poweractivitymodeselect",kind="dropdown",label="show when",value=toggle.poweractivitymode,col=2},{id="ppms",kind="toggle",label="voltmeter panel",on=toggle.ppms and not toggle.ppmspowerblocked,col=2},
             section("structures esp",2),{id="roof",kind="toggle",label="roof HP",on=toggle.roof,col=2}
         }
@@ -486,11 +594,11 @@ local function currentitems()
         return {
             section("interface",1),{id="presetselect",kind="dropdown",label="preset",value=themes[themeindex].name,col=1},{id="opacity",kind="slider",label="opacity",value=guiopacity,min=0.2,max=1,display=tostring(math.floor(guiopacity*100+0.5)).."%",col=1},{id="watermark",kind="toggle",label="watermark state",on=toggle.watermark,col=1},{id="watermarkhint",kind="toggle",label="watermark hint",on=toggle.watermarkhint,col=1},
             section("theme colors",1),{id="accentcolor",kind="color",label="accent",index="accent",col=1},{id="themebgcolor",kind="color",label="background",index="themebg",col=1},{id="themetopcolor",kind="color",label="top bar",index="themetop",col=1},{id="themebordercolor",kind="color",label="border",index="themeborder",col=1},{id="themeoutlinecolor",kind="color",label="outline",index="themeoutline",col=1},{id="themetextcolor",kind="color",label="text",index="themetext",col=1},
+            section("fonts",1),{id="espfontselect",kind="dropdown",label="esp font",value=fontnames[fontindex],col=1},{id="hudfontselect",kind="dropdown",label="hud font",value=fontnames[toggle.hudfontindex],col=1},{id="fontsize",kind="slider",label="font size",value=espfontsize,min=13,max=20,col=1},
             section("rgb accent",1),{id="barrgb",kind="toggle",label="rgb accent",on=toggle.barrgb,col=1},{id="rgbdirectionselect",kind="dropdown",label="rgb direction",value=toggle.rgbdirection,col=1},{id="rgbspeed",kind="slider",label="rgb speed",value=rgbspeed,min=0.5,max=2,display=string.format("%.2fx",rgbspeed),col=1},
             section("teleports",1),{id="scrapteleportselect",kind="dropdown",label="sort by",value=toggle.scrapteleport,col=1},{id="scrap",kind="action",label="teleport to scrap",col=1},{id="flare",kind="action",label="teleport to flare",col=1},{id="teleportcooldown",kind="toggle",label="safety cooldown",on=toggle.teleportcooldown,info=teleportinfo,warning=true,unstable=true,col=1},
             section("configuration",2),{id="configname",kind="text",stacked=true,label="config name",value=configcapture and configname.."_"or configname,col=2},{id="configselect",kind="dropdown",stacked=true,label="config list",value=configslots[configslot]or"none",col=2},{id="save",kind="action",label="save",col=2},{id="load",kind="action",label="load",col=2},
-            section("fonts",2),{id="espfontselect",kind="dropdown",label="esp font",value=fontnames[fontindex],col=2},{id="hudfontselect",kind="dropdown",label="hud font",value=fontnames[toggle.hudfontindex],col=2},{id="fontsize",kind="slider",label="font size",value=espfontsize,min=13,max=20,col=2},
-            section("keybinds",2),{id="bindmenu",kind="bind",bind="menu",label=bindlabels.menu,value=capture=="menu"and"press a key..."or"["..(keynames[keybinds.menu]or tostring(keybinds.menu)).."]",col=2},{id="bindesp",kind="bind",bind="esp",label=bindlabels.esp,value=capture=="esp"and"press a key..."or"["..(keynames[keybinds.esp]or tostring(keybinds.esp)).."]",col=2},{id="bindhud",kind="bind",bind="hud",label=bindlabels.hud,value=capture=="hud"and"press a key..."or"["..(keynames[keybinds.hud]or tostring(keybinds.hud)).."]",col=2},{id="bindscrap",kind="bind",bind="scrap",label=bindlabels.scrap,value=capture=="scrap"and"press a key..."or"["..(keynames[keybinds.scrap]or tostring(keybinds.scrap)).."]",col=2},{id="bindflare",kind="bind",bind="flare",label=bindlabels.flare,value=capture=="flare"and"press a key..."or"["..(keynames[keybinds.flare]or tostring(keybinds.flare)).."]",col=2},{id="bindthirdperson",kind="bind",bind="thirdperson",label=bindlabels.thirdperson,value=capture=="thirdperson"and"press a key..."or"["..(keynames[keybinds.thirdperson]or tostring(keybinds.thirdperson)).."]",col=2},
+            section("keybinds",2),{id="bindmenu",kind="bind",bind="menu",label=bindlabels.menu,value=capture=="menu"and"press a key..."or"["..(keynames[keybinds.menu]or tostring(keybinds.menu)).."]",col=2},{id="bindesp",kind="bind",bind="esp",label=bindlabels.esp,value=capture=="esp"and"press a key..."or"["..(keynames[keybinds.esp]or tostring(keybinds.esp)).."]",col=2},{id="bindhud",kind="bind",bind="hud",label=bindlabels.hud,value=capture=="hud"and"press a key..."or"["..(keynames[keybinds.hud]or tostring(keybinds.hud)).."]",col=2},{id="bindscrap",kind="bind",bind="scrap",label=bindlabels.scrap,value=capture=="scrap"and"press a key..."or"["..(keynames[keybinds.scrap]or tostring(keybinds.scrap)).."]",col=2},{id="bindflare",kind="bind",bind="flare",label=bindlabels.flare,value=capture=="flare"and"press a key..."or"["..(keynames[keybinds.flare]or tostring(keybinds.flare)).."]",col=2},
             section("world esp ring",2),{id="ringenabled",kind="toggle",label="esp ring",on=toggle.ringenabled,col=2},{id="ringshapeselect",kind="dropdown",label="shape",value=toggle.ringshape,col=2},{id="ringfade",kind="slider",label="render distance",value=ringfade,min=10,max=150,display=tostring(math.floor(ringfade)).."m",col=2},{id="ringsize",kind="slider",label="size multiplier",value=toggle.ringsize,min=0.5,max=3,display=string.format("%.1fx",toggle.ringsize),col=2},{id="ringspin",kind="toggle",label="rotating ring",on=toggle.ringspin,col=2},{id="ringspinspeed",kind="slider",label="rotation speed",value=toggle.ringspinspeed,min=0.1,max=3,display=string.format("%.1fx",toggle.ringspinspeed),col=2},
             section("reset",2),{id="resetcolors",kind="action",label="reset colors",col=2},{id="resettheme",kind="action",label="reset theme",col=2},{id="resettoggles",kind="action",label="reset toggles",col=2},{id="resetbinds",kind="action",label="reset binds",col=2},{id="reset",kind="action",label="reset all",col=2}
         }
@@ -504,7 +612,7 @@ local function clampmenu()
     menustate.x=clamp(menustate.x,0,math.max(0,v.X-w));menustate.y=clamp(menustate.y,0,math.max(0,v.Y-h))
 end
 local function menupos()
-    clampmenu();menustate.tabfade=toggle.ease(menustate.tabfade,1,0.2);menustate.tabslide=toggle.ease(menustate.tabslide,0,0.22);menustate.positionanimating=math.abs(menustate.tabfade-1)>0.001 or math.abs(menustate.tabslide)>0.001;local displayw,displayh=displaysize()
+    clampmenu();menustate.tabfade=toggle.ease(menustate.tabfade,1,0.26);menustate.tabslide=toggle.ease(menustate.tabslide,0,0.28);menustate.positionanimating=math.abs(menustate.tabfade-1)>0.001 or math.abs(menustate.tabslide)>0.001;local displayw,displayh=displaysize()
     menubg.Position=Vector2.new(menustate.x,menustate.y);menubg.Size=Vector2.new(displayw,displayh)
     menutop.Position=Vector2.new(menustate.x,menustate.y);menutop.Size=Vector2.new(displayw,menustate.minimized and menustate.watermarkh or 27)
     menuchrome.border.Position=Vector2.new(menustate.x,menustate.y);menuchrome.border.Size=Vector2.new(displayw,displayh);menuchrome.columnborders[1].Position=Vector2.new(menustate.x+1,menustate.y+1);menuchrome.columnborders[1].Size=Vector2.new(displayw-2,displayh-2);menuchrome.columnborders[2].Position=Vector2.new(menustate.x+2,menustate.y+2);menuchrome.columnborders[2].Size=Vector2.new(displayw-4,displayh-4)
@@ -512,7 +620,7 @@ local function menupos()
     local navx,navy,navw,navh=menustate.x+4,menustate.y+29,menustate.w-8,18
     menuside.Position=Vector2.new(navx,navy);menuside.Size=Vector2.new(navw,navh)
     local tabw=navw/#tabnames
-    for i=1,#tabnames do local x=math.floor(navx+(i-1)*tabw+0.5);local right=math.floor(navx+i*tabw+0.5);local w=right-x;local linew=#tabnames[i]*7+10;tabbg[i].Position=Vector2.new(x+math.floor((w-linew)/2),navy+navh-1);tabbg[i].Size=Vector2.new(linew,1);tabborder[i].Position=tabbg[i].Position;tabborder[i].Size=tabbg[i].Size;tabtext[i].Position=Vector2.new(x+math.floor(w/2),navy+8);if i==menustate.tab then local targetx=x+math.floor((w-linew)/2);menustate.indicatorx=toggle.ease(menustate.indicatorx,targetx,0.28);menustate.indicatorw=toggle.ease(menustate.indicatorw,linew,0.28);if math.abs(menustate.indicatorx-targetx)>0.001 or math.abs(menustate.indicatorw-linew)>0.001 then menustate.positionanimating=true end end end
+    for i=1,#tabnames do local x=math.floor(navx+(i-1)*tabw+0.5);local right=math.floor(navx+i*tabw+0.5);local w=right-x;local linew=#tabnames[i]*7+10;tabbg[i].Position=Vector2.new(x+math.floor((w-linew)/2),navy+navh-1);tabbg[i].Size=Vector2.new(linew,1);tabborder[i].Position=tabbg[i].Position;tabborder[i].Size=tabbg[i].Size;tabtext[i].Position=Vector2.new(x+math.floor(w/2),navy+8);if i==menustate.tab then local targetx=x+math.floor((w-linew)/2);menustate.indicatorx=toggle.ease(menustate.indicatorx,targetx,0.34);menustate.indicatorw=toggle.ease(menustate.indicatorw,linew,0.34);if math.abs(menustate.indicatorx-targetx)>0.001 or math.abs(menustate.indicatorw-linew)>0.001 then menustate.positionanimating=true end end end
     menuchrome.tabindicator.Position=Vector2.new(math.floor((menustate.indicatorx or navx)+0.5),navy+navh-2);menuchrome.tabindicator.Size=Vector2.new(math.max(1,math.floor((menustate.indicatorw or 1)+0.5)),2)
     menuchrome.content.Position=Vector2.new(menustate.x+6,menustate.y+52);menuchrome.content.Size=Vector2.new(menustate.w-12,menustate.h-56)
     if menustate.minimized then menuitems={};itemlayouts={} elseif menustate.itemsdirty or #menuitems==0 then menuitems=currentitems();menustate.itemsdirty=false;itemlayouts={}else itemlayouts={}end;toggle.menuinfo.layouts={}
@@ -527,7 +635,7 @@ local function menupos()
     end
     for col=1,2 do local total=0;for i=#menuitems,1,-1 do local item=menuitems[i];if(item.col or 1)==col then total=total+rowadvances[i];if item.kind=="section"then groupheights[i]=total;total=0 end end end end
     for i=1,#menuitems do local item=menuitems[i];local col=item.col or 1;natural[col]=natural[col]+rowadvances[i]end
-    local viewport=clipbottom-cliptop;local content=math.max(natural[1],natural[2]);menustate.scrollmax[menustate.tab]=math.max(0,content-viewport);menustate.scrolltarget[menustate.tab]=clamp(menustate.scrolltarget[menustate.tab]or 0,0,menustate.scrollmax[menustate.tab]);local oldscroll=menustate.scroll[menustate.tab]or menustate.scrolltarget[menustate.tab];local targetscroll=menustate.scrolltarget[menustate.tab];local scroll=toggle.ease(oldscroll,targetscroll,0.24);menustate.scroll[menustate.tab]=scroll;if math.abs(scroll-targetscroll)>0.001 then menustate.positionanimating=true end
+    local viewport=clipbottom-cliptop;local content=math.max(natural[1],natural[2]);menustate.scrollmax[menustate.tab]=math.max(0,content-viewport);menustate.scrolltarget[menustate.tab]=clamp(menustate.scrolltarget[menustate.tab]or 0,0,menustate.scrollmax[menustate.tab]);local oldscroll=menustate.scroll[menustate.tab]or menustate.scrolltarget[menustate.tab];local targetscroll=menustate.scrolltarget[menustate.tab];local scroll=toggle.ease(oldscroll,targetscroll,0.3);menustate.scroll[menustate.tab]=scroll;if math.abs(scroll-targetscroll)>0.001 then menustate.positionanimating=true end
     local renderscroll=math.floor(scroll+0.5);local ys={ystart-renderscroll,ystart-renderscroll}
     for i=1,#menuitems do
         local item=menuitems[i];local col=item.col or 1;local x=left+(col-1)*(w+gap)+math.floor(menustate.tabslide+0.5);local y=ys[col];local h=toggle.rowheight(item);local panelh=groupheights[i]or h
@@ -539,10 +647,10 @@ local function menupos()
         itemlayouts[i]={x=x,y=y,w=w,h=h,panelh=panelh,item=item,visible=visible,fade=fade,linefade=linefade,sliderfade=sliderfade,textfade=textfade,valuefade=valuefade,textvisible=texty>=cliptop and texty+10<=clipbottom,valuevisible=valuey>=cliptop and valuey+10<=clipbottom,markvisible=fade>0.08,linevisible=linefade>0.01,trackvisible=sliderfade>0.01,hittop=math.max(y,cliptop),hitbottom=math.min(y+h,clipbottom),cliptop=cliptop,clipbottom=clipbottom};local shown=toggle.itemshown(item)
         if visible then
         if item.kind~="section"then itembg[i].Position=Vector2.new(x,item.stacked and y+18 or y);itembg[i].Size=Vector2.new(w,item.stacked and 27 or h-1)end;itemlabel[i].Position=Vector2.new(x+(item.kind=="section"and 12 or 7),texty);itemvalue[i].Text=shown;itemvalue[i].Position=Vector2.new(item.stacked and x+8 or x+w-7-math.floor(#shown*7),valuey)
-        itemlabel[i].Center=item.kind=="action"and not item.info;if item.kind=="action"then if item.info then local labelw=#item.label*7;local totalw=labelw+24;local startx=x+math.floor((w-totalw)/2);itemlabel[i].Position=Vector2.new(startx,texty);toggle.menuinfo.items[i].Position=Vector2.new(startx+labelw+3,texty);toggle.menuinfo.layouts[i]={x=startx+labelw+1,y=texty-2,w=18,h=14,text=item.info,warning=item.warning,unstable=item.unstable,visible=visible and texty>=cliptop and texty+10<=clipbottom}else itemlabel[i].Position=Vector2.new(x+w/2,texty)end elseif item.info then local infox=math.min(x+w-48,x+7+#item.label*7+4);toggle.menuinfo.items[i].Position=Vector2.new(infox,texty);toggle.menuinfo.layouts[i]={x=infox-2,y=texty-2,w=18,h=14,text=item.info,warning=item.warning,unstable=item.unstable,visible=visible and texty>=cliptop and texty+10<=clipbottom}end
+        itemlabel[i].Center=item.kind=="action"and not item.info;if item.kind=="action"then if item.info then local labelw=#item.label*7;local totalw=labelw+24;local startx=x+math.floor((w-totalw)/2);itemlabel[i].Position=Vector2.new(startx,texty);toggle.menuinfo.items[i].Position=Vector2.new(startx+labelw+3,texty);toggle.menuinfo.layouts[i]={x=startx+labelw+1,y=texty-2,w=18,h=14,text=item.info,warning=item.warning,unstable=item.unstable,permission=item.permission,visible=visible and texty>=cliptop and texty+10<=clipbottom}else itemlabel[i].Position=Vector2.new(x+w/2,texty)end elseif item.info then local infox=math.min(x+w-48,x+7+#item.label*7+4);toggle.menuinfo.items[i].Position=Vector2.new(infox,texty);toggle.menuinfo.layouts[i]={x=infox-2,y=texty-2,w=18,h=14,text=item.info,warning=item.warning,unstable=item.unstable,permission=item.permission,visible=visible and texty>=cliptop and texty+10<=clipbottom}end
         local markx,marky,markw,markh=x+w-16,y+4,9,9;if item.kind=="color"then markx,markw=x+w-31,24 end
         itemmark[i].Position=Vector2.new(markx+1,marky+1);itemmark[i].Size=Vector2.new(markw-2,markh-2)
-        local ratio=item.kind=="slider"and clamp((item.value-item.min)/(item.max-item.min),0,1)or 0;if item.kind=="slider"then local animkey=tostring(menustate.tab)..":"..item.id;local targetratio=ratio;menustate.slideranim[animkey]=toggle.ease(menustate.slideranim[animkey],targetratio,0.28);ratio=menustate.slideranim[animkey];if math.abs(ratio-targetratio)>0.001 then menustate.positionanimating=true end end
+        local ratio=item.kind=="slider"and clamp((item.value-item.min)/(item.max-item.min),0,1)or 0;if item.kind=="slider"then local animkey=tostring(menustate.tab)..":"..item.id;local targetratio=ratio;menustate.slideranim[animkey]=toggle.ease(menustate.slideranim[animkey],targetratio,0.36);ratio=menustate.slideranim[animkey];if math.abs(ratio-targetratio)>0.001 then menustate.positionanimating=true end end
         if item.kind=="section"then
             local bgtop=math.max(cliptop,y+17);local bgbottom=math.min(clipbottom,y+panelh-4);itembg[i].Position=Vector2.new(x-2,bgtop);itembg[i].Size=Vector2.new(w+4,math.max(0,bgbottom-bgtop));local frame=getsectionframe(i);local titleend=math.min(x+w-12,x+12+#item.label*7)
             local topy=y+15;local leftx=x-2;local rightx=math.min(x+w+2,menustate.x+menustate.w-12);local bottomy=y+panelh-2;frame.topl.From=Vector2.new(leftx,topy);frame.topl.To=Vector2.new(x+8,topy);frame.topr.From=Vector2.new(titleend+5,topy);frame.topr.To=Vector2.new(rightx,topy);local sidetop=math.max(cliptop,topy);local sidebottom=math.min(clipbottom,bottomy);frame.left.From=Vector2.new(leftx,sidetop);frame.left.To=Vector2.new(leftx,sidebottom);frame.right.From=Vector2.new(rightx,sidetop);frame.right.To=Vector2.new(rightx,sidebottom);frame.bottom.From=Vector2.new(leftx,bottomy);frame.bottom.To=Vector2.new(rightx,bottomy)
@@ -575,10 +683,10 @@ end
 local function dropdownupdate(visible)
     local values=dropdownvalues();dropdownlayouts={};local rowid=dropdownkind=="espfont"and"espfontselect"or dropdownkind=="hudfont"and"hudfontselect"or dropdownkind=="preset"and"presetselect"or dropdownkind=="unit"and"distanceunitselect"or dropdownkind=="distanceposition"and"distancepositionselect"or dropdownkind=="scrapstyle"and"scrapstyleselect"or dropdownkind=="scrapteleport"and"scrapteleportselect"or dropdownkind=="ringshape"and"ringshapeselect"or dropdownkind=="rgbdirection"and"rgbdirectionselect"or dropdownkind=="powerformat"and"powerformatselect"or dropdownkind=="timerformat"and"timerformatselect"or dropdownkind=="ppmsstyle"and"ppmsstyleselect"or dropdownkind=="rakehealthformat"and"rakehealthformatselect"or dropdownkind=="hudstyle"and"hudstyleselect"or dropdownkind=="poweractivitymode"and"poweractivitymodeselect"or"configselect";local source=nil
     for i=1,#itemlayouts do if itemlayouts[i].item.id==rowid and itemlayouts[i].visible then source=itemlayouts[i];break end end
-    if not visible or not source then dropdown.opened=false;dropdown.anim=0;toggle.setvisible(dropdown.panel,false);toggle.setvisible(dropdown.border,false);toggle.setvisible(dropdown.accent,false);for i=1,dropdown.max do toggle.setvisible(dropdown.bg[i],false);toggle.setvisible(dropdown.text[i],false)end;return end
-    if not dropdown.opened then dropdown.anim=0;dropdown.opened=true end;dropdown.anim=toggle.ease(dropdown.anim,1,0.3)
+    if not visible or not source then if not dropdown.opened then return end;dropdown.opened=false;dropdown.anim=0;toggle.setvisible(dropdown.panel,false);toggle.setvisible(dropdown.border,false);toggle.setvisible(dropdown.accent,false);for i=1,dropdown.max do toggle.setvisible(dropdown.bg[i],false);toggle.setvisible(dropdown.text[i],false)end;return end
+    if not dropdown.opened then dropdown.anim=0;dropdown.opened=true end;dropdown.anim=toggle.ease(dropdown.anim,1,0.38)
     local w,rowh=source.item.stacked and source.w or 150,22;local x=source.x+source.w-w;local y=source.y+source.h+2;local count=math.min(#values,dropdown.max)
-    y=clamp(y,menustate.y+54,menustate.y+menustate.h-count*rowh-7)+math.floor((1-dropdown.anim)*6+0.5);dropdown.panel.Position=Vector2.new(x-3,y-4);dropdown.panel.Size=Vector2.new(w+6,count*rowh+7);dropdown.panel.Color=color("top");dropdown.panel.Transparency=dropdown.anim;dropdown.panel.Visible=true;dropdown.border.Position=dropdown.panel.Position;dropdown.border.Size=dropdown.panel.Size;dropdown.border.Color=themes.borderblack;dropdown.border.Transparency=dropdown.anim;dropdown.border.Visible=true;dropdown.accent.Position=Vector2.new(x-2,y-3);dropdown.accent.Size=Vector2.new(w+4,2);dropdown.accent.Color=toggle.accentvisual();dropdown.accent.Transparency=dropdown.anim;dropdown.accent.Visible=true
+    y=clamp(y,menustate.y+54,menustate.y+menustate.h-count*rowh-7)+math.floor((1-dropdown.anim)*6+0.5);dropdown.panel.Position=Vector2.new(x-3,y-4);dropdown.panel.Size=Vector2.new(w+6,count*rowh+7);dropdown.panel.Color=color("top");dropdown.panel.Transparency=dropdown.anim;toggle.setvisible(dropdown.panel,true);dropdown.border.Position=dropdown.panel.Position;dropdown.border.Size=dropdown.panel.Size;dropdown.border.Color=themes.borderblack;dropdown.border.Transparency=dropdown.anim;toggle.setvisible(dropdown.border,true);dropdown.accent.Position=Vector2.new(x-2,y-3);dropdown.accent.Size=Vector2.new(w+4,2);dropdown.accent.Color=toggle.accentvisual();dropdown.accent.Transparency=dropdown.anim;toggle.setvisible(dropdown.accent,true)
     for i=1,dropdown.max do
         local on=i<=#values;toggle.setvisible(dropdown.bg[i],on);toggle.setvisible(dropdown.text[i],on)
         if on then local selected=(dropdownkind=="espfont"and i==fontindex)or(dropdownkind=="hudfont"and i==toggle.hudfontindex)or(dropdownkind=="preset"and i==themeindex)or(dropdownkind=="unit"and values[i]==toggle.distanceunit)or(dropdownkind=="distanceposition"and values[i]==toggle.distanceposition)or(dropdownkind=="scrapstyle"and values[i]==toggle.scrapstyle)or(dropdownkind=="scrapteleport"and values[i]==toggle.scrapteleport)or(dropdownkind=="ringshape"and values[i]==toggle.ringshape)or(dropdownkind=="rgbdirection"and values[i]==toggle.rgbdirection)or(dropdownkind=="powerformat"and values[i]==toggle.powerformat)or(dropdownkind=="timerformat"and values[i]==toggle.timerformat)or(dropdownkind=="ppmsstyle"and values[i]==toggle.ppmsstyle)or(dropdownkind=="rakehealthformat"and values[i]==toggle.rakehealthformat)or(dropdownkind=="hudstyle"and values[i]==toggle.hudstyle)or(dropdownkind=="poweractivitymode"and values[i]==toggle.poweractivitymode)or(dropdownkind=="config"and i==configslot);local iy=y+(i-1)*rowh;local hover=inside(mouse.X,mouse.Y,x,iy,w,rowh);dropdown.bg[i].Position=Vector2.new(x,iy);dropdown.bg[i].Size=Vector2.new(w,rowh-1);dropdown.bg[i].Color=color(selected and"select"or hover and"hover"or"card");dropdown.bg[i].Transparency=dropdown.anim;dropdown.text[i].Position=Vector2.new(x+8,iy+7);dropdown.text[i].Text=values[i];dropdown.text[i].Color=color(selected and"accent"or"text");dropdown.text[i].Transparency=dropdown.anim;dropdown.text[i].Outline=themes[themeindex].light~=true;dropdownlayouts[i]={x=x,y=iy,w=w,h=rowh,index=i,value=values[i]}end
@@ -587,12 +695,12 @@ end
 local function pickerupdate(visible)
     local cfg=entrycfg(pickerentry);local on=visible and cfg~=nil
     local rgbvisible=on and(type(pickerentry)=="number"or type(pickerentry)=="string"and(string.match(pickerentry,"^volt%d$")or string.sub(pickerentry,1,6)=="crate_")or pickerentry=="distance"or pickerentry=="rake"or pickerentry=="rakehealth"or pickerentry=="rakebar"or pickerentry=="roof"or pickerentry=="hudtimer"or pickerentry=="hudtarget"or pickerentry=="hudscrap"or pickerentry=="hudpower"or pickerentry=="cooldownlabel"or pickerentry=="cooldownvalue"or pickerentry=="ppmslabel"or pickerentry=="ppmsvalue"or pickerentry=="valuetimer"or pickerentry=="valuetarget"or pickerentry=="valuescrap"or pickerentry=="valuepower"or pickerentry=="timerwarning")
-    if on and not picker.opened then picker.anim=0;picker.cursorx=nil;picker.cursory=nil;picker.huey=nil;picker.opened=true elseif not on then picker.opened=false;picker.anim=0 end;if on then picker.anim=toggle.ease(picker.anim,1,0.24)end
+    if on and not picker.opened then picker.anim=0;picker.cursorx=nil;picker.cursory=nil;picker.huey=nil;picker.opened=true elseif not on then picker.opened=false;picker.anim=0 end;if on then picker.anim=toggle.ease(picker.anim,1,0.32)elseif picker.wasvisible==false then pickerlayouts={};return end
     for i=1,#picker.baseobjects do toggle.setvisible(picker.baseobjects[i],on)end;toggle.setvisible(picker.reveal,on and picker.anim<0.999);for i=1,#picker.rgbobjects do toggle.setvisible(picker.rgbobjects[i],rgbvisible)end
     for i=1,#picker.previewrgb do toggle.setvisible(picker.previewrgb[i],false)end
     for i=1,6 do toggle.setvisible(picker.recent[i],on);toggle.setvisible(picker.recentborder[i],on)end
     if picker.wasvisible~=on then for i=1,#picker.grid do toggle.setvisible(picker.grid[i],on)end;for i=1,#picker.hue do toggle.setvisible(picker.hue[i],on)end;picker.wasvisible=on end
-    picker.accent.Visible=false;for _,d in ipairs({picker.title,picker.rgbtext,picker.donetext,picker.hexlabel,picker.hextext,picker.recentlabel})do d.Outline=themes[themeindex].light~=true end;pickerlayouts={};if not on then toggle.paintgradient(picker.gradient,false);return end
+    toggle.setvisible(picker.accent,false);for _,d in ipairs({picker.title,picker.rgbtext,picker.donetext,picker.hexlabel,picker.hextext,picker.recentlabel})do d.Outline=themes[themeindex].light~=true end;pickerlayouts={};if not on then toggle.paintgradient(picker.gradient,false);return end
     local pw,ph=280,312;local px=menustate.x+menustate.w+8;local py=clamp(menustate.y+55,2,math.max(2,cam.ViewportSize.Y-ph-2));if px+pw>cam.ViewportSize.X-2 then px=math.max(2,menustate.x-pw-8)end;local c=cfg.labelcolor;local h,s,v=tohsv(c);if not picker.hexactive then picker.hexvalue=toggle.hexof(c)end
     local alpha=picker.anim;picker.border.Position=Vector2.new(px,py);picker.border.Size=Vector2.new(pw,ph);picker.border.Color=themes.borderblack;picker.border.Transparency=alpha;picker.middleborder.Position=Vector2.new(px+1,py+1);picker.middleborder.Size=Vector2.new(pw-2,ph-2);picker.middleborder.Color=color("outline");picker.middleborder.Transparency=0.85*alpha;picker.innerborder.Position=Vector2.new(px+2,py+2);picker.innerborder.Size=Vector2.new(pw-4,ph-4);picker.innerborder.Color=themes.borderblack;picker.innerborder.Transparency=alpha
     picker.bg.Position=Vector2.new(px+3,py+3);picker.bg.Size=Vector2.new(pw-6,ph-6);picker.bg.Color=color("bg");picker.bg.Transparency=alpha;picker.top.Position=Vector2.new(px+3,py+3);picker.top.Size=Vector2.new(pw-6,25);picker.top.Color=color("top");picker.top.Transparency=alpha;toggle.layoutgradient(picker.gradient,px+3,py+3,pw-6);toggle.paintgradient(picker.gradient,true,alpha);picker.divider.From=Vector2.new(px+3,py+28);picker.divider.To=Vector2.new(px+pw-3,py+28);picker.divider.Color=color("select");picker.divider.Transparency=0.75*alpha
@@ -606,7 +714,7 @@ local function pickerupdate(visible)
     local hx,hy,hw,hh=px+244,sy,22,sh;local hueh=hh/picker.huesteps
     if picker.huelayoutkey~=layoutkey or picker.cachedh~=h or picker.cacheds~=s then for i=1,#picker.hue do local d=picker.hue[i];d.Position=Vector2.new(hx,hy+(i-1)*hueh);d.Size=Vector2.new(hw,math.ceil(hueh+0.5));d.Color=Color3.fromHSV(h,s,1-(i-1)/(picker.huesteps-1));d.Transparency=1 end;picker.huelayoutkey=layoutkey;picker.cachedh=h;picker.cacheds=s end
     picker.hueborder.Position=Vector2.new(hx-1,hy-1);picker.hueborder.Size=Vector2.new(hw+2,hh+2);picker.hueborder.Color=themes.borderblack;picker.hueborder.Transparency=alpha;picker.huey=toggle.ease(picker.huey,hy+clamp((1-v)*hh,1,hh-3),0.36);picker.huecursor.Position=Vector2.new(hx-2,picker.huey);picker.huecursor.Size=Vector2.new(hw+4,4);picker.huecursor.Color=Color3.fromHex("#ffffff");picker.huecursor.Transparency=alpha;picker.reveal.Position=Vector2.new(sx,sy);picker.reveal.Size=Vector2.new(hx+hw-sx,sh);picker.reveal.Color=color("bg");picker.reveal.Transparency=1-alpha
-    local fy=py+210;picker.previewborder.Position=Vector2.new(px+12,fy);picker.previewborder.Size=Vector2.new(78,27);picker.previewborder.Color=themes.borderblack;picker.previewborder.Transparency=alpha;picker.preview.Position=Vector2.new(px+14,fy+2);picker.preview.Size=Vector2.new(74,23);picker.preview.Color=cfg.rgb and rgb(0)or c;picker.preview.Transparency=alpha;picker.preview.Visible=true
+    local fy=py+210;picker.previewborder.Position=Vector2.new(px+12,fy);picker.previewborder.Size=Vector2.new(78,27);picker.previewborder.Color=themes.borderblack;picker.previewborder.Transparency=alpha;picker.preview.Position=Vector2.new(px+14,fy+2);picker.preview.Size=Vector2.new(74,23);picker.preview.Color=cfg.rgb and rgb(0)or c;picker.preview.Transparency=alpha;toggle.setvisible(picker.preview,true)
     picker.rgbborder.Position=Vector2.new(px+98,fy);picker.rgbborder.Size=Vector2.new(72,27);picker.rgbborder.Color=themes.borderblack;picker.rgbborder.Transparency=alpha;picker.rgbbg.Position=Vector2.new(px+100,fy+2);picker.rgbbg.Size=Vector2.new(68,23);picker.rgbbg.Color=color("top");picker.rgbbg.Transparency=alpha;picker.rgbmarkborder.Position=Vector2.new(px+106,fy+8);picker.rgbmarkborder.Size=Vector2.new(11,11);picker.rgbmarkborder.Color=color("outline");picker.rgbmarkborder.Transparency=alpha;picker.rgbmark.Position=Vector2.new(px+108,fy+10);picker.rgbmark.Size=Vector2.new(7,7);picker.rgbmark.Color=cfg.rgb and toggle.accentvisual()or color("bg");picker.rgbmark.Transparency=alpha;picker.rgbtext.Position=Vector2.new(px+124,fy+6);picker.rgbtext.Color=color("text");picker.rgbtext.Transparency=alpha
     picker.doneborder.Position=Vector2.new(px+178,fy);picker.doneborder.Size=Vector2.new(88,27);picker.doneborder.Color=themes.borderblack;picker.doneborder.Transparency=alpha;picker.donebg.Position=Vector2.new(px+180,fy+2);picker.donebg.Size=Vector2.new(84,23);picker.donebg.Color=color(inside(mouse.X,mouse.Y,px+178,fy,88,27)and"hover"or"top");picker.donebg.Transparency=alpha;picker.donetext.Position=Vector2.new(px+222,fy+12);picker.donetext.Color=color("text");picker.donetext.Transparency=alpha
     local hexy=py+244;picker.hexlabel.Position=Vector2.new(px+12,hexy+6);picker.hexlabel.Color=color("muted");picker.hexlabel.Transparency=alpha;picker.hexborder.Position=Vector2.new(px+54,hexy);picker.hexborder.Size=Vector2.new(212,27);picker.hexborder.Color=picker.hexactive and toggle.accentvisual()or themes.borderblack;picker.hexborder.Transparency=alpha;picker.hexbg.Position=Vector2.new(px+56,hexy+2);picker.hexbg.Size=Vector2.new(208,23);picker.hexbg.Color=color("top");picker.hexbg.Transparency=alpha;picker.hextext.Position=Vector2.new(px+64,hexy+6);picker.hextext.Text="#"..picker.hexvalue..(picker.hexactive and"_"or"");picker.hextext.Color=color(picker.hexactive and"accent"or"text");picker.hextext.Transparency=alpha
@@ -617,34 +725,35 @@ end
 local function menuobjects(visible)
     local expanded=visible and not menustate.minimized
     toggle.setvisible(menubg,visible);toggle.setvisible(menutop,visible);toggle.setvisible(menuchrome.border,visible);toggle.setvisible(menutitle,visible);toggle.setvisible(menuclose,visible);toggle.setvisible(menuside,expanded);toggle.setvisible(menuchrome.tabindicator,expanded);toggle.setvisible(menuchrome.content,false);toggle.setvisible(menuchrome.divider,false)
-    local canscroll=expanded and(menustate.scrollmax[menustate.tab]or 0)>0;menuchrome.scrolltrack.Visible=canscroll;menuchrome.scrollthumb.Visible=canscroll;menuchrome.scrollborder.Visible=canscroll
+    local canscroll=expanded and(menustate.scrollmax[menustate.tab]or 0)>0;toggle.setvisible(menuchrome.scrolltrack,canscroll);toggle.setvisible(menuchrome.scrollthumb,canscroll);toggle.setvisible(menuchrome.scrollborder,canscroll)
     for i=1,2 do toggle.setvisible(menuchrome.columns[i],false);toggle.setvisible(menuchrome.columnborders[i],visible)end
     for i=1,#tabnames do toggle.setvisible(tabbg[i],expanded and i==menustate.tab);toggle.setvisible(tabborder[i],false);toggle.setvisible(tabtext[i],expanded)end
-    for i=1,menustate.maxitems do
+    local itemcount=math.max(#menuitems,menustate.lastitemcount or 0)
+    for i=1,itemcount do
         local item=menuitems[i];local layout=itemlayouts[i];local on=expanded and item~=nil and layout and layout.visible;local sectionon=on and item.kind=="section";local slideron=on and item.kind=="slider";local markon=on and(item.kind=="toggle"or item.kind=="color");local markcfg=markon and item.kind=="color"and entrycfg(item.index)or nil;local rgbmarkon=false;local bordered=on and(item.kind=="action"or item.kind=="text"and item.id~="rakenameinput")
         local sliderframeon=slideron and layout.trackvisible;local markframeon=markon and layout.markvisible
         toggle.setvisible(itembg[i],on);toggle.setvisible(itemborder[i],sliderframeon or markframeon or bordered);toggle.setvisible(itemlabel[i],on and layout.textvisible);toggle.setvisible(toggle.menuinfo.items[i],on and item.info~=nil and layout.textvisible);toggle.setvisible(itemvalue[i],on and layout.valuevisible and item.kind~="section"and item.kind~="toggle"and item.kind~="color");toggle.setvisible(itemmark[i],markframeon and not rgbmarkon);toggle.setvisible(markborder[i],sliderframeon or markframeon or bordered);toggle.setvisible(itemline[i],false);toggle.setvisible(itemtrack[i],sliderframeon);toggle.setvisible(itemfill[i],sliderframeon);toggle.setvisible(trackborder[i],sliderframeon or markframeon or bordered)
         local frame=sectionframes[i];if frame then local topy=layout and layout.y+15 or 0;local bottomy=layout and layout.y+layout.panelh-2 or 0;local topvisible=sectionon and topy>=layout.cliptop and topy<=layout.clipbottom;local sidevisible=sectionon and math.min(layout.clipbottom,bottomy)>math.max(layout.cliptop,topy);local bottomvisible=sectionon and bottomy>=layout.cliptop and bottomy<=layout.clipbottom;toggle.setvisible(frame.topl,topvisible);toggle.setvisible(frame.topr,topvisible);toggle.setvisible(frame.left,sidevisible);toggle.setvisible(frame.right,sidevisible);toggle.setvisible(frame.bottom,bottomvisible)end
         if itemrgb[i]then for s=1,itemrgbcount do toggle.setvisible(itemrgb[i][s],rgbmarkon)end end
     end
-    for i=1,#menurgb do toggle.setvisible(menurgb[i],visible)end
+    menustate.lastitemcount=#menuitems
     dropdownupdate(expanded and dropdownkind~=nil and pickerentry==nil);pickerupdate(expanded and pickerentry~=nil)
 end
 local function menuupdate(animateonly)
     if toggle.uibatch then menustate.itemsdirty=true;return end
     if not animateonly then menustate.itemsdirty=true end
     local title=toggle.menutitle();if menutitle.Text~=title then menutitle.Text=title;menustate.watermarkw=math.min(menustate.w,math.max(100,#title*7+28))end
-    local targetscroll=menustate.scrolltarget[menustate.tab]or 0;local currentscroll=menustate.scroll[menustate.tab]or targetscroll;local moved=menustate.layoutx~=menustate.x or menustate.layouty~=menustate.y or menustate.layouttab~=menustate.tab or menustate.layoutminimized~=menustate.minimized;if not animateonly or menustate.itemsdirty or menustate.positionanimating or math.abs(targetscroll-currentscroll)>0.001 or moved then menupos();menustate.layoutx=menustate.x;menustate.layouty=menustate.y;menustate.layouttab=menustate.tab;menustate.layoutminimized=menustate.minimized end;local mx,my=mouse.X,mouse.Y;local menuoutline=themes[themeindex].light~=true
-    menubg.Color=color("bg");menutop.Color=color("top");menuside.Color=color("side");menutitle.Color=color("text");menutitle.Outline=menuoutline;menuclose.Color=color("muted");menuclose.Outline=menuoutline;menuchrome.border.Color=themes.borderblack;menuchrome.columnborders[1].Color=color("outline");menuchrome.columnborders[2].Color=themes.borderblack;menuchrome.content.Color=color("select");menuchrome.divider.Color=color("select");menuchrome.scrolltrack.Color=color("bg");menuchrome.scrollthumb.Color=toggle.accentvisual();menuchrome.scrollborder.Color=color("select");menuchrome.tabindicator.Color=toggle.accentvisual();menubg.Transparency=guiopacity;menutop.Transparency=guiopacity;menuside.Transparency=guiopacity;menuchrome.border.Transparency=guiopacity;menuchrome.columnborders[1].Transparency=0.85*guiopacity;menuchrome.columnborders[2].Transparency=guiopacity;menuchrome.content.Transparency=guiopacity;menuchrome.divider.Transparency=0.7*guiopacity;menuchrome.scrolltrack.Transparency=0.75*guiopacity;menuchrome.scrollthumb.Transparency=guiopacity;menuchrome.scrollborder.Transparency=0.8*guiopacity;menuchrome.tabindicator.Transparency=guiopacity;menuclose.Text=menustate.minimized and"+"or"-"
+    local targetscroll=menustate.scrolltarget[menustate.tab]or 0;local currentscroll=menustate.scroll[menustate.tab]or targetscroll;local moved=menustate.layoutx~=menustate.x or menustate.layouty~=menustate.y or menustate.layouttab~=menustate.tab or menustate.layoutminimized~=menustate.minimized;if not animateonly or menustate.itemsdirty or menustate.positionanimating or math.abs(targetscroll-currentscroll)>0.001 or moved then menupos();menustate.layoutx=menustate.x;menustate.layouty=menustate.y;menustate.layouttab=menustate.tab;menustate.layoutminimized=menustate.minimized end;local mx,my=mouse.X,mouse.Y;local menuoutline=themes[themeindex].light~=true;local accentcolor=toggle.accentvisual()
+    toggle.setprop(menubg,"Color",color("bg"));toggle.setprop(menutop,"Color",color("top"));toggle.setprop(menuside,"Color",color("side"));toggle.setprop(menutitle,"Color",color("text"));toggle.setprop(menutitle,"Outline",menuoutline);toggle.setprop(menuclose,"Color",color("muted"));toggle.setprop(menuclose,"Outline",menuoutline);toggle.setprop(menuchrome.border,"Color",themes.borderblack);toggle.setprop(menuchrome.columnborders[1],"Color",color("outline"));toggle.setprop(menuchrome.columnborders[2],"Color",themes.borderblack);toggle.setprop(menuchrome.content,"Color",color("select"));toggle.setprop(menuchrome.divider,"Color",color("select"));toggle.setprop(menuchrome.scrolltrack,"Color",color("bg"));toggle.setprop(menuchrome.scrollthumb,"Color",accentcolor);toggle.setprop(menuchrome.scrollborder,"Color",color("select"));toggle.setprop(menuchrome.tabindicator,"Color",accentcolor);toggle.setprop(menubg,"Transparency",guiopacity);toggle.setprop(menutop,"Transparency",guiopacity);toggle.setprop(menuside,"Transparency",guiopacity);toggle.setprop(menuchrome.border,"Transparency",guiopacity);toggle.setprop(menuchrome.columnborders[1],"Transparency",0.85*guiopacity);toggle.setprop(menuchrome.columnborders[2],"Transparency",guiopacity);toggle.setprop(menuchrome.content,"Transparency",guiopacity);toggle.setprop(menuchrome.divider,"Transparency",0.7*guiopacity);toggle.setprop(menuchrome.scrolltrack,"Transparency",0.75*guiopacity);toggle.setprop(menuchrome.scrollthumb,"Transparency",guiopacity);toggle.setprop(menuchrome.scrollborder,"Transparency",0.8*guiopacity);toggle.setprop(menuchrome.tabindicator,"Transparency",guiopacity);toggle.setprop(menuclose,"Text",menustate.minimized and"+"or"-")
     local navw=menustate.w-8;local tabw=navw/#tabnames
-    for i=1,#tabnames do local tx=menustate.x+4+(i-1)*tabw;local hover=inside(mx,my,tx,menustate.y+29,tabw,18);local key="tab:"..tostring(i);menustate.hover[key]=toggle.ease(menustate.hover[key],hover and 1 or 0,0.2);tabbg[i].Color=toggle.accentvisual();tabbg[i].Transparency=0;tabtext[i].Color=toggle.colormix(i==menustate.tab and toggle.accentvisual()or color("text"),toggle.accentvisual(),menustate.hover[key]);tabtext[i].Outline=menuoutline end
+    for i=1,#tabnames do local tx=menustate.x+4+(i-1)*tabw;local hover=inside(mx,my,tx,menustate.y+29,tabw,18);local key="tab:"..tostring(i);menustate.hover[key]=toggle.ease(menustate.hover[key],hover and 1 or 0,0.28);toggle.setprop(tabbg[i],"Color",accentcolor);toggle.setprop(tabbg[i],"Transparency",0);toggle.setprop(tabtext[i],"Color",toggle.colormix(i==menustate.tab and accentcolor or color("text"),accentcolor,menustate.hover[key]));toggle.setprop(tabtext[i],"Outline",menuoutline)end
     for i=1,#menuitems do
-        local item=menuitems[i];local l=itemlayouts[i];if l.visible then local fade=l.fade or 1;local borderfade=item.kind=="section"and(l.linefade or 0)or item.kind=="slider"and(l.sliderfade or 0)or fade;local hover=l.visible and item.kind~="section"and inside(mx,my,l.x,l.hittop,l.w,l.hitbottom-l.hittop);local shown=toggle.itemshown(item);local strong=item.kind=="dropdown"or item.kind=="action"or item.kind=="bind"or item.kind=="text";local animkey=tostring(menustate.tab)..":"..tostring(item.id or item.label or i);menustate.hover[animkey]=toggle.ease(menustate.hover[animkey],hover and 1 or 0,0.2);local basecolor=item.kind=="section"and"top"or strong and"top"or"card";local hovercolor=strong and"select"or"hover";itembg[i].Color=toggle.colormix(color(basecolor),color(hovercolor),menustate.hover[animkey]);itembg[i].Transparency=(item.kind=="section"and 0.72 or strong and(0.58+0.38*menustate.hover[animkey])or 0.13+0.25*menustate.hover[animkey])*guiopacity*fade;itemborder[i].Color=themes.borderblack;itemborder[i].Transparency=guiopacity*borderfade;markborder[i].Color=color("outline");markborder[i].Transparency=0.9*guiopacity*borderfade;trackborder[i].Color=themes.borderblack;trackborder[i].Transparency=guiopacity*borderfade;itemlabel[i].Text=item.label;itemlabel[i].Color=color("text");itemlabel[i].Transparency=l.textfade;itemlabel[i].Outline=menuoutline;toggle.menuinfo.items[i].Text=item.warning and"[!]"or"[i]";toggle.menuinfo.items[i].Color=Color3.fromHex(item.warning and"#ff3b3b"or"#f2a93b");toggle.menuinfo.items[i].Transparency=l.textfade;toggle.menuinfo.items[i].Outline=menuoutline;itemvalue[i].Text=shown;itemvalue[i].Color=color(item.stacked and"text"or"accent");itemvalue[i].Transparency=l.valuefade;itemvalue[i].Outline=menuoutline;itemline[i].Color=toggle.accentvisual();itemline[i].Transparency=0.85*guiopacity*borderfade;itemtrack[i].Color=color("bg");itemtrack[i].Transparency=item.kind=="slider"and borderfade or fade;itemfill[i].Color=toggle.accentvisual();itemfill[i].Transparency=item.kind=="section"and borderfade or item.kind=="slider"and borderfade or fade
-        if item.kind=="toggle"then menustate.toggleanim[animkey]=toggle.ease(menustate.toggleanim[animkey],item.on and 1 or 0,0.26);itemmark[i].Color=toggle.accentvisual();itemmark[i].Transparency=menustate.toggleanim[animkey]*fade
+        local item=menuitems[i];local l=itemlayouts[i];if l.visible then local fade=l.fade or 1;local borderfade=item.kind=="section"and(l.linefade or 0)or item.kind=="slider"and(l.sliderfade or 0)or fade;local hover=l.visible and item.kind~="section"and inside(mx,my,l.x,l.hittop,l.w,l.hitbottom-l.hittop);local shown=toggle.itemshown(item);local strong=item.kind=="dropdown"or item.kind=="action"or item.kind=="bind"or item.kind=="text";local animkey=tostring(menustate.tab)..":"..tostring(item.id or item.label or i);menustate.hover[animkey]=toggle.ease(menustate.hover[animkey],hover and 1 or 0,0.2);local basecolor=item.kind=="section"and"top"or strong and"top"or"card";local hovercolor=strong and"select"or"hover";toggle.setprop(itembg[i],"Color",toggle.colormix(color(basecolor),color(hovercolor),menustate.hover[animkey]));toggle.setprop(itembg[i],"Transparency",(item.kind=="section"and 0.72 or strong and(0.58+0.38*menustate.hover[animkey])or 0.13+0.25*menustate.hover[animkey])*guiopacity*fade);toggle.setprop(itemborder[i],"Color",themes.borderblack);toggle.setprop(itemborder[i],"Transparency",guiopacity*borderfade);toggle.setprop(markborder[i],"Color",color("outline"));toggle.setprop(markborder[i],"Transparency",0.9*guiopacity*borderfade);toggle.setprop(trackborder[i],"Color",themes.borderblack);toggle.setprop(trackborder[i],"Transparency",guiopacity*borderfade);toggle.setprop(itemlabel[i],"Text",item.label);toggle.setprop(itemlabel[i],"Color",color("text"));toggle.setprop(itemlabel[i],"Transparency",l.textfade);toggle.setprop(itemlabel[i],"Outline",menuoutline);toggle.setprop(toggle.menuinfo.items[i],"Text",item.permission and"[p]"or item.warning and"[!]"or"[?]");toggle.setprop(toggle.menuinfo.items[i],"Color",item.permission and toggle.permissionblue or item.warning and toggle.warningred or toggle.infoorange);toggle.setprop(toggle.menuinfo.items[i],"Transparency",l.textfade);toggle.setprop(toggle.menuinfo.items[i],"Outline",menuoutline);toggle.setprop(itemvalue[i],"Text",shown);toggle.setprop(itemvalue[i],"Color",color(item.stacked and"text"or"accent"));toggle.setprop(itemvalue[i],"Transparency",l.valuefade);toggle.setprop(itemvalue[i],"Outline",menuoutline);toggle.setprop(itemline[i],"Color",accentcolor);toggle.setprop(itemline[i],"Transparency",0.85*guiopacity*borderfade);toggle.setprop(itemtrack[i],"Color",color("bg"));toggle.setprop(itemtrack[i],"Transparency",item.kind=="slider"and borderfade or fade);toggle.setprop(itemfill[i],"Color",accentcolor);toggle.setprop(itemfill[i],"Transparency",item.kind=="section"and borderfade or item.kind=="slider"and borderfade or fade)
+        if item.kind=="toggle"then menustate.toggleanim[animkey]=toggle.ease(menustate.toggleanim[animkey],item.on and 1 or 0,0.34);toggle.setprop(itemmark[i],"Color",accentcolor);toggle.setprop(itemmark[i],"Transparency",menustate.toggleanim[animkey]*fade)
         elseif item.kind=="color"then
-            local cfg=entrycfg(item.index);itemmark[i].Color=cfg and(cfg.rgb and rgb(0)or cfg.labelcolor)or color("accent");itemmark[i].Transparency=fade;itemvalue[i].Text=cfg and cfg.rgb and"RGB"or""
+            local cfg=entrycfg(item.index);toggle.setprop(itemmark[i],"Color",cfg and(cfg.rgb and rgb(0)or cfg.labelcolor)or color("accent"));toggle.setprop(itemmark[i],"Transparency",fade);toggle.setprop(itemvalue[i],"Text",cfg and cfg.rgb and"RGB"or"")
         end
-        local frame=sectionframes[i];if frame and item.kind=="section"then local bottomcenter=l.y+l.panelh-2;local bottomfade=clamp(math.min(bottomcenter-l.cliptop,l.clipbottom-bottomcenter)/10,0,1);frame.topl.Color=toggle.accentvisual();frame.topr.Color=toggle.accentvisual();frame.topl.Transparency=guiopacity*(l.linefade or 0);frame.topr.Transparency=guiopacity*(l.linefade or 0);frame.left.Color=color("select");frame.right.Color=color("select");frame.bottom.Color=color("select");frame.left.Transparency=guiopacity*fade;frame.right.Transparency=guiopacity*fade;frame.bottom.Transparency=guiopacity*bottomfade end
+        local frame=sectionframes[i];if frame and item.kind=="section"then local bottomcenter=l.y+l.panelh-2;local bottomfade=clamp(math.min(bottomcenter-l.cliptop,l.clipbottom-bottomcenter)/10,0,1);toggle.setprop(frame.topl,"Color",accentcolor);toggle.setprop(frame.topr,"Color",accentcolor);toggle.setprop(frame.topl,"Transparency",guiopacity*(l.linefade or 0));toggle.setprop(frame.topr,"Transparency",guiopacity*(l.linefade or 0));toggle.setprop(frame.left,"Color",color("select"));toggle.setprop(frame.right,"Color",color("select"));toggle.setprop(frame.bottom,"Color",color("select"));toggle.setprop(frame.left,"Transparency",guiopacity*fade);toggle.setprop(frame.right,"Transparency",guiopacity*fade);toggle.setprop(frame.bottom,"Transparency",guiopacity*bottomfade)end
     end end
     menuobjects(toggle.menu);toggle.tooltipupdate()
 end
@@ -664,13 +773,13 @@ toggle.ppmsdraw.value.Visible=false;toggle.ppmsdraw.label.Visible=false
 toggle.makewidgetframe=function()
     return {bg=setz(newsquare(Color3.fromHex("#262626"),0.95),10),top=setz(newsquare(Color3.fromHex("#363636"),0.95),11),outer=setz(newborder(Color3.fromHex("#000000"),1),12),middle=setz(newborder(Color3.fromHex("#555555"),1),12),inner=setz(newborder(Color3.fromHex("#000000"),1),12),accent=setz(newsquare(Color3.fromHex("#99c30b"),1),13),gradient=toggle.makegradient(72,13)}
 end
-toggle.groupwidget=toggle.makewidgetframe();toggle.groupwidget.accent.Visible=false;toggle.widgetgroup={x=nil,y=nil,w=0,h=0,dragged=false}
+toggle.groupwidget=toggle.makewidgetframe();toggle.setvisible(toggle.groupwidget.accent,false);toggle.widgetgroup={x=nil,y=nil,w=0,h=0,dragged=false}
 toggle.placewidget=function(frame,x,y,w,h)
     x=toggle.pixel(x);y=toggle.pixel(y);w=toggle.pixel(w);h=toggle.pixel(h);frame.x=x;frame.y=y;frame.w=w;frame.h=h
-    frame.outer.Position=Vector2.new(x,y);frame.outer.Size=Vector2.new(w,h);frame.middle.Position=Vector2.new(x+1,y+1);frame.middle.Size=Vector2.new(w-2,h-2);frame.inner.Position=Vector2.new(x+2,y+2);frame.inner.Size=Vector2.new(w-4,h-4);frame.bg.Position=Vector2.new(x+3,y+3);frame.bg.Size=Vector2.new(w-6,h-6);frame.top.Position=Vector2.new(x+3,y+3);frame.top.Size=Vector2.new(w-6,7);frame.accent.Visible=false;toggle.layoutgradient(frame.gradient,x+3,y+3,w-6)
+    frame.outer.Position=Vector2.new(x,y);frame.outer.Size=Vector2.new(w,h);frame.middle.Position=Vector2.new(x+1,y+1);frame.middle.Size=Vector2.new(w-2,h-2);frame.inner.Position=Vector2.new(x+2,y+2);frame.inner.Size=Vector2.new(w-4,h-4);frame.bg.Position=Vector2.new(x+3,y+3);frame.bg.Size=Vector2.new(w-6,h-6);frame.top.Position=Vector2.new(x+3,y+3);frame.top.Size=Vector2.new(w-6,7);toggle.setvisible(frame.accent,false);toggle.layoutgradient(frame.gradient,x+3,y+3,w-6)
 end
 toggle.paintwidget=function(frame,on,phaseoffset)
-    frame.accent.Visible=false;if not on then toggle.setvisible(frame.outer,false);toggle.setvisible(frame.middle,false);toggle.setvisible(frame.inner,false);toggle.setvisible(frame.bg,false);toggle.setvisible(frame.top,false);toggle.paintgradient(frame.gradient,false);return end
+    toggle.setvisible(frame.accent,false);if not on then toggle.setvisible(frame.outer,false);toggle.setvisible(frame.middle,false);toggle.setvisible(frame.inner,false);toggle.setvisible(frame.bg,false);toggle.setvisible(frame.top,false);toggle.paintgradient(frame.gradient,false);return end
     toggle.setprop(frame.outer,"Color",themes.borderblack);toggle.setprop(frame.outer,"Transparency",guiopacity);toggle.setvisible(frame.outer,true);toggle.setprop(frame.middle,"Color",color("outline"));toggle.setprop(frame.middle,"Transparency",0.85*guiopacity);toggle.setvisible(frame.middle,true);toggle.setprop(frame.inner,"Color",themes.borderblack);toggle.setprop(frame.inner,"Transparency",guiopacity);toggle.setvisible(frame.inner,true);toggle.setprop(frame.bg,"Color",color("bg"));toggle.setprop(frame.bg,"Transparency",guiopacity);toggle.setvisible(frame.bg,true);toggle.setprop(frame.top,"Color",color("top"));toggle.setprop(frame.top,"Transparency",guiopacity);toggle.setvisible(frame.top,true);toggle.paintgradient(frame.gradient,true,guiopacity)
 end
 toggle.hidewidgets=function()
@@ -689,14 +798,14 @@ local function powerpos()
     if toggle.uibatch then toggle.huddirty=true;return end
     local p,n,mask=toggle.powerpanel,0,0
     for i=1,#powerlines do if p.lineactive[i]then n=n+1;mask=mask+2^(i-1)end end
-    local showalways=toggle.poweractivitymode=="always";local hasactivity=n>0;local empty=toggle.poweractivity and showalways and not hasactivity;local rows=toggle.poweractivity and(empty and 1 or n)or 0;local volt=toggle.ppms and not toggle.ppmspowerblocked and(hasactivity or showalways);p.w=empty and 216 or 164;p.h=36+rows*17+(volt and 23 or 0);p.x=clamp(p.x,0,math.max(0,cam.ViewportSize.X-p.w));p.y=clamp(p.y,0,math.max(0,cam.ViewportSize.Y-p.h));local activityon=toggle.poweractivity and(hasactivity or showalways);local on=toggle.hud and(activityon or volt);p.anim=toggle.ease(p.anim,on and 1 or 0,on and 0.18 or 0.22);local drawon=p.anim>0.01;local drawy=p.y+math.floor((1-p.anim)*8+0.5);local alpha=guiopacity*p.anim
+    local showalways=toggle.poweractivitymode=="always";local hasactivity=n>0;local empty=toggle.poweractivity and showalways and not hasactivity;local rows=toggle.poweractivity and(empty and 1 or n)or 0;local volt=toggle.ppms and not toggle.ppmspowerblocked and(hasactivity or showalways);p.w=empty and 216 or 164;p.h=36+rows*17+(volt and 23 or 0);p.x=clamp(p.x,0,math.max(0,cam.ViewportSize.X-p.w));p.y=clamp(p.y,0,math.max(0,cam.ViewportSize.Y-p.h));local activityon=toggle.poweractivity and(hasactivity or showalways);local on=toggle.hud and(activityon or volt);p.anim=toggle.ease(p.anim,on and 1 or 0,on and 0.26 or 0.3);local drawon=p.anim>0.01;local drawy=p.y+math.floor((1-p.anim)*8+0.5);local alpha=guiopacity*p.anim
     local shown=math.min(toggle.ppmslevel or 0,5);local geometrychanged=p.lastx~=p.x or p.lastdrawy~=drawy or p.lastw~=p.w or p.lasth~=p.h or p.lastmask~=mask or p.lastrows~=rows or p.lastvolt~=volt or p.lastlevel~=shown;p.lastx=p.x;p.lastdrawy=drawy;p.lastw=p.w;p.lasth=p.h;p.lastmask=mask;p.lastrows=rows;p.lastvolt=volt;p.lastlevel=shown
-    n=0;for i=1,#powerlines do local line=powerlines[i];local lineon=drawon and toggle.poweractivity and p.lineactive[i]or false;toggle.setvisible(line,lineon);if lineon then n=n+1;if geometrychanged then line.Position=Vector2.new(p.x+10,drawy+29+(n-1)*17)end;line.Color=color("text");line.Transparency=alpha end end
-    if geometrychanged then toggle.powerempty.Position=Vector2.new(p.x+10,drawy+29)end;toggle.powerempty.Color=color("muted");toggle.powerempty.Transparency=alpha;toggle.setvisible(toggle.powerempty,drawon and empty)
+    n=0;for i=1,#powerlines do local line=powerlines[i];local lineon=drawon and toggle.poweractivity and p.lineactive[i]or false;toggle.setvisible(line,lineon);if lineon then n=n+1;if geometrychanged then line.Position=Vector2.new(p.x+10,drawy+29+(n-1)*17)end;toggle.setprop(line,"Color",color("text"));toggle.setprop(line,"Transparency",alpha)end end
+    if geometrychanged then toggle.powerempty.Position=Vector2.new(p.x+10,drawy+29)end;toggle.setprop(toggle.powerempty,"Color",color("muted"));toggle.setprop(toggle.powerempty,"Transparency",alpha);toggle.setvisible(toggle.powerempty,drawon and empty)
     if geometrychanged then p.outer.Position=Vector2.new(p.x,drawy);p.outer.Size=Vector2.new(p.w,p.h);p.middle.Position=Vector2.new(p.x+1,drawy+1);p.middle.Size=Vector2.new(p.w-2,p.h-2);p.inner.Position=Vector2.new(p.x+2,drawy+2);p.inner.Size=Vector2.new(p.w-4,p.h-4);p.bg.Position=Vector2.new(p.x+3,drawy+3);p.bg.Size=Vector2.new(p.w-6,p.h-6);p.top.Position=Vector2.new(p.x+3,drawy+3);p.top.Size=Vector2.new(p.w-6,21);p.accent.Visible=false;toggle.layoutgradient(p.gradient,p.x+3,drawy+3,p.w-6);p.divider.From=Vector2.new(p.x+3,drawy+24);p.divider.To=Vector2.new(p.x+p.w-3,drawy+24);powerlabel.Position=Vector2.new(p.x+10,drawy+9)end
-    p.outer.Color=themes.borderblack;p.outer.Transparency=alpha;toggle.setvisible(p.outer,drawon);p.middle.Color=color("outline");p.middle.Transparency=0.85*alpha;toggle.setvisible(p.middle,drawon);p.inner.Color=themes.borderblack;p.inner.Transparency=alpha;toggle.setvisible(p.inner,drawon);p.bg.Color=color("bg");p.bg.Transparency=alpha;toggle.setvisible(p.bg,drawon);p.top.Color=color("top");p.top.Transparency=alpha;toggle.setvisible(p.top,drawon);toggle.paintgradient(p.gradient,drawon,alpha);p.divider.Color=color("select");p.divider.Transparency=0.7*alpha;toggle.setvisible(p.divider,drawon);powerlabel.Color=toggle.white;toggle.setvisible(powerlabel,drawon);powerlabel.Transparency=alpha
+    toggle.setprop(p.outer,"Color",themes.borderblack);toggle.setprop(p.outer,"Transparency",alpha);toggle.setvisible(p.outer,drawon);toggle.setprop(p.middle,"Color",color("outline"));toggle.setprop(p.middle,"Transparency",0.85*alpha);toggle.setvisible(p.middle,drawon);toggle.setprop(p.inner,"Color",themes.borderblack);toggle.setprop(p.inner,"Transparency",alpha);toggle.setvisible(p.inner,drawon);toggle.setprop(p.bg,"Color",color("bg"));toggle.setprop(p.bg,"Transparency",alpha);toggle.setvisible(p.bg,drawon);toggle.setprop(p.top,"Color",color("top"));toggle.setprop(p.top,"Transparency",alpha);toggle.setvisible(p.top,drawon);toggle.paintgradient(p.gradient,drawon,alpha);toggle.setprop(p.divider,"Color",color("select"));toggle.setprop(p.divider,"Transparency",0.7*alpha);toggle.setvisible(p.divider,drawon);toggle.setprop(powerlabel,"Color",toggle.white);toggle.setvisible(powerlabel,drawon);toggle.setprop(powerlabel,"Transparency",alpha)
     local total=shown>0 and shown*12+(shown-1)*3 or 0;local startx=p.x+math.floor((p.w-total)/2);local celly=drawy+29+rows*17
-    for i=1,5 do local cellon=drawon and volt and i<=shown;local square,border=toggle.ppmsdraw.squares[i],toggle.ppmsdraw.borders[i];if geometrychanged then local sx=startx+(i-1)*15;square.Position=Vector2.new(sx,celly);square.Size=Vector2.new(12,20);border.Position=Vector2.new(sx+9,celly);border.Size=Vector2.new(3,20)end;square.Transparency=alpha;border.Transparency=0.48*alpha;toggle.setvisible(square,cellon);toggle.setvisible(border,cellon)end
+    for i=1,5 do local cellon=drawon and volt and i<=shown;local square,border=toggle.ppmsdraw.squares[i],toggle.ppmsdraw.borders[i];if geometrychanged then local sx=startx+(i-1)*15;square.Position=Vector2.new(sx,celly);square.Size=Vector2.new(12,20);border.Position=Vector2.new(sx+9,celly);border.Size=Vector2.new(3,20)end;toggle.setprop(square,"Transparency",alpha);toggle.setprop(border,"Transparency",0.48*alpha);toggle.setvisible(square,cellon);toggle.setvisible(border,cellon)end
 end
 toggle.placehudcontent=function(item,x,valuey)
     x=toggle.pixel(x);valuey=toggle.pixel(valuey);item.value.Position=Vector2.new(x,valuey);item.label.Position=Vector2.new(x,valuey+18)
@@ -742,6 +851,7 @@ espcfg={
 for _,cfg in pairs(espcfg)do cfg.labelcolor=cfg.color;cfg.rgb=false;cfg.defaultcolor=cfg.color;cfg.defaultrgb=false end
 local tracked={}
 local byaddr={}
+toggle.bysource=setmetatable({},{__mode="k"})
 local function getmodel(inst)
     local current=inst
     while current do if current:IsA("Model")then return current end;current=current.Parent end
@@ -819,7 +929,7 @@ local function removerec(rec)
     if rec.items then for i=1,#rec.items do remove(rec.items[i])end end
 end
 local function track(inst)
-    if not inst or #tracked>=maxtrack then return end
+    if not inst or toggle.bysource[inst]or #tracked>=maxtrack then return end
     local model=getmodel(inst)
     local cfgname,cfg=getcfg(inst,model)
     if not cfg then return end
@@ -828,13 +938,13 @@ local function track(inst)
     local source=rmodel or part
     local address=source.Address
     if not address or byaddr[address]then return end
-    local rec={address=address,object=part,model=rmodel or part.Parent,cfgname=cfgname,cfg=cfg,folder=cfg.crate and itemfolder(rmodel)or nil,hidden=true}
-    byaddr[address]=rec;tracked[#tracked+1]=rec
+    local rec={address=address,source=inst,object=part,model=rmodel or part.Parent,cfgname=cfgname,cfg=cfg,folder=cfg.crate and itemfolder(rmodel)or nil,hidden=true}
+    byaddr[address]=rec;toggle.bysource[inst]=rec;tracked[#tracked+1]=rec
 end
 local function untrack(i)
     local rec=tracked[i]
     if not rec then return end
-    removerec(rec);byaddr[rec.address]=nil;tracked[i]=tracked[#tracked];tracked[#tracked]=nil
+    removerec(rec);byaddr[rec.address]=nil;if rec.source then toggle.bysource[rec.source]=nil end;tracked[i]=tracked[#tracked];tracked[#tracked]=nil
 end
 local function scan()
     local filter=ws:FindFirstChild("Filter")
@@ -883,14 +993,14 @@ local function drawcrate(rec,screen,meters,yoffset)
         local d,child=rec.items[i],children[i]
         if child then
             local n=i-1;local row=math.floor(n/3);local col=n%3
-            d.Text=cratenames[child.Name]or child.Name;local itemstyle=toggle.cratestyles[child.Name];d.Color=itemstyle and(itemstyle.rgb and rgb((i-1)/#rec.items)or itemstyle.labelcolor)or cratetext
-            toggle.setpos(d,screen.X+(col-1)*cratecol,screen.Y-12+yoffset+row*craterow+cratey);d.Visible=true
-        else d.Visible=false end
+            toggle.setprop(d,"Text",cratenames[child.Name]or child.Name);local itemstyle=toggle.cratestyles[child.Name];toggle.setprop(d,"Color",itemstyle and(itemstyle.rgb and rgb((i-1)/#rec.items)or itemstyle.labelcolor)or cratetext)
+            toggle.setpos(d,screen.X+(col-1)*cratecol,screen.Y-12+yoffset+row*craterow+cratey);toggle.setvisible(d,true)
+        else toggle.setvisible(d,false)end
     end
     if visible>0 then
         local rows=math.max(1,math.ceil(visible/3));local firsty=screen.Y-12+yoffset+cratey;local miny=firsty-8-cratepady
-        rec.bg.Size=Vector2.new(cratewidth,(rows-1)*craterow+16+cratepady*2);toggle.setpos(rec.bg,screen.X-cratewidth/2,miny);rec.bg.Visible=true
-    else rec.bg.Visible=false end
+        toggle.setprop(rec.bg,"Size",Vector2.new(cratewidth,(rows-1)*craterow+16+cratepady*2));toggle.setpos(rec.bg,screen.X-cratewidth/2,miny);toggle.setvisible(rec.bg,true)
+    else toggle.setvisible(rec.bg,false)end
 end
 toggle.ringpoint=function(world,y,radius,t,sides,angle)
     if sides==0 then local a=angle+2*math.pi*t;return Vector3.new(world.X+math.cos(a)*radius,y,world.Z+math.sin(a)*radius)end
@@ -900,11 +1010,12 @@ end
 local function drawring(rec,world,meters)
     if rec.cfg.noring or not toggle.ringenabled or meters>=ringfade then hidering(rec);return end
     makering(rec);if not rec.ring then return end
-    local y=world.Y-(rec.cfg.ringyoffset or 0);local radius=(rec.cfg.ringradius or 2)*toggle.ringsize;local alpha=clamp(1-meters/ringfade,0,1);local sides=toggle.ringshape=="triangle"and 3 or toggle.ringshape=="square"and 4 or 0;local angle=toggle.ringspin and tick()*toggle.ringspinspeed or 0
-    local previous,previouson=WorldToScreen(toggle.ringpoint(world,y,radius,0,sides,angle))
+    local y=world.Y-(rec.cfg.ringyoffset or 0);local radius=(rec.cfg.ringradius or 2)*toggle.ringsize;local alpha=clamp(1-meters/ringfade,0,1);local sides=toggle.ringshape=="triangle"and 3 or toggle.ringshape=="square"and 4 or 0;local angle=toggle.ringspin and(toggle.frametime or tick())*toggle.ringspinspeed or 0;local cachekey=tostring(sides)..":"..tostring(ringseg);local unit=toggle.ringunit[cachekey]
+    if not unit then unit={};for n=0,ringseg do local point=toggle.ringpoint(Vector3.new(0,0,0),0,1,n/ringseg,sides,0);unit[n+1]=Vector2.new(point.X,point.Z)end;toggle.ringunit[cachekey]=unit end
+    local cosa,sina=1,0;if angle~=0 then cosa,sina=math.cos(angle),math.sin(angle)end;local first=unit[1];local firstx=first.X*cosa-first.Y*sina;local firstz=first.X*sina+first.Y*cosa;local previous,previouson=WorldToScreen(Vector3.new(world.X+firstx*radius,y,world.Z+firstz*radius))
     for i=1,ringseg do
-        local current,currenton=WorldToScreen(toggle.ringpoint(world,y,radius,i/ringseg,sides,angle));local line=rec.ring[i];local visible=toggle.esp and previouson and currenton
-        if visible then line.From=previous;line.To=current;line.Color=rec.cfg.rgb and toggle.ringrgbcolor or rec.cfg.labelcolor;line.Transparency=alpha end;toggle.setvisible(line,visible);previous,previouson=current,currenton
+        local point=unit[i+1];local px=point.X*cosa-point.Y*sina;local pz=point.X*sina+point.Y*cosa;local current,currenton=WorldToScreen(Vector3.new(world.X+px*radius,y,world.Z+pz*radius));local line=rec.ring[i];local visible=toggle.esp and previouson and currenton
+        if visible then line.From=previous;line.To=current;toggle.setprop(line,"Color",rec.cfg.rgb and toggle.ringrgbcolor or rec.cfg.labelcolor);toggle.setprop(line,"Transparency",alpha)end;toggle.setvisible(line,visible);previous,previouson=current,currenton
     end
 end
 local function drawrec(rec,viewer)
@@ -916,7 +1027,7 @@ local function drawrec(rec,viewer)
     local screen,on=WorldToScreen(world)
     if not on then hiderec(rec);return true end
     rec.hidden=false
-    local meters=dist(viewer,world);local yoffset=rec.cfg.textyoffset or 0;local sx,sy=toggle.pixel(screen.X),toggle.pixel(screen.Y)
+    local meters=dist(viewer,world);local yoffset=rec.cfg.textyoffset or 0;local sx,sy=screen.X,screen.Y
     makelabels(rec)
     local alpha=1
     local labelvisible=toggle.esp and(not rec.cfg.crate or toggle.supplylabel);local topy=sy-espfontsize-2+yoffset;local bottomy=sy+2+yoffset;local labelcolor=rec.cfg.rgb and rgb(0)or rec.cfg.labelcolor;toggle.setprop(rec.name,"Text",rec.cfg.text);toggle.setpos(rec.name,sx,toggle.distanceposition=="above"and bottomy or topy);toggle.setprop(rec.name,"Transparency",alpha);toggle.setprop(rec.name,"Color",labelcolor);toggle.setprop(rec.name,"Size",espfontsize);toggle.setvisible(rec.name,labelvisible)
@@ -940,26 +1051,26 @@ local function getchar(part)
     while current do if current:FindFirstChild("Humanoid")then return current end;current=current.Parent end
 end
 local function drawroof()
-    if not toggle.esp or not toggle.roof or not rakeroof or not rakehp then rooflabel.Visible=false;roofhp.Visible=false;return end
+    if not toggle.esp or not toggle.roof or not rakeroof or not rakehp then toggle.setvisible(rooflabel,false);toggle.setvisible(roofhp,false);return end
     local part=toggle.roofpart;if not part or not part.Parent then part=findclass(rakeroof,"BasePart");toggle.roofpart=part end
-    if not part then rooflabel.Visible=false;roofhp.Visible=false;return end
+    if not part then toggle.setvisible(rooflabel,false);toggle.setvisible(roofhp,false);return end
     local screen,on=WorldToScreen(part.Position)
-    if not on then rooflabel.Visible=false;roofhp.Visible=false;return end
+    if not on then toggle.setvisible(rooflabel,false);toggle.setvisible(roofhp,false);return end
     local roofcolor=roofstyle.rgb and rgb(0)or roofstyle.labelcolor
-    local sx,sy=toggle.pixel(screen.X),toggle.pixel(screen.Y);local hptext=tostring(rakehp.Value).."/30";toggle.setprop(roofhp,"Text",hptext);toggle.setprop(roofhp,"Color",roofcolor);toggle.setprop(rooflabel,"Color",roofcolor);toggle.setprop(rooflabel,"Size",espfontsize);toggle.setprop(roofhp,"Size",espfontsize);toggle.setpos(rooflabel,sx,sy-espfontsize-2);toggle.setpos(roofhp,sx,sy+2);toggle.setvisible(rooflabel,true);toggle.setvisible(roofhp,true)
+    local sx,sy=screen.X,screen.Y;local hptext=tostring(rakehp.Value).."/30";toggle.setprop(roofhp,"Text",hptext);toggle.setprop(roofhp,"Color",roofcolor);toggle.setprop(rooflabel,"Color",roofcolor);toggle.setprop(rooflabel,"Size",espfontsize);toggle.setprop(roofhp,"Size",espfontsize);toggle.setpos(rooflabel,sx,sy-espfontsize-2);toggle.setpos(roofhp,sx,sy+2);toggle.setvisible(rooflabel,true);toggle.setvisible(roofhp,true)
 end
 toggle.drawrake=function(viewer)
     local d=toggle.rakedraw;local part=toggle.rakepart;local humanoid=toggle.rakehumanoid;local visible=toggle.esp and part and part.Parent and humanoid and humanoid.Parent and(toggle.rakename or toggle.rakehealth or toggle.rakedistance)
-    if not visible then for _,entry in pairs(d)do entry.Visible=false end;return end
-    local world=part.Position;local screen,on=WorldToScreen(Vector3.new(world.X,world.Y+4,world.Z));if not on then for _,entry in pairs(d)do entry.Visible=false end;return end
-    local sx,sy=toggle.pixel(screen.X),toggle.pixel(screen.Y);local meters=dist(viewer,world);local alpha=1;local labelcolor=toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor;local healthcolor=toggle.rakehealthstyle.rgb and rgb(0)or toggle.rakehealthstyle.labelcolor;local health=tonumber(humanoid.Health)or 0;local maximum=tonumber(humanoid.MaxHealth)or 0;local bar=toggle.rakehealth and toggle.rakehealthformat=="bar";local ratio=maximum>0 and clamp(health/maximum,0,1)or 0
+    if not visible then for _,entry in pairs(d)do toggle.setvisible(entry,false)end;return end
+    local world=part.Position;local screen,on=WorldToScreen(Vector3.new(world.X,world.Y+4,world.Z));if not on then for _,entry in pairs(d)do toggle.setvisible(entry,false)end;return end
+    local sx,sy=screen.X,screen.Y;local meters=dist(viewer,world);local alpha=1;local labelcolor=toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor;local healthcolor=toggle.rakehealthstyle.rgb and rgb(0)or toggle.rakehealthstyle.labelcolor;local health=tonumber(humanoid.Health)or 0;local maximum=tonumber(humanoid.MaxHealth)or 0;local bar=toggle.rakehealth and toggle.rakehealthformat=="bar";local ratio=maximum>0 and clamp(health/maximum,0,1)or 0
     local dynamic=Color3.fromHSV(ratio/3,0.9,1);if toggle.healthbased then healthcolor=dynamic end
     toggle.setprop(d.name,"Text",toggle.rakenamevalue);toggle.setpos(d.name,sx,sy-espfontsize-2+toggle.rakenamey);toggle.setprop(d.name,"Color",labelcolor);toggle.setprop(d.name,"Transparency",alpha);toggle.setprop(d.name,"Size",espfontsize);toggle.setprop(d.name,"Font",font);toggle.setvisible(d.name,toggle.rakename)
     local healthtext=tostring(math.floor(health+0.5));toggle.setprop(d.health,"Text",healthtext);toggle.setpos(d.health,sx,sy+2+toggle.rakehealthy);toggle.setprop(d.health,"Color",healthcolor);toggle.setprop(d.health,"Transparency",alpha);toggle.setprop(d.health,"Size",espfontsize);toggle.setprop(d.health,"Font",font);toggle.setvisible(d.health,toggle.rakehealth and not bar)
-    toggle.setpos(d.barbg,sx-toggle.rakebarwidth/2,sy-5+toggle.rakehealthy);d.barbg.Size=Vector2.new(toggle.rakebarwidth,7);toggle.setprop(d.barbg,"Transparency",alpha*0.78);toggle.setvisible(d.barbg,bar)
-    toggle.setpos(d.barfill,d.barbg.Position.X+1,sy-4+toggle.rakehealthy);d.barfill.Size=Vector2.new(math.max(0,toggle.pixel((toggle.rakebarwidth-2)*ratio)),5);toggle.setprop(d.barfill,"Color",toggle.healthbased and dynamic or toggle.rakebarstyle.labelcolor);toggle.setprop(d.barfill,"Transparency",alpha);toggle.setvisible(d.barfill,bar and ratio>0 and(toggle.healthbased or not toggle.rakebarstyle.rgb))
-    for i=1,24 do local segment=d["gradient"..i];local a=(i-1)/24;local b=math.min(i/24,ratio);segment.Visible=bar and toggle.rakebarstyle.rgb and not toggle.healthbased and b>a;if segment.Visible then segment.Position=Vector2.new(d.barfill.Position.X+(toggle.rakebarwidth-2)*a,d.barfill.Position.Y);segment.Size=Vector2.new((toggle.rakebarwidth-2)*(b-a),5);segment.Color=rgb(a*rgbspread);segment.Transparency=alpha end end
-    d.barborder.Position=d.barbg.Position;d.barborder.Size=d.barbg.Size;d.barborder.Transparency=alpha;d.barborder.Visible=bar
+    toggle.setpos(d.barbg,sx-toggle.rakebarwidth/2,sy-5+toggle.rakehealthy);toggle.setprop(d.barbg,"Size",Vector2.new(toggle.rakebarwidth,7));toggle.setprop(d.barbg,"Transparency",alpha*0.78);toggle.setvisible(d.barbg,bar)
+    toggle.setpos(d.barfill,d.barbg.Position.X+1,sy-4+toggle.rakehealthy);toggle.setprop(d.barfill,"Size",Vector2.new(math.max(0,toggle.pixel((toggle.rakebarwidth-2)*ratio)),5));toggle.setprop(d.barfill,"Color",toggle.healthbased and dynamic or toggle.rakebarstyle.labelcolor);toggle.setprop(d.barfill,"Transparency",alpha);toggle.setvisible(d.barfill,bar and ratio>0 and(toggle.healthbased or not toggle.rakebarstyle.rgb))
+    for i=1,24 do local segment=d["gradient"..i];local a=(i-1)/24;local b=math.min(i/24,ratio);local segmenton=bar and toggle.rakebarstyle.rgb and not toggle.healthbased and b>a;if segmenton then toggle.setprop(segment,"Position",Vector2.new(d.barfill.Position.X+(toggle.rakebarwidth-2)*a,d.barfill.Position.Y));toggle.setprop(segment,"Size",Vector2.new((toggle.rakebarwidth-2)*(b-a),5));toggle.setprop(segment,"Color",rgb(a*rgbspread));toggle.setprop(segment,"Transparency",alpha)end;toggle.setvisible(segment,segmenton)end
+    toggle.setprop(d.barborder,"Position",d.barbg.Position);toggle.setprop(d.barborder,"Size",d.barbg.Size);toggle.setprop(d.barborder,"Transparency",alpha);toggle.setvisible(d.barborder,bar)
     local distancetext=tostring(math.floor(meters)).."m";toggle.setprop(d.distance,"Text",distancetext);toggle.setpos(d.distance,sx,sy+espfontsize+10);toggle.setprop(d.distance,"Color",toggle.distancestyle.rgb and rgb(0)or toggle.distancestyle.labelcolor);toggle.setprop(d.distance,"Transparency",1);toggle.setprop(d.distance,"Size",espfontsize);toggle.setprop(d.distance,"Font",font);toggle.setvisible(d.distance,toggle.rakedistance)
 end
 local function powerhud()
@@ -1015,9 +1126,9 @@ local function showhud()
     if toggle.hudstyle=="container"then toggle.paintwidget(toggle.groupwidget,(toggle.hudcount or 0)>0)else toggle.hidewidgets()end
 end
 local function drawrgb()
-    timerlabel.Color=toggle.hudstyles.timer.rgb and rgb(0)or toggle.hudstyles.timer.labelcolor;targetlabel.Color=toggle.hudstyles.target.rgb and rgb(0)or toggle.hudstyles.target.labelcolor;scraplabel.Color=toggle.hudstyles.scrap.rgb and rgb(0)or toggle.hudstyles.scrap.labelcolor;toggle.powerdraw.label.Color=toggle.hudstyles.power.rgb and rgb(0)or toggle.hudstyles.power.labelcolor
-    local timerstyle=toggle.timerlow and toggle.hudvalues.warning or toggle.hudvalues.timer;timertxt.Color=timerstyle.rgb and rgb(0)or timerstyle.labelcolor;targettxt.Color=toggle.hudvalues.target.rgb and rgb(0)or toggle.hudvalues.target.labelcolor;scraptxt.Color=toggle.hudvalues.scrap.rgb and rgb(0)or toggle.hudvalues.scrap.labelcolor;toggle.powerdraw.value.Color=toggle.hudvalues.power.rgb and rgb(0)or toggle.hudvalues.power.labelcolor
-    powerlabel.Color=toggle.white;toggle.cooldowndraw.label.Color=toggle.cooldownstyle.rgb and rgb(0)or toggle.cooldownstyle.labelcolor;toggle.cooldowndraw.value.Color=toggle.cooldownvaluestyle.rgb and rgb(0)or toggle.cooldownvaluestyle.labelcolor;toggle.ppmsdraw.label.Color=toggle.ppmslabelstyle.rgb and rgb(0)or toggle.ppmslabelstyle.labelcolor;for i=1,5 do local cfg=toggle.voltmeterstyles[i];toggle.ppmsdraw.squares[i].Color=cfg.rgb and rgb((i-1)/5*rgbspread)or cfg.labelcolor end
+    toggle.setprop(timerlabel,"Color",toggle.hudstyles.timer.rgb and rgb(0)or toggle.hudstyles.timer.labelcolor);toggle.setprop(targetlabel,"Color",toggle.hudstyles.target.rgb and rgb(0)or toggle.hudstyles.target.labelcolor);toggle.setprop(scraplabel,"Color",toggle.hudstyles.scrap.rgb and rgb(0)or toggle.hudstyles.scrap.labelcolor);toggle.setprop(toggle.powerdraw.label,"Color",toggle.hudstyles.power.rgb and rgb(0)or toggle.hudstyles.power.labelcolor)
+    local timerstyle=toggle.timerlow and toggle.hudvalues.warning or toggle.hudvalues.timer;toggle.setprop(timertxt,"Color",timerstyle.rgb and rgb(0)or timerstyle.labelcolor);toggle.setprop(targettxt,"Color",toggle.hudvalues.target.rgb and rgb(0)or toggle.hudvalues.target.labelcolor);toggle.setprop(scraptxt,"Color",toggle.hudvalues.scrap.rgb and rgb(0)or toggle.hudvalues.scrap.labelcolor);toggle.setprop(toggle.powerdraw.value,"Color",toggle.hudvalues.power.rgb and rgb(0)or toggle.hudvalues.power.labelcolor)
+    toggle.setprop(powerlabel,"Color",toggle.white);toggle.setprop(toggle.cooldowndraw.label,"Color",toggle.cooldownstyle.rgb and rgb(0)or toggle.cooldownstyle.labelcolor);toggle.setprop(toggle.cooldowndraw.value,"Color",toggle.cooldownvaluestyle.rgb and rgb(0)or toggle.cooldownvaluestyle.labelcolor);toggle.setprop(toggle.ppmsdraw.label,"Color",toggle.ppmslabelstyle.rgb and rgb(0)or toggle.ppmslabelstyle.labelcolor);for i=1,5 do local cfg=toggle.voltmeterstyles[i];toggle.setprop(toggle.ppmsdraw.squares[i],"Color",cfg.rgb and rgb((i-1)/5*rgbspread)or cfg.labelcolor)end
     toggle.paintgradient(rgbline,toggle.hudbarvisible(),1)
     if toggle.hudstyle=="container"then toggle.paintwidget(toggle.groupwidget,(toggle.hudcount or 0)>0)else toggle.hidewidgets()end
     toggle.paintgradient(menurgb,toggle.menu,guiopacity);toggle.paintgradient(picker.gradient,picker.opened and pickerentry~=nil and toggle.menu,picker.anim)
@@ -1075,6 +1186,12 @@ toggle.setzoomamount=function(value,quiet)
 end
 toggle.setthirdperson=function(value,quiet)
     toggle.zoom.thirdperson=value==true;toggle.zoom.min=toggle.zoom.thirdperson and toggle.zoom.amount or 0;toggle.zoom.max=toggle.zoom.thirdperson and 10000 or 0;toggle.zoom.nextapply=0;toggle.applyzoom(true);menuupdate();if not quiet then bindlog(toggle.zoom.thirdperson and"enabled third person"or"disabled third person")end
+end
+toggle.enableshiftlock=function(quiet)
+    toggle.shiftlockstate.active=true;local applied=toggle.applyshiftlock();menuupdate();if not quiet then bindlog(applied and"enabled shift lock"or"shift lock offset unavailable")end;return applied
+end
+toggle.setinstacrate=function(value,quiet)
+    toggle.instacrate=value==true;toggle.instacratestate.nextapply=0;toggle.instacratestate.lastbox=nil;toggle.instacratestate.lastopen=0;if toggle.instacrate then toggle.applyinstacrate(true)end;menuupdate();if not quiet then bindlog(toggle.instacrate and"enabled insta-open crate"or"disabled insta-open crate")end
 end
 toggle.sethudelement=function(id,value,quiet)
     if toggle.hudelements[id]==nil then return end;toggle.hudelements[id]=value==true;hudpos();showhud();menuupdate();if not quiet then bindlog((toggle.hudelements[id]and"enabled "or"disabled ")..id.." HUD")end
@@ -1296,7 +1413,7 @@ local function configdata()
     for id,cfg in pairs(toggle.cratestyles)do local c=cfg.labelcolor;crateitemcolors[id]={r=channel(c.R),g=channel(c.G),b=channel(c.B),rgb=cfg.rgb==true}end
     for i=1,5 do local cfg=toggle.voltmeterstyles[i];local c=cfg.labelcolor;voltmetercolors[i]={r=channel(c.R),g=channel(c.G),b=channel(c.B),rgb=cfg.rgb==true}end
     for i=1,#picker.recentcolors do local c=picker.recentcolors[i];recentcolors[i]={r=channel(c.R),g=channel(c.G),b=channel(c.B)}end
-    return {menu_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_size=espfontsize,preset=themeindex,preset_schema=4,theme_schema=4,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,recent_colors=recentcolors,gui_opacity=guiopacity,watermark=toggle.watermark,watermark_hint=toggle.watermarkhint,client=toggle.client,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,hud_style=toggle.hudstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,health_based=toggle.healthbased,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=100,ring_fade=ringfade,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,rake_health_y=toggle.rakehealthy,rake_health_format=toggle.rakehealthformat,rake_health_bar_width=toggle.rakebarwidth,bar_rgb=toggle.barrgb,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,timer_format=toggle.timerformat,timer_warning_enabled=toggle.timerwarningenabled,timer_warning=toggle.timerwarning,teleport_cooldown=toggle.teleportcooldown,ppms=toggle.ppms,voltmeter_colors=voltmetercolors,distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,minimized=menustate.minimized}}
+    return {menu_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_size=espfontsize,preset=themeindex,preset_schema=4,theme_schema=4,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,recent_colors=recentcolors,gui_opacity=guiopacity,watermark=toggle.watermark,watermark_hint=toggle.watermarkhint,client=toggle.client,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,insta_open_crate=toggle.instacrate,hud_style=toggle.hudstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,health_based=toggle.healthbased,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=100,ring_fade=ringfade,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,rake_health_y=toggle.rakehealthy,rake_health_format=toggle.rakehealthformat,rake_health_bar_width=toggle.rakebarwidth,bar_rgb=toggle.barrgb,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,timer_format=toggle.timerformat,timer_warning_enabled=toggle.timerwarningenabled,timer_warning=toggle.timerwarning,teleport_cooldown=toggle.teleportcooldown,ppms=toggle.ppms,voltmeter_colors=voltmetercolors,distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,minimized=menustate.minimized}}
 end
 local function saveconfig()
     configname=toggle.cleanconfig(configname);local ok=pcall(function()makefolder("therakesaint");writefile(configpath(),http:JSONEncode(configdata()))end);if ok then toggle.refreshconfigs(configname);menuupdate()end
@@ -1328,7 +1445,7 @@ local function loadconfig(quiet)
     local savedjump=false;if type(data.client)=="table"and type(data.client.noJumpCooldown)=="boolean"then savedjump=data.client.noJumpCooldown elseif type(data.noJumpCooldown)=="boolean"then savedjump=data.noJumpCooldown end;toggle.setclient("noJumpCooldown",savedjump,true)
     local savedstamina=false;if type(data.client)=="table"and type(data.client.infiniteStamina)=="boolean"then savedstamina=data.client.infiniteStamina elseif type(data.infiniteStamina)=="boolean"then savedstamina=data.infiniteStamina end;toggle.setclient("infiniteStamina",savedstamina,true)
     local savedfall=false;if type(data.client)=="table"and type(data.client.noFall)=="boolean"then savedfall=data.client.noFall elseif type(data.noFall)=="boolean"then savedfall=data.noFall end;toggle.setclient("noFall",savedfall,true)
-    local zoomamount=type(data.zoom_amount)=="number"and data.zoom_amount or type(data.min_zoom)=="number"and data.min_zoom>=0.5 and data.min_zoom or type(data.minZoom)=="number"and data.minZoom>=0.5 and data.minZoom or 10;toggle.setzoomamount(zoomamount,true);local thirdperson=false;if type(data.third_person)=="boolean"then thirdperson=data.third_person elseif type(data.min_zoom)=="number"then thirdperson=data.min_zoom>=9.5 elseif type(data.minZoom)=="number"then thirdperson=data.minZoom>=9.5 end;toggle.setthirdperson(thirdperson,true)
+    local zoomamount=type(data.zoom_amount)=="number"and data.zoom_amount or type(data.min_zoom)=="number"and data.min_zoom>=0.5 and data.min_zoom or type(data.minZoom)=="number"and data.minZoom>=0.5 and data.minZoom or 10;toggle.setzoomamount(zoomamount,true);local thirdperson=false;if type(data.third_person)=="boolean"then thirdperson=data.third_person elseif type(data.min_zoom)=="number"then thirdperson=data.min_zoom>=9.5 elseif type(data.minZoom)=="number"then thirdperson=data.minZoom>=9.5 end;toggle.setthirdperson(thirdperson,true);toggle.setinstacrate(data.insta_open_crate==true,true)
     if data.hud_style=="minimal"then toggle.sethudstyle("minimal",true)elseif data.hud_style=="widgets"or data.hud_style=="container"then toggle.sethudstyle("container",true)end
     if type(data.widget_group)=="table"and data.widget_group.dragged==true then toggle.widgetgroup.dragged=true;if type(data.widget_group.x)=="number"then toggle.widgetgroup.x=data.widget_group.x end;if type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end else toggle.widgetgroup.dragged=false;toggle.widgetgroup.x=nil;if type(data.widget_group)=="table"and type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end end
     if type(data.distance_min)=="number"then toggle.distancemin=math.floor(clamp(data.distance_min,0,100)+0.5)end
@@ -1404,12 +1521,12 @@ toggle.resettheme=function(quiet)
 end
 toggle.resettoggles=function(quiet)
     setesp(true,true);sethud(true,true);for _,id in ipairs({"timer","scrap","power"})do toggle.sethudelement(id,true,true)end;toggle.sethudelement("target",false,true);toggle.watermark=true;toggle.watermarkhint=true;toggle.hudlabels=true;toggle.sethudstyle("container",true);toggle.widgetgroup.x=nil;toggle.widgetgroup.y=nil;toggle.widgetgroup.dragged=false;toggle.distanceminimum=false;toggle.distancemin=20;toggle.healthbased=false;toggle.setpoweractivity(true,true);toggle.setpoweractivitymode("activity",true);toggle.cooldownuntil=0;toggle.cooldownremaining=0;toggle.teleporthistory={};toggle.setteleportcooldown(false,true);toggle.setcooldownseconds(30,true);toggle.setppms(true,true);toggle.setppmsstyle("voltmeter",true);toggle.setppmssquares(5,true);toggle.setroof(false,true);toggle.setrakename(true,true);toggle.setrakehealth(true,true);toggle.setrakedistance(false,true);toggle.rakenamevalue="rake";toggle.rakedraw.name.Text="rake";toggle.setrakenamey(0,true);toggle.setrakehealthy(0,true);toggle.setrakehealthformat("value",true);toggle.setrakebarwidth(70,true);setbarrgb(true,true);toggle.setrgbdirection("left",true);toggle.setrgbspeed(0.6,true);setdistance(false,true);toggle.distancefade=false;toggle.setunit("meters",true);toggle.setdistanceposition("below",true);toggle.setscrapstyle("none",true);toggle.setscrapteleport("nearest",true);toggle.setsupplylabel(true,true);toggle.setsupplyitems(true,true);toggle.setringenabled(true,true);toggle.setringshape("circle",true);toggle.setringfade(40,true);toggle.setringsize(1,true);toggle.setringspin(false,true);toggle.setringspinspeed(1,true);toggle.setpowerformat("percent",true);toggle.setpowerdecimal(true,true);toggle.settimerformat("clock",true);toggle.timerwarningenabled=false;toggle.settimerwarning(15,true)
-    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall"})do toggle.setclient(id,false,true)end;toggle.setzoomamount(10,true);toggle.setthirdperson(false,true)
+    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall"})do toggle.setclient(id,false,true)end;toggle.setzoomamount(10,true);toggle.setthirdperson(false,true);toggle.setinstacrate(false,true)
     for _,id in ipairs({"locations","scraps","traps","flares","crates"})do setgroup(id,true,true)end;espgroups.rake=true;for id in pairs(espgroups.items)do toggle.setitem(id,true,true)end
     menuupdate();if not quiet then bindlog("reset toggles")end
 end
 toggle.resetbinds=function(quiet)
-    keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,thirdperson=defaultbinds.thirdperson};capture=nil;menuupdate();if not quiet then bindlog("reset binds")end
+    keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare};capture=nil;menuupdate();if not quiet then bindlog("reset binds")end
 end
 local function resetsettings()
     toggle.uibatch=true
@@ -1421,7 +1538,6 @@ local function runaction(id)
     if id=="menu"then if toggle.rakenamecapture then toggle.finishrakename(false)end;if toggle.watermark then toggle.menu=true;menustate.minimized=not menustate.minimized else toggle.menu=not toggle.menu;menustate.minimized=false end;capture=nil;pickerentry=nil;picker.hexactive=false;dropdownkind=nil;configcapture=false;showmenu();bindlog(not toggle.menu and"closed menu"or menustate.minimized and"watermark state"or"expanded menu")
     elseif id=="esp"then setesp(not toggle.esp)
     elseif id=="hud"then sethud(not toggle.hud)
-    elseif id=="thirdperson"then toggle.setthirdperson(not toggle.zoom.thirdperson)
     elseif id=="scrap"or id=="flare"then
         if not toggle.cooldownready()then bindlog("teleport cooldown: "..tostring(math.max(1,math.ceil(toggle.cooldownuntil-tick()))).."s");return end
         local ok=false;if id=="scrap"then ok=tpscrap()else ok=tpflare()end;if ok then toggle.startcooldown()end;bindlog(ok and"teleported to "..id or id.." not found")
@@ -1505,9 +1621,9 @@ local function clickmenu(mx,my)
             if configcapture and item.id~="configname"then toggle.finishconfiginput(false)end
             if toggle.rakenamecapture and item.id~="rakenameinput"then toggle.finishrakename(false)end
             if item.kind=="toggle"then
-                if item.id=="distanceminimum"or item.id=="healthbased"or item.id=="timerwarningenabled"or item.id=="watermarkhint"then toggle[item.id]=not toggle[item.id];timerhud();showhud();menuupdate()elseif item.itemkey then toggle.setitem(item.itemkey,not espgroups.items[item.itemkey])elseif item.id=="esp"then setesp(not toggle.esp)elseif item.id=="hud"then sethud(not toggle.hud)elseif item.id=="hudtimer"then toggle.sethudelement("timer",not toggle.hudelements.timer)elseif item.id=="hudtarget"then toggle.sethudelement("target",not toggle.hudelements.target)elseif item.id=="hudscrap"then toggle.sethudelement("scrap",not toggle.hudelements.scrap)elseif item.id=="hudpower"then toggle.sethudelement("power",not toggle.hudelements.power)elseif item.id=="roof"then toggle.setroof(not toggle.roof)elseif item.id=="rakename"then toggle.setrakename(not toggle.rakename)elseif item.id=="rakehealth"then toggle.setrakehealth(not toggle.rakehealth)elseif item.id=="rakedistance"then toggle.setrakedistance(not toggle.rakedistance)elseif item.id=="thirdperson"then toggle.setthirdperson(not toggle.zoom.thirdperson)elseif item.id=="powerdecimal"then toggle.setpowerdecimal(not toggle.powerdecimal)elseif item.id=="poweractivity"then toggle.setpoweractivity(not toggle.poweractivity)elseif item.id=="teleportcooldown"then toggle.setteleportcooldown(not toggle.teleportcooldown)elseif item.id=="ppms"then toggle.setppms(not toggle.ppms)elseif item.id=="watermark"then toggle.watermark=not toggle.watermark;if not toggle.watermark then menustate.minimized=false end;menuupdate();bindlog(toggle.watermark and"enabled watermark state"or"disabled watermark state")elseif item.id=="barrgb"then setbarrgb(not toggle.barrgb)elseif item.id=="distance"then setdistance(not toggle.distance)elseif item.id=="supplylabel"then toggle.setsupplylabel(not toggle.supplylabel)elseif item.id=="supplyitems"then toggle.setsupplyitems(not toggle.supplyitems)elseif item.id=="ringenabled"then toggle.setringenabled(not toggle.ringenabled)elseif item.id=="ringspin"then toggle.setringspin(not toggle.ringspin)elseif toggle.client[item.id]~=nil then toggle.setclient(item.id,not toggle.client[item.id])else setgroup(item.id,not espgroups[item.id])end
+                if item.id=="distanceminimum"or item.id=="healthbased"or item.id=="timerwarningenabled"or item.id=="watermarkhint"then toggle[item.id]=not toggle[item.id];timerhud();showhud();menuupdate()elseif item.itemkey then toggle.setitem(item.itemkey,not espgroups.items[item.itemkey])elseif item.id=="esp"then setesp(not toggle.esp)elseif item.id=="hud"then sethud(not toggle.hud)elseif item.id=="hudtimer"then toggle.sethudelement("timer",not toggle.hudelements.timer)elseif item.id=="hudtarget"then toggle.sethudelement("target",not toggle.hudelements.target)elseif item.id=="hudscrap"then toggle.sethudelement("scrap",not toggle.hudelements.scrap)elseif item.id=="hudpower"then toggle.sethudelement("power",not toggle.hudelements.power)elseif item.id=="roof"then toggle.setroof(not toggle.roof)elseif item.id=="rakename"then toggle.setrakename(not toggle.rakename)elseif item.id=="rakehealth"then toggle.setrakehealth(not toggle.rakehealth)elseif item.id=="rakedistance"then toggle.setrakedistance(not toggle.rakedistance)elseif item.id=="thirdperson"then toggle.setthirdperson(not toggle.zoom.thirdperson)elseif item.id=="instacrate"then toggle.setinstacrate(not toggle.instacrate)elseif item.id=="powerdecimal"then toggle.setpowerdecimal(not toggle.powerdecimal)elseif item.id=="poweractivity"then toggle.setpoweractivity(not toggle.poweractivity)elseif item.id=="teleportcooldown"then toggle.setteleportcooldown(not toggle.teleportcooldown)elseif item.id=="ppms"then toggle.setppms(not toggle.ppms)elseif item.id=="watermark"then toggle.watermark=not toggle.watermark;if not toggle.watermark then menustate.minimized=false end;menuupdate();bindlog(toggle.watermark and"enabled watermark state"or"disabled watermark state")elseif item.id=="barrgb"then setbarrgb(not toggle.barrgb)elseif item.id=="distance"then setdistance(not toggle.distance)elseif item.id=="supplylabel"then toggle.setsupplylabel(not toggle.supplylabel)elseif item.id=="supplyitems"then toggle.setsupplyitems(not toggle.supplyitems)elseif item.id=="ringenabled"then toggle.setringenabled(not toggle.ringenabled)elseif item.id=="ringspin"then toggle.setringspin(not toggle.ringspin)elseif toggle.client[item.id]~=nil then toggle.setclient(item.id,not toggle.client[item.id])else setgroup(item.id,not espgroups[item.id])end
             elseif item.kind=="action"then
-                if item.id=="scrap"or item.id=="flare"then runaction(item.id)elseif item.id=="save"then saveconfig()elseif item.id=="load"then loadconfig(false)elseif item.id=="resetcolors"then toggle.resetcolors(false)elseif item.id=="resettheme"then toggle.resettheme(false)elseif item.id=="resettoggles"then toggle.resettoggles(false)elseif item.id=="resetbinds"then toggle.resetbinds(false)elseif item.id=="reset"then resetsettings()end
+                if item.id=="scrap"or item.id=="flare"then runaction(item.id)elseif item.id=="shiftlock"then toggle.enableshiftlock(false)elseif item.id=="save"then saveconfig()elseif item.id=="load"then loadconfig(false)elseif item.id=="resetcolors"then toggle.resetcolors(false)elseif item.id=="resettheme"then toggle.resettheme(false)elseif item.id=="resettoggles"then toggle.resettoggles(false)elseif item.id=="resetbinds"then toggle.resetbinds(false)elseif item.id=="reset"then resetsettings()end
             elseif item.kind=="dropdown"then
                 dropdownkind=item.id=="espfontselect"and"espfont"or item.id=="hudfontselect"and"hudfont"or item.id=="presetselect"and"preset"or item.id=="distanceunitselect"and"unit"or item.id=="distancepositionselect"and"distanceposition"or item.id=="scrapstyleselect"and"scrapstyle"or item.id=="scrapteleportselect"and"scrapteleport"or item.id=="ringshapeselect"and"ringshape"or item.id=="rgbdirectionselect"and"rgbdirection"or item.id=="powerformatselect"and"powerformat"or item.id=="timerformatselect"and"timerformat"or item.id=="ppmsstyleselect"and"ppmsstyle"or item.id=="rakehealthformatselect"and"rakehealthformat"or item.id=="hudstyleselect"and"hudstyle"or item.id=="poweractivitymodeselect"and"poweractivitymode"or"config";dropdown.opened=false;capture=nil;menuupdate()
             elseif item.kind=="slider"then inputstate.sliding=item.id;sliderapply(mx,my,true)
@@ -1581,7 +1697,7 @@ local function drawesp()
     keys();mouseinput()
     if not toggle.esp then return end
     local viewer=viewpos();local i=#tracked
-    while i>=1 do local rec=tracked[i];local ok,alive=pcall(function()return drawrec(rec,viewer)end);if not ok or not alive then untrack(i)end;i=i-1 end
+    while i>=1 do local rec=tracked[i];local ok,alive=pcall(drawrec,rec,viewer);if not ok or not alive then untrack(i)end;i=i-1 end
     drawroof();toggle.drawrake(viewer)
 end
 toggle.lastviewport=cam.ViewportSize
@@ -1594,16 +1710,29 @@ spawn(function()
 end)
 spawn(function()while true do local changed=scraphud();if powerhud()then changed=true end;if targethud()then changed=true end;if changed then hudpos();showhud()end;task.wait(statusrate)end end)
 spawn(function()
+    local nextrake=0
     while true do
-        pcall(function()scan();rakeinfo()end)
+        pcall(scan);local now=tick();if now>=nextrake then pcall(rakeinfo);nextrake=now+1 end
         task.wait(scanrate)
+    end
+end)
+spawn(function()
+    while true do
+        pcall(toggle.applyclient,false);pcall(toggle.applyzoom,false);pcall(toggle.applyshiftlock)
+        task.wait(0.05)
+    end
+end)
+spawn(function()
+    while true do
+        if toggle.instacrate then pcall(toggle.applyinstacrate,false)end
+        task.wait(0.1)
     end
 end)
 spawn(function()
     local lastframe=tick()
     while true do
         local now=tick();toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);lastframe=now;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1
-        pcall(toggle.applyclient,false);pcall(toggle.applyzoom,false);pcall(drawesp);pcall(drawrgb)
+        toggle.gradientcache.frame=toggle.gradientcache.frame+1;pcall(drawesp);pcall(drawrgb)
         task.wait()
     end
 end)
