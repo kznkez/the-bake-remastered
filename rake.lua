@@ -166,6 +166,17 @@ toggle.lefttext=function(d,x,cy)
     if not d or toggle.removeddraw[d]then return end;local meta=toggle.textroles[d];local size=meta and meta.size or 13;local line=meta and meta.role=="esp"and toggle.esplineheight or meta and meta.role=="hud"and toggle.hudlineheight or 13
     toggle.setprop(d,"Center",false);toggle.setpos(d,x,cy-(line or size)/2)
 end
+toggle.rightwidth=function(d)
+    if not d or toggle.removeddraw[d]then return 0 end
+    local meta=toggle.textroles[d];local selected=meta and(meta.preview or toggle.fontvalue(meta.role))or font;local size=meta and meta.size or 13;local key=tostring(selected)..":"..size..":"..d.Text
+    local measured=meta and meta.rightmeasure;local width=measured and measured.key==key and measured.width or nil
+    if not width then local ok,bounds=pcall(function()return d.TextBounds end);if ok and bounds and toggle.drawingfinite(bounds.X,100000)and bounds.X>0 then width=bounds.X;if meta then meta.rightmeasure={key=key,width=width}end end end
+    return width or toggle.measuretext(d.Text,selected,size)
+end
+toggle.righttext=function(d,right,cy)
+    if not d or toggle.removeddraw[d]then return end
+    toggle.centertext(d,right-toggle.rightwidth(d)/2,cy)
+end
 local function waitchild(parent,name,timeout)
     local start=tick()
     local child=parent:FindFirstChild(name)
@@ -692,11 +703,11 @@ toggle.newdrawing=function(kind)
         if state.removed or not toggle.running or toggle.replacing then return nil end;if state.native then return state.native end
         local native=Drawing.new(kind);state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
             assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=false
-            for key,value in pairs(props)do if key~="Visible"and key~="Font"and key~="Data"and key~="Size"and key~="Position"then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then error("invalid drawing property: "..key,2)end;native[key]=value end end
-            for _,key in ipairs({"Data","Font","Size","Position"})do local value=props[key];if value~=nil then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then error("invalid drawing property: "..key,2)end;native[key]=value end end
+            for key,value in pairs(props)do if key~="Visible"and key~="Font"and key~="Data"and key~="Size"and key~="Position"then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;native[key]=value end end
+            for _,key in ipairs({"Data","Font","Size","Position"})do local value=props[key];if value~=nil then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;native[key]=value end end
             if props.Visible then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=true end
         end)
-        if not ok then if state.native==native then state.native=nil;toggle.forgetdrawingowner(state);pcall(function()native:Remove()end)end;error(err)end;return state.native
+        if not ok then if state.native==native then state.native=nil;toggle.forgetdrawingowner(state);pcall(function()native:Remove()end)end;assert(false,tostring(err))end;return state.native
     end
     local function dispose()
         if state.removed then return end;local native=state.native;state.removed=true;state.native=nil;state.properties=nil
@@ -709,7 +720,7 @@ toggle.newdrawing=function(kind)
         if key=="TextBounds"then local native=prime();return native and native.TextBounds end
         return props[key]
     end,__newindex=function(_,key,value)
-        if state.removed or not toggle.running or toggle.replacing then return end;if not toggle.validdrawing(key,value)then error("invalid drawing property: "..key,2)end;if toggle.drawingequal(key,props[key],value)then if key=="Visible"and value==true and not state.native then prime()end;return end
+        if state.removed or not toggle.running or toggle.replacing then return end;if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;if toggle.drawingequal(key,props[key],value)then if key=="Visible"and value==true and not state.native then prime()end;return end
         local native=state.native;if native then native[key]=value end;props[key]=value
         if key=="Visible"and value==true and not native then prime()end
     end})
@@ -723,7 +734,7 @@ toggle.warmdrawings=function()
         local queue=toggle.drawingqueue;local cursor=toggle.drawingcursor;local started=tick();local count,work=0,0
         while cursor<=#queue and count<4 and work<64 do
             local d=queue[cursor];queue[cursor]=false;cursor=cursor+1;work=work+1;local state=toggle.drawingstates[d]
-            if state and not state.removed and not state.native then count=count+1;pcall(toggle.primedrawing,d)end
+            if state and state.kind~="Line"and not state.removed and not state.native then count=count+1;pcall(toggle.primedrawing,d)end
             if tick()-started>=0.001 then break end
         end
         toggle.drawingcursor=cursor
@@ -883,6 +894,20 @@ end
 local function remove(d)
     if not d or toggle.removeddraw[d]then return end
     toggle.removeddraw[d]=true;toggle.drawregistry[d]=nil;toggle.iconstates[d]=nil;toggle.drawcolors[d]=nil;toggle.textroles[d]=nil;if toggle.playerprops then toggle.playerprops[d]=nil end;pcall(function()d.Visible=false end);pcall(function()d:Remove()end)
+end
+toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"});toggle.linepoolmax=512
+ toggle.acquireline=function(c)
+    local pool=toggle.linepool;local d
+    while #pool>0 and not d do local candidate=pool[#pool];pool[#pool]=nil;toggle.linepooled[candidate]=nil;if not toggle.removeddraw[candidate]then d=candidate end end
+    d=d or newline(c);toggle.setprop(d,"Visible",false);toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",1);toggle.setprop(d,"Thickness",2);toggle.setprop(d,"From",Vector2.new(0,0));toggle.setprop(d,"To",Vector2.new(0,0));toggle.setprop(d,"ZIndex",0);return d
+end
+ toggle.recycleline=function(d)
+    if not d or toggle.removeddraw[d]or toggle.linepooled[d]then return end
+    local ok=pcall(function()d.Visible=false end)
+    if ok and toggle.running and not toggle.replacing and #toggle.linepool<toggle.linepoolmax then toggle.linepooled[d]=true;toggle.linepool[#toggle.linepool+1]=d else remove(d)end
+end
+ toggle.releasering=function(rec)
+    if rec.ring then for i=1,#rec.ring do toggle.recycleline(rec.ring[i])end end;rec.ring=nil;rec.ringpoints=nil;rec.ringvisible=false;rec.ringactivecount=0
 end
 local function hide(d)if d and not toggle.removeddraw[d]and d.Visible then d.Visible=false end end
 toggle.setvisible=function(d,value)if d and not toggle.removeddraw[d]and d.Visible~=(value==true)then d.Visible=value==true end end
@@ -1630,7 +1655,7 @@ local function menupos()
     for i=1,#menuitems do
         local item=menuitems[i];local col=item.col or 1;local x=left+(col-1)*(w+gap)+menustate.tabslide;local y=ys[col];local h=toggle.rowheight(item);local panelh=groups[i]or h;local stacked=item.stacked or item.kind=="dropdown"
         if item.kind=="section"then groupbottom[col]=math.min(clipbottom,y+panelh-sectiongap)end
-        local rowclip=item.kind=="section"and clipbottom or groupbottom[col];local phase=item.widgetphase or 1;local texty=y+(item.kind=="section"and(compact and 6 or 16)or item.kind=="action"and(compact and 9.5 or 15.5)or stacked and 4 or item.kind=="toggle"and(compact and 6.5 or 11.5)or(compact and 8 or 10));local valuey=stacked and y+(compact and 21.5 or 34.5)or texty
+        local rowclip=item.kind=="section"and clipbottom or groupbottom[col];local phase=item.widgetphase or 1;local texty=y+(item.kind=="section"and(compact and 6 or 16)or item.kind=="action"and(compact and 9.5 or 15.5)or stacked and 4  or item.kind=="toggle"and(compact and 6.5 or 11.5)or(compact and 8 or 10));local valuey=stacked and y+(compact and 21.5 or 34.5)or texty
         local renderh=item.kind=="section"and panelh-sectiongap or h;local overlap=math.min(y+renderh,rowclip)-math.max(y,cliptop);local visible=overlap>4 and phase>0.015 and(menustate.menuanim or 0)>0.001
         local fade=(visible and(item.kind=="section"and 1 or toggle.edgefade(texty,texty+16,cliptop,clipbottom))or 0)*menustate.tabfade*phase
         local fieldtop=stacked and y+(compact and 18 or 26)or item.kind=="action"and y+3 or y;local fieldbottom=stacked and y+(compact and 38 or 60)or y+h-3;local fieldvisible=visible and math.min(fieldbottom,rowclip)-math.max(fieldtop,cliptop)>4
@@ -1646,9 +1671,9 @@ local function menupos()
         if visible then
             toggle.ensuremenurow(i);menustate.itemkinds[i]=item.kind;setz(itembg[i],item.kind=="section"and 105 or 110)
             l.valuebudget=item.kind=="dropdown"and math.max(0,l.controlw-56)or nil;local shown=toggle.itemshown(item,l.valuebudget);local valuewidth=toggle.uiwidth(shown,13);toggle.setprop(itemvalue[i],"Text",shown);toggle.setprop(itemvalue[i],"Size",13);if not item.inlinebind and item.kind~="dropdown"then toggle.setprop(itemvalue[i],"Center",false)end
-            l.shownlabel=toggle.uititle(item.label);if compact and item.kind~="action"then local leftpad=item.kind=="toggle"and 42 or 16;local rightpad=20+(item.info and 24 or 0)+(item.colorindex and 26 or 0)+(item.inlinebind and math.max(26,valuewidth+14)+8 or 0);l.shownlabel=toggle.fitmenutext(l.shownlabel,math.max(24,w-leftpad-rightpad))end
+            l.shownlabel=toggle.uititle(item.label);if compact and item.kind~="action"then local leftpad=item.kind=="toggle"and 42 or 16;local rightpad=(item.kind=="slider"and 24+toggle.rightwidth(itemvalue[i])or 20)+(item.info and 24 or 0)+(item.colorindex and 26 or 0)+(item.inlinebind and math.max(26,valuewidth+14)+8 or 0);l.shownlabel=toggle.fitmenutext(l.shownlabel,math.max(item.kind=="slider"and 0 or 24,w-leftpad-rightpad))end
             toggle.setprop(itemlabel[i],"Text",l.shownlabel);if item.kind~="action"then toggle.lefttext(itemlabel[i],x+(item.kind=="toggle"and(compact and 42 or 60)or 16),texty+6.5)end
-            if item.kind=="dropdown"or item.kind=="text"then toggle.lefttext(itemvalue[i],x+26,(fieldtop+fieldbottom)/2)elseif not item.inlinebind then toggle.setpos(itemvalue[i],stacked and x+26 or x+w-16-valuewidth,valuey)end
+            if item.kind=="dropdown"or item.kind=="text"then toggle.lefttext(itemvalue[i],x+26,(fieldtop+fieldbottom)/2)elseif item.kind=="slider"then toggle.righttext(itemvalue[i],x+w-16,valuey+6.5)elseif not item.inlinebind then toggle.setpos(itemvalue[i],stacked and x+26 or x+w-16-valuewidth,valuey)end
             toggle.setpos(itembg[i],x+14,fieldtop);itembg[i].Size=Vector2.new(w-28,math.max(0,fieldbottom-fieldtop));itemborder[i].Position=itembg[i].Position;itemborder[i].Size=itembg[i].Size
             if item.kind=="section"then
                 local top=math.max(y,cliptop);local bottom=math.min(y+renderh,clipbottom);toggle.setpos(itembg[i],x,top);itembg[i].Size=Vector2.new(w,math.max(0,bottom-top));itemborder[i].Position=itembg[i].Position;itemborder[i].Size=itembg[i].Size;local ax,ay=x+w-22,y+(compact and 13 or 23);local angle=(1-(item.openphase or 1))*math.pi/2
@@ -2291,9 +2316,9 @@ end
 local function makering(rec,count)
     if rec.cfg.noring or not toggle.ringenabled then return end
     if not rec.ring or rec.ring[1]and toggle.removeddraw[rec.ring[1]]then rec.ring={};rec.ringpoints={};rec.ringvisible=false;rec.ringactivecount=0 end
-    for i=#rec.ring+1,count do rec.ring[i]=newline(rec.cfg.labelcolor or toggle.white)end
+    for i=#rec.ring+1,count do rec.ring[i]=toggle.acquireline(rec.cfg.labelcolor or toggle.white)end
 end
-local function hidering(rec)if(rec.ringanim or 0)>0.01 then return end;if rec.ring and rec.ringvisible~=false then for i=1,#rec.ring do hide(rec.ring[i])end;rec.ringvisible=false;rec.ringactivecount=0 end end
+local function hidering(rec)if(rec.ringanim or 0)>0.01 then return end;if rec.ring then toggle.releasering(rec)end end
 local function makecrate(rec)
     if not rec.cfg.crate then return end;local intact=rec.items and rec.bg and rec.take and rec.takekey and rec.cratetitle and not toggle.removeddraw[rec.bg]and not toggle.removeddraw[rec.take]and not toggle.removeddraw[rec.takekey]and not toggle.removeddraw[rec.cratetitle];if intact then for i=1,#rec.items do if toggle.removeddraw[rec.items[i]]or toggle.removeddraw[rec.status[i]]then intact=false;break end end end;if intact then return end
     for _,d in pairs({rec.bg,rec.bgouter,rec.bgmiddle,rec.bginner,rec.take,rec.crateheadbg,rec.crateheadborder,rec.cratetitle,rec.crategift,rec.takekey})do remove(d)end;if rec.items then for i=1,#rec.items do remove(rec.items[i]);remove(rec.status and rec.status[i])end end
@@ -2308,7 +2333,7 @@ local function hiderec(rec)
 end
 local function removerec(rec)
     remove(rec.name);remove(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder})do remove(d)end;
-    if rec.ring then for i=1,#rec.ring do remove(rec.ring[i])end end
+    toggle.releasering(rec)
     remove(rec.bg);remove(rec.bgouter);remove(rec.bgmiddle);remove(rec.bginner);remove(rec.take);remove(rec.crateheadbg);remove(rec.crateheadborder);remove(rec.cratetitle);remove(rec.crategift);remove(rec.takekey)
     if rec.items then for i=1,#rec.items do remove(rec.items[i]);remove(rec.status and rec.status[i])end end
 end
@@ -2551,7 +2576,7 @@ local function drawring(rec,world,meters,wanted)
     end;if(rec.ringactivecount or 0)>segments then for i=segments+1,rec.ringactivecount do toggle.setvisible(rec.ring[i],false)end end;rec.ringactivecount=segments;rec.ringvisible=true
 end
 toggle.cleartracers=function()
-    local state=toggle.tracers;for key,rec in pairs(state.records)do for _,line in ipairs(rec.lines or{})do remove(line)end;state.records[key]=nil end;state.count=0
+    local state=toggle.tracers;for key,rec in pairs(state.records)do for _,line in ipairs(rec.lines or{})do toggle.recycleline(line)end;state.records[key]=nil end;state.count=0
 end
 toggle.touchtracer=function(kind,key,x,y,tint,alpha)
     local state=toggle.tracers;if not toggle.esp or not state.selected[kind]or not x or not y or x~=x or y~=y or math.abs(x)>1000000 or math.abs(y)>1000000 then return end
@@ -2577,13 +2602,13 @@ toggle.drawtracers=function()
     local state=toggle.tracers;if state.count==0 then return end;local now=toggle.frametime or tick();local mx,my=mouse and mouse.X,mouse and mouse.Y;if not toggle.drawingfinite(mx,1000000)or not toggle.drawingfinite(my,1000000)then for _,rec in pairs(state.records)do for _,line in ipairs(rec.lines)do toggle.setvisible(line,false)end end;return end;state.phase=((state.phase or 0)+(toggle.framedt or 1/60)*0.65*state.speed)%1;local samples=state.samples or{};state.samples=samples;for i=1,state.segments do local sample=samples[i];if not sample then local u=i/state.segments;sample={u=u,bend=2*u*(1-u)};samples[i]=sample end;local phase=((i-0.5)/state.segments-state.phase)*math.pi*2;sample.alpha=0.55+math.exp((math.cos(phase)-1)*5)*0.35 end
     for key,rec in pairs(state.records)do
         local on=toggle.esp and state.selected[rec.kind]and rec.seen==state.frame;rec.anim=toggle.ease(rec.anim,on and 1 or 0,on and 0.10 or 0.13)
-        if not on and rec.anim<=0.01 then for _,line in ipairs(rec.lines)do remove(line)end;state.records[key]=nil;state.count=state.count-1
+        if not on and rec.anim<=0.01 then for _,line in ipairs(rec.lines)do toggle.recycleline(line)end;state.records[key]=nil;state.count=state.count-1
         else
             rec.drawx=rec.x;rec.drawy=rec.y
             local dx,dy=rec.drawx-mx,rec.drawy-my;local length=math.sqrt(dx*dx+dy*dy);local bend=math.min(75,length*0.13);local last=Vector2.new(mx,my)
             for i=1,state.segments do
                 local sample=samples[i];local point=Vector2.new(mx+dx*sample.u,my+dy*sample.u-bend*sample.bend)
-                local line=rec.lines[i];if not line then line=setz(newline(rec.tint),0.5);rec.lines[i]=line end
+                local line=rec.lines[i];if not line then line=setz(toggle.acquireline(rec.tint),0.5);rec.lines[i]=line end
                 toggle.setprop(line,"From",last);toggle.setprop(line,"To",point);toggle.setprop(line,"Color",rec.tint);toggle.setprop(line,"Thickness",1.5);toggle.setprop(line,"Transparency",rec.anim*rec.alpha*state.opacity*sample.alpha);toggle.setvisible(line,length>3 and rec.anim>0.01);last=point
             end
         end
@@ -3319,7 +3344,7 @@ local function setringsegments(value,quiet)
     local nextvalue=64
     if nextvalue~=ringseg then
         ringseg=nextvalue
-        for i=1,#tracked do local rec=tracked[i];if rec.ring then for j=1,#rec.ring do remove(rec.ring[j])end;rec.ring=nil end end
+        for i=1,#tracked do toggle.releasering(tracked[i])end
     end
     menuupdate();if not quiet then bindlog("ring segments set to "..tostring(ringseg))end
 end
@@ -3764,7 +3789,7 @@ toggle.cleanup=function()
     local state=toggle.instacratestate;state.collectid=(state.collectid or 0)+1;state.request=nil;state.worker=false;state.collecting=false
     toggle.eventstates=setmetatable({},{__mode="k"});toggle.aurastate.parts={};toggle.aurastate.stick=nil;toggle.aurastate.remote=nil;toggle.aurastate.character=nil;toggle.aurastate.rake=nil
     pcall(toggle.restorezoom);pcall(toggle.restorevisuals);pcall(toggle.restoreidle);pcall(toggle.cleartracers);pcall(toggle.restoredoors);pcall(toggle.restorecollisions);pcall(toggle.applynofall,false,true);pcall(toggle.applytowerbarriers,false,true)
-    for d in pairs(toggle.drawregistry)do remove(d)end;toggle.cleardrawingowners();toggle.drawingqueue={};toggle.drawingcursor=1
+    for d in pairs(toggle.drawregistry)do remove(d)end;toggle.cleardrawingowners();toggle.drawingqueue={};toggle.drawingcursor=1;toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"})
 end
 toggle.spawn(function()toggle.wait();while toggle.running and(toggle.starting)do toggle.wait(0.1)end;if toggle.running then pcall(toggle.avatarload)end end)
 toggle.backspaceheld=function(edge)
