@@ -36,8 +36,8 @@ toggle.clientgcnames={"vars","canMove","can_jump","can_jump2","lastJump","handli
 toggle.clientgc={cache={},bykey={},valid=false,scanning=false,nextapply=0,nextscan=0,scanfailures=0,applyfailures=0,misses=0,recoveries=0,stableat=nil,lastscan=0,character=lp and lp.Character or nil,characterkey=nil,rescanat=nil,maxstamina=100}
 toggle.nofall={size=Vector3.new(100000,100000,100000),originals={},nextapply=0}
 toggle.towerbarriers={originals={},nextapply=0,applied=false,inv=nil,generation=0}
-toggle.zoom={thirdperson=false,amount=8,min=0,max=0,originalmin=nil,originalmax=nil,memoryvalid=false,directvalid=false,nextapply=0,minoffset=0x35C,maxoffset=0x358}
-toggle.shiftlockstate={offset=0x3B6,active=false,nextapply=0}
+toggle.zoom={thirdperson=false,amount=8,min=0,max=0,originalmin=nil,originalmax=nil,memoryvalid=false,directvalid=false,nextapply=0,minoffset=nil,maxoffset=nil,offsetverified=false}
+toggle.shiftlockstate={offset=nil,offsetverified=false,active=false,pending=false,nextapply=0}
 toggle.instacrate=false;toggle.instacratestate={active=nil,distance=math.huge,collecting=false,collectuntil=0,range=30,patched=setmetatable({},{__mode="k"})};toggle.inventorycache={next=0,items={}}
 toggle.autocollect={enabled=false,selected={},order={{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Tracker",label="tracker"},{name="FirstAidKit",label="medkit"},{name="Vitamins",label="vitamin"}}}
 toggle.prompts=false;toggle.promptsettings={master=false,housedoor=true,houselights=true,houseknock=true,trapdoor=true,forceopen=true,radar=true,towerlights=true};toggle.promptorder={{id="house",label="house controls"},{id="trapdoor",label="tower trapdoor"},{id="release",label="tower release"},{id="radar",label="radar"},{id="towerlights",label="lights"}};toggle.promptoptionorder={{id="housedoor",label="house door",panel="house"},{id="houselights",label="house lights",panel="house"},{id="houseknock",label="house knock",panel="house"},{id="trapdoor",label="tower trapdoor",panel="trapdoor"},{id="forceopen",label="release",panel="release"},{id="radar",label="tower radar",panel="radar"},{id="towerlights",label="tower lights",panel="towerlights"}};toggle.promptstate={records={},active=nil,distance=math.huge,nextresolve=0}
@@ -58,7 +58,7 @@ toggle.shop={
 toggle.playeresp={stacking=true,stackanim=0,enabled=true,distance=150,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=5,showusername=true,showhealth=true,showdistance=false,background=true,style="modern",selected={FlareGun=true,StunStick=true,UV_Lamp=true,FirstAidKit=true,Vest=true},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
 toggle.autorecover=false;toggle.autorecovernext=0;toggle.autorecoverfolder=nil;toggle.recovervalue=0;toggle.recovervaluenext=0;toggle.autosellscrap=false;toggle.autosellnext=0;toggle.autobuyitems={selected={},next=0};toggle.autosellitems={selected={},next=0}
 toggle.borderradius=10
-toggle.offseturl="https://offsets.imtheo.lol/version-2366ba214ec740ca/offsets.hpp"
+toggle.offseturl="https://offsets.femboythighs.org/version-7a0c6d10fcb34a2c/offsets.cs"
 toggle.offsettext=nil;toggle.offsetloaded=false;toggle.offsetretry=0
 toggle.white=Color3.fromHex("#ffffff");toggle.ringrgbcolor=Color3.fromHex("#d8d8d8");toggle.warningred=Color3.fromHex("#f2c94c");toggle.infoorange=Color3.fromHex("#ffffff");toggle.permissionblue=Color3.fromHex("#ffffff");toggle.permissionpink=Color3.fromHex("#66ccff");toggle.ringunit={}
 toggle.playerdisplayname=lp and(lp.DisplayName or lp.Name)or"player";toggle.localusername=lp and lp.Name or"Player"
@@ -455,32 +455,32 @@ toggle.effectrawvalue=function(field,value)
 end
 toggle.offsetstructvalue=function(structname,name)
     local source=toggle.offsettext;if type(source)~="string"then return nil end
-    local block=string.match(source,"namespace%s+"..structname.."%s*{(.-)%s*}")or string.match(source,"struct%s+"..structname.."%s*:%s*[%w_:]+%s*{(.-)%s*};");if type(block)~="string"then return nil end
-    local value=string.match(block,"%s"..name.."%s*=%s*(0x[%da-fA-F]+)");return value and tonumber(value)or nil
+    local block=string.match(source,"class%s+"..structname.."%s*{(.-)%s*}")or string.match(source,"namespace%s+"..structname.."%s*{(.-)%s*}")or string.match(source,"struct%s+"..structname.."%s*:%s*[%w_:]+%s*{(.-)%s*};");if type(block)~="string"then return nil end
+    local value=string.match(block,"%s"..name.."%s*=%s*(0[xX][%da-fA-F]+)")or string.match(block,"%s"..name.."%s*=%s*(%d+)%s*;");return value and tonumber(value)or nil
 end
+
 toggle.offsetvalue=function(name)return toggle.offsetstructvalue("Player",name)end
+
 toggle.loadoffsets=function(force)
     local now=tick();if toggle.offsetloading then return false end;if not force and toggle.offsetloaded then return true end;if not force and now<(toggle.offsetretry or 0)then return false end;toggle.offsetloading=true;toggle.offsetretry=now+10
     local processkey=toggle.visualprocesskey();local cached=type(_G)=="table"and _G.__therakeCameraOffsetText;local ok,source=false,nil
     if not force and processkey and type(cached)=="table"and cached.key==processkey and cached.url==toggle.offseturl then ok,source=true,cached.text else ok,source=pcall(function()return game:HttpGet(toggle.offseturl)end)end;toggle.offsetloading=false
-    if not ok or type(source)~="string"or #source<100 then toggle.offsetretry=now+10;return false end
-    toggle.offsettext=source;if processkey and type(_G)=="table"then _G.__therakeCameraOffsetText={key=processkey,url=toggle.offseturl,text=source}end
-    local minimum=toggle.offsetvalue("MinZoomDistance")or toggle.offsetvalue("CameraMinZoomDistance");local maximum=toggle.offsetvalue("MaxZoomDistance")or toggle.offsetvalue("CameraMaxZoomDistance");local shiftlock=toggle.offsetvalue("DevEnableMouseLock")or toggle.shiftlockstate.offset;local unlockvalue=toggle.offsetstructvalue("DoubleConstrainedValue","Value")or toggle.offsetstructvalue("Misc","Value")or toggle.instacratestate.unlockoffset
-    local minimumok=type(minimum)=="number"and minimum>0 and minimum<0x10000;local maximumok=type(maximum)=="number"and maximum>0 and maximum<0x10000;local shiftlockok=type(shiftlock)=="number"and shiftlock>0 and shiftlock<0x10000;local unlockok=type(unlockvalue)=="number"and unlockvalue>0 and unlockvalue<0x10000
-    local zoomchanged=minimumok and toggle.zoom.minoffset~=minimum or maximumok and toggle.zoom.maxoffset~=maximum
-    if minimumok then toggle.zoom.minoffset=minimum end;if maximumok then toggle.zoom.maxoffset=maximum end;if shiftlockok then toggle.shiftlockstate.offset=shiftlock end;if unlockok then toggle.instacratestate.unlockoffset=unlockvalue end
-    if minimumok and maximumok and(zoomchanged or not toggle.zoom.memoryvalid)then toggle.capturezoom()end
-    toggle.offsetloaded=minimumok and maximumok and shiftlockok;toggle.offsetretry=toggle.offsetloaded and 0 or now+10
-    return toggle.offsetloaded
+    if not toggle.running or toggle.replacing or not ok or type(source)~="string"or #source<100 or #source>262144 then return false end
+    local version=source:match("Roblox%s+Version%s*:%s*(version%-[%w]+)");if version and not toggle.offseturl:find(version,1,true)then return false end
+    toggle.offsettext=source
+    local minimum=toggle.offsetvalue("MinZoomDistance")or toggle.offsetvalue("CameraMinZoomDistance");local maximum=toggle.offsetvalue("MaxZoomDistance")or toggle.offsetvalue("CameraMaxZoomDistance");local shiftlock=toggle.offsetvalue("DevEnableMouseLock")
+    local minimumok=type(minimum)=="number"and minimum>0 and minimum<0x10000 and minimum%4==0;local maximumok=type(maximum)=="number"and maximum>0 and maximum<0x10000 and maximum%4==0 and maximum~=minimum;local shiftlockok=type(shiftlock)=="number"and shiftlock>0 and shiftlock<0x10000 and shiftlock%1==0
+    if not minimumok or not maximumok then return false end
+    local zoomchanged=not toggle.zoom.offsetverified or toggle.zoom.minoffset~=minimum or toggle.zoom.maxoffset~=maximum
+    toggle.zoom.minoffset=minimum;toggle.zoom.maxoffset=maximum;toggle.zoom.offsetverified=true;toggle.shiftlockstate.offset=shiftlockok and shiftlock or nil;toggle.shiftlockstate.offsetverified=shiftlockok
+    if zoomchanged then toggle.zoom.memoryvalid=false;toggle.capturezoom()end
+    toggle.offsetloaded=true;toggle.offsetretry=0;if processkey and type(_G)=="table"then _G.__therakeCameraOffsetText={key=processkey,url=toggle.offseturl,text=source}end
+    toggle.zoom.nextapply=0;toggle.shiftlockstate.nextapply=0;return true
 end
+
 toggle.requestoffsets=function()
     if toggle.offsetloading or toggle.offsetqueued or toggle.offsetloaded or tick()<(toggle.offsetretry or 0)then return false end;toggle.offsetqueued=true
     toggle.spawn(function()pcall(toggle.loadoffsets,false);toggle.offsetqueued=false end);return true
-end
-toggle.applyshiftlock=function()
-    local state=toggle.shiftlockstate;if not state.active then return false end;local now=tick();if now<(state.nextapply or 0)then return true end;state.nextapply=now+0.1;if not state.offset then toggle.requestoffsets()end
-    local address=toggle.instanceaddress(lp);if not address or not state.offset then return false end
-    return toggle.memorywrite("byte",address+state.offset,1)
 end
 toggle.clientgc.characterkey=toggle.instanceaddress(toggle.clientgc.character)or toggle.clientgc.character
 toggle.validzoom=function(minimum,maximum)
@@ -489,7 +489,7 @@ end
 toggle.capturezoom=function()
     local directmin,directmax;pcall(function()directmin=lp.CameraMinZoomDistance;directmax=lp.CameraMaxZoomDistance end)
     toggle.zoom.directvalid=toggle.validzoom(directmin,directmax)
-    local address=toggle.instanceaddress(lp);local memorymin=address and toggle.memoryread("float",address+toggle.zoom.minoffset)or nil;local memorymax=address and toggle.memoryread("float",address+toggle.zoom.maxoffset)or nil
+    local address=toggle.instanceaddress(lp);local memorymin=address and toggle.zoom.offsetverified and toggle.memoryread("float",address+toggle.zoom.minoffset)or nil;local memorymax=address and toggle.zoom.offsetverified and toggle.memoryread("float",address+toggle.zoom.maxoffset)or nil
     toggle.zoom.memoryvalid=address~=nil and toggle.validzoom(memorymin,memorymax)
     local minimum,maximum=toggle.zoom.memoryvalid and memorymin or directmin,toggle.zoom.memoryvalid and memorymax or directmax
     if toggle.validzoom(minimum,maximum)then toggle.zoom.originalmin=minimum;toggle.zoom.originalmax=maximum end;toggle.zoom.min=toggle.zoom.thirdperson and toggle.zoom.amount or 0;toggle.zoom.max=toggle.zoom.thirdperson and 10000 or 0
@@ -514,7 +514,7 @@ toggle.applyzoom=function(force)
             applied=wrote or applied
         else state.directvalid=false end
     end
-    if state.memoryvalid then
+    if state.offsetverified and state.memoryvalid then
         local address=toggle.instanceaddress(lp);local currentmin=address and toggle.memoryread("float",address+state.minoffset)or nil;local currentmax=address and toggle.memoryread("float",address+state.maxoffset)or nil
         if not address or not toggle.validzoom(currentmin,currentmax)then state.memoryvalid=false;return applied end
         local function changed(a,b)return math.abs(a-b)>0.001 end
@@ -1379,7 +1379,7 @@ toggle.featurecatalog=function(tab)
             section("teleports",2),{id="scrap",kind="toggle",label="tp scrap",on=toggle.scrapteleportenabled,bind="scrap",inlinebind=true,col=2},{id="flare",kind="toggle",label="tp flare",on=toggle.flareteleportenabled,bind="flare",inlinebind=true,col=2},{id="scrapteleportselect",kind="dropdown",label="sort scrap by",value=toggle.scrapteleport,col=2},{id="teleportcooldown",kind="toggle",label="tp safe cooldown",on=toggle.teleportcooldown,info=teleportinfo,col=2},{id="cooldownseconds",kind="slider",label="cooldown time",value=toggle.cooldownseconds,min=10,max=30,display=tostring(toggle.cooldownseconds).."s",col=2},
             section("prompts",1,"shows interactive controls over supported house and tower mechanisms","hybrid"),{id="promptmaster",kind="toggle",label="bypass prompts",on=toggle.prompts,info="use the prompt bind near a mechanism; left or right click switches actions",col=1},{id="promptsselect",kind="dropdown",label="prompt panels",value=toggle.promptlabel(),col=1},{id="bindprompt",kind="bind",bind="prompt",inlinebind=true,label="prompt toggle bind",col=1},
             section("combat",1,"uses supported combat remote actions","hybrid"),{id="killaura",kind="toggle",label="stun aura",on=toggle.killaura,bind="aura",inlinebind=true,info="uses an equipped stun stick without consuming stamina",col=1},{id="killaurarange",kind="slider",label="stun range",value=toggle.killaurarange,min=6,max=30,display=tostring(toggle.killaurarange).." studs",col=1},{id="killauradelay",kind="slider",label="stun delay",value=toggle.killauradelay,min=0.05,max=0.6,display=string.format("%.2fs",toggle.killauradelay),col=1},{id="autoheal",kind="toggle",label="auto-heal",on=toggle.autoheal,info="uses an equipped first aid kit when your health drops below the selected amount",col=1},{id="autohealth",kind="slider",label="heal below",value=toggle.autohealth,min=20,max=70,display=tostring(toggle.autohealth).." hp",col=1},
-            section("camera",2,"equip an item after enabling third person; change shift lock in Roblox movement settings",nil),{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,bind="thirdperson",inlinebind=true,col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="toggle",label="shift lock",on=toggle.shiftlockstate.active,col=2},
+            section("camera",2,"equip an item after enabling third person; change shift lock in Roblox movement settings",nil),{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,bind="thirdperson",inlinebind=true,col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="toggle",label="shift lock",on=false,disabled=true,infowhendisabled=true,info="disabled because updated shift lock memory offsets are unavailable",col=2},
             section("supply",2),{id="supplylabel",kind="toggle",label="crate esp",on=toggle.supplylabel,colorindex=8,col=2},{id="flares",kind="toggle",label="flare esp",on=espgroups.flares,colorindex=1,col=2},{id="supplyitems",kind="toggle",label="crate inventory",on=toggle.supplyitems,disabled=toggle.instacrate,info="shows crate contents and taken items; locked on while instant crate is enabled",col=2},{id="instacrate",kind="toggle",label="instant crate",on=toggle.instacrate,info="left click selects the next item; right click selects the previous item",permission="hybrid",col=2},{id="bindcrate",kind="bind",label="take item bind",bind="crate",bindinfo="takes the selected crate item; click to change this required bind",inlinebind=true,col=2},{id="autocollect",kind="toggle",label="auto-collect",on=toggle.autocollect.enabled,disabled=not toggle.instacrate,col=2},{id="autocollectselect",kind="dropdown",label="auto-collect items",value=toggle.autocollectlabel(),disabled=not toggle.instacrate,col=2},
             section("client",2),{id="antiCollide",kind="toggle",label="player no-collide",on=toggle.client.antiCollide,bind="collide",inlinebind=true,info="disables collisions with other players; restores them when switched off",col=2},{id="doorNoCollide",kind="toggle",label="Door No-Collide",on=toggle.client.doorNoCollide,bind="door",inlinebind=true,info="walk through the house and tower doors; restores collisions to match their open state when disabled",col=2},{id="preventIdle",kind="toggle",label="Prevent Idle Timeout",on=toggle.client.preventIdle,info="prevents idle kicks; has not been tested",warning=true,unstable=true,col=2},{id="noFall",kind="toggle",label="no fall damage",on=toggle.client.noFall,col=2},{id="towerBarriers",kind="toggle",label="no tower push",on=toggle.client.towerBarriers,info="disables conveyors that push you off the tower fences",col=2},{id="autoradio",kind="toggle",label="auto-take radio",on=toggle.autoradio,info="instantly takes the radio when you are close to its prompt range",permission="hybrid",col=2},{id="noJumpCooldown",kind="toggle",label="no jump cooldown",on=toggle.client.noJumpCooldown,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},{id="infiniteStamina",kind="toggle",label="infinite stamina",on=toggle.client.infiniteStamina,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},
             section("power usage",2),{id="hudpower",kind="toggle",label="power left",on=toggle.hudelements.power,info="reads an existing voltmeter in any player's inventory",col=2},{id="autopower",kind="toggle",label="auto-power station",on=toggle.autopower,info="automatically starts the station while you remain within 4 meters of it",permission="hybrid",col=2},{id="autopowertoolbox",kind="toggle",label="require toolbox",on=toggle.autopowerrequiretoolbox,info="only lets auto-power run while a toolbox is equipped",col=2},{id="poweractivity",kind="toggle",label="activity panel",on=toggle.poweractivity,col=2},{id="poweractivitymodeselect",kind="dropdown",label="show panel when",value=toggle.poweractivitymode,col=2},
@@ -1790,11 +1790,16 @@ local function pickerupdate(visible)
     for _,d in ipairs({picker.title,picker.rgbtext,picker.hextext})do toggle.uioutline(d,alpha,d.Color)end
     pickerlayouts.popup={x=px,y=py,w=pw,h=ph};pickerlayouts.square={x=sx,y=sy,w=sw,h=sh};pickerlayouts.hue={x=hx,y=hy,w=hw,h=hh};pickerlayouts.rgb=rgbvisible and{x=px+chromax,y=fy,w=buttonw,h=32}or nil;pickerlayouts.hex={x=px+hexx,y=fy,w=hexw,h=32}
 end
+toggle.lockfeature=function(item)
+    if item and item.id=="shiftlock"then item.on=false;item.disabled=true;item.infowhendisabled=true;item.info="disabled because updated shift lock memory offsets are unavailable";item.permission=nil;item.warning=nil;item.unstable=nil end
+    return item
+end
+
 toggle.preparewidgets=function(raw)
     local tab=menustate.tab;local closed=menustate.widgetclosed[tab];if type(closed)~="table"then closed={};menustate.widgetclosed[tab]=closed end
     menustate.widgetanim=menustate.widgetanim or{};menustate.widgetanim[tab]=menustate.widgetanim[tab]or{};local anim=menustate.widgetanim[tab];menustate.widgetanimating=false
     local current={};local items=menustate.widgetitems or{};menustate.widgetitems=items;for i=#items,1,-1 do items[i]=nil end
-    for i=1,#raw do local item=raw[i];local col=item.col or 1
+    for i=1,#raw do local item=toggle.lockfeature(raw[i]);local col=item.col or 1
         if item.kind=="section"then local id=item.widgetid or item.label;current[col]=id;item.widgetid=id;local target=closed[id]and 0 or 1;anim[id]=toggle.ease(anim[id],target,0.28);if math.abs(anim[id]-target)>0.001 then menustate.widgetanimating=true else anim[id]=target end;item.openphase=anim[id];item.widgetphase=1;items[#items+1]=item
         else local id=current[col];item.widgetid=id;item.widgetphase=anim[id]or 1;if item.widgetphase>0.001 then items[#items+1]=item end end
     end
@@ -1822,7 +1827,7 @@ local function menuobjects(visible)
         if iconon and not toggle.menuinfo.icons[i]then toggle.menuinfo.icons[i]=toggle.newtooltipicon(123)end
         if toggle.menuinfo.icons[i]then
             local k=item and(item.permission=="hybrid"and"hybrid"or item.permission=="hybrid"and"hybrid"or(item.unstable or item.warning)and"warning"or"info")or"info"
-            local c=item and(item.disabled and color("muted")or item.permission=="hybrid"and toggle.permissionpink or item.permission and toggle.permissionblue or(item.unstable or item.warning)and toggle.warningred or toggle.infoorange)or toggle.white
+            local c=item and(item.disabled and not item.infowhendisabled and color("muted")or item.permission=="hybrid"and toggle.permissionpink or item.permission and toggle.permissionblue or(item.unstable or item.warning)and toggle.warningred or toggle.infoorange)or toggle.white
             toggle.settooltipicon(toggle.menuinfo.icons[i],k,info and info.x+2 or 0,info and info.y+0.5 or 0,c,l and l.textfade*(menustate.contentfade or 0)*(menustate.menuanim or 0)or 0,iconon)
         end
     end
@@ -1897,9 +1902,9 @@ local function menuupdate(animateonly)
                 toggle.setpos(d.collapse,hx,hy);toggle.setprop(d.collapse,"Size",Vector2.new(24,24));toggle.setprop(d.collapse,"Corner",math.min(7,toggle.borderradius));toggle.setprop(d.collapse,"Color",accent);toggle.setprop(d.collapse,"Transparency",0.08*menustate.hover[headerkey]*a)
                 toggle.setpos(d.line,l.x+16,l.y+(compact and 24 or 43));toggle.setprop(d.line,"Size",Vector2.new(l.w-32,1));toggle.setprop(d.line,"Color",color("outline"));toggle.setprop(d.line,"Transparency",0.10*a*(item.openphase or 1))
             elseif item.kind=="toggle"then
-                local ta=toggle.ease(menustate.toggleanim[key],item.on and 1 or 0,0.26);menustate.toggleanim[key]=ta
+                local ta=item.disabled and 0 or toggle.ease(menustate.toggleanim[key],item.on and 1 or 0,0.26);menustate.toggleanim[key]=ta
                 toggle.setprop(markborder[i],"Color",toggle.colormix(toggle.colormix(surface,color("muted"),0.26),accent,ta));toggle.setprop(markborder[i],"Transparency",(item.disabled and 0.45 or 1)*guiopacity*fade)
-                local compact=toggle.visualstyle=="compact";toggle.setprop(markborder[i],"Position",Vector2.new(l.x+(compact and 10 or 13),l.y+(compact and 5 or 8)));toggle.setprop(markborder[i],"Size",Vector2.new(compact and 24 or 34,compact and 16 or 20));toggle.setprop(markborder[i],"Corner",compact and 8 or 10);toggle.setprop(itemmark[i],"Corner",compact and 5 or 7);toggle.setprop(markborder[i],"Filled",true);toggle.setprop(itemmark[i],"Size",Vector2.new(compact and 10 or 14,compact and 10 or 14));toggle.setprop(itemmark[i],"Position",Vector2.new(l.x+(compact and 13 or 16)+(compact and 8 or 14)*ta,l.y+(compact and 8 or 11)));toggle.setprop(itemmark[i],"Color",toggle.colormix(color("text"),toggle.white,0.18*ta));toggle.setprop(itemmark[i],"Transparency",l.textfade*alpha*(item.disabled and 0.5 or 1))
+                local compact=toggle.visualstyle=="compact";toggle.setprop(markborder[i],"Position",Vector2.new(l.x+(compact and 10 or 13),l.y+(compact and 5 or 8)));toggle.setprop(markborder[i],"Size",Vector2.new(compact and 24 or 34,compact and 16 or 20));toggle.setprop(markborder[i],"Corner",compact and 8 or 10);toggle.setprop(itemmark[i],"Corner",compact and 5 or 7);toggle.setprop(markborder[i],"Filled",true);toggle.setprop(itemmark[i],"Size",Vector2.new(compact and 10 or 14,compact and 10 or 14));toggle.setprop(itemmark[i],"Position",Vector2.new(l.x+(compact and 13 or 16)+(compact and 8 or 14)*ta,l.y+(compact and 8 or 11)));toggle.setprop(itemmark[i],"Color",item.disabled and color("muted")or toggle.colormix(color("text"),toggle.white,0.18*ta));toggle.setprop(itemmark[i],"Transparency",l.textfade*alpha*(item.disabled and 0.5 or 1))
             elseif item.kind=="slider"then
                 toggle.setprop(itemmark[i],"Color",toggle.colormix(accent,color("text"),0.16+ha*0.10));toggle.setprop(itemmark[i],"Transparency",fade)
                 local halo=toggle.sliderhalo(i);local size=l.thumbsize+6+ha*2;l.halovisible=l.trackcy-size/2>=l.cliptop and l.trackcy+size/2<=l.clipbottom;toggle.setpos(halo,l.trackx+l.trackw*(l.slideratio or 0)-size/2,l.trackcy-size/2);toggle.setprop(halo,"Size",Vector2.new(size,size));toggle.setprop(halo,"Corner",size/2);toggle.setprop(halo,"Color",accent);toggle.setprop(halo,"Transparency",(ha*0.10+pa*0.08)*fade)
@@ -3105,8 +3110,9 @@ toggle.setthirdperson=function(value,quiet)
     toggle.zoom.thirdperson=value==true;toggle.zoom.min=toggle.zoom.thirdperson and toggle.zoom.amount or 0;toggle.zoom.max=toggle.zoom.thirdperson and 10000 or 0;toggle.zoom.nextapply=0;toggle.applyzoom(true);menuupdate();if not quiet then bindlog(toggle.zoom.thirdperson and"enabled third person"or"disabled third person")end
 end
 toggle.setshiftlock=function(value,quiet)
-    local state=toggle.shiftlockstate;state.active=value==true;state.nextapply=0;if not state.offset then toggle.requestoffsets()end;local address=toggle.instanceaddress(lp);local applied=address and state.offset and toggle.memorywrite("byte",address+state.offset,state.active and 1 or 0)or false;menuupdate();if not quiet then bindlog(applied and(state.active and"enabled shift lock"or"disabled shift lock")or"shift lock offset unavailable")end;return applied
+    toggle.shiftlockstate.active=false;toggle.shiftlockstate.pending=false;menuupdate();return false
 end
+
 toggle.setinstacrate=function(value,quiet)
     toggle.instacrate=value==true;if toggle.instacrate then toggle.supplyitems=true else toggle.instacratestate.collectid=(toggle.instacratestate.collectid or 0)+1;toggle.instacratestate.active=nil;toggle.instacratestate.distance=math.huge;toggle.instacratestate.collecting=false;toggle.instacratestate.worker=false;toggle.instacratestate.request=nil;toggle.instacratestate.nextcollect=0;toggle.autocollect.enabled=false end;menuupdate();if not quiet then bindlog(toggle.instacrate and"enabled instant crate"or"disabled instant crate")end;return toggle.instacrate
 end
@@ -3720,7 +3726,7 @@ local function clickmenu(mx,my)
     for i=1,#itemlayouts do
         local layout=itemlayouts[i];local item=layout.item
         if item.kind~="section"and toggle.controlhit(layout,mx,my)then
-            if item.disabled then return end
+            if item.id=="shiftlock"or item.disabled then return end
             if item.colorindex and inside(mx,my,layout.colorx,layout.colory,layout.colorw,layout.colorh)then toggle.search.open=false;toggle.search.active=false;pickerentry=item.colorindex;picker.label=item.label;picker.opened=false;picker.hexactive=false;picker.hexreplace=false;picker.hexvalue=toggle.hexof(entrycfg(pickerentry).labelcolor);capture=nil;dropdownkind=nil;menuupdate();return end
             if item.inlinebind and layout.bindx and inside(mx,my,layout.bindx,layout.bindy,layout.bindw,layout.bindh)then capture=item.bind;configcapture=false;dropdownkind=nil;menuupdate();return end
             if configcapture and item.id~="configname"then toggle.finishconfiginput(false)end
@@ -3923,14 +3929,14 @@ toggle.worker(function()
 end)
 toggle.worker(function()
     while toggle.starting and toggle.running do toggle.wait()end;if not toggle.running then return end
-    local jobs={toggle.runpromptqueue,toggle.applyidle,toggle.applydoors,toggle.applycollisions,toggle.applyclient,toggle.applykillaura,toggle.applyautoheal,toggle.applyautopower,toggle.applyautoradio,toggle.applyautorecover,toggle.applyautobuyitems,toggle.applyautosellscrap,toggle.applyautosellitems,toggle.applyzoom,toggle.applyshiftlock,toggle.applyvisuals}
+    local jobs={toggle.runpromptqueue,toggle.applyidle,toggle.applydoors,toggle.applycollisions,toggle.applyclient,toggle.applykillaura,toggle.applyautoheal,toggle.applyautopower,toggle.applyautoradio,toggle.applyautorecover,toggle.applyautobuyitems,toggle.applyautosellscrap,toggle.applyautosellitems,toggle.applyzoom,toggle.applyvisuals}
     while toggle.running do
         local started=tick();local budgetstart=started;local work=0
         for i=1,#jobs do if not toggle.running then break end;pcall(jobs[i],false);work=work+1;if work>=4 or tick()-budgetstart>=0.002 then toggle.wait();budgetstart=tick();work=0 end end
         toggle.wait(math.max(0.001,0.05-(tick()-started)))
     end
 end)
-toggle.spawn(function()toggle.wait();if toggle.running and(toggle.zoom.thirdperson or toggle.shiftlockstate.active)then pcall(toggle.loadoffsets,false)end end)
+toggle.spawn(function()toggle.wait();if toggle.running and toggle.zoom.thirdperson then pcall(toggle.loadoffsets,false)end end)
 toggle.worker(function()
     while toggle.starting and toggle.running do toggle.wait()end;if not toggle.running then return end
     local lastframe=tick()
