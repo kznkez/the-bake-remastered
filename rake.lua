@@ -19,7 +19,7 @@ if type(_G)=="table"then
     end
     _G.__therakeDrawingSession=toggle
 end
-toggle.version="v3.7"
+toggle.version="v3.7.1"
 toggle.bootpanel={started=tick(),phase=1,draws={},closed=false,widths={}}
 toggle.bootcleanup=function()
     local state=toggle.bootpanel;if not state or state.closed then return end;state.closed=true
