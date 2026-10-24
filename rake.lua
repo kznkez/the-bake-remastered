@@ -19,7 +19,9 @@ if type(_G)=="table"then
     end
     _G.__therakeDrawingSession=toggle
 end
-toggle.version="v3.7.1"
+toggle.health={renderat=0,frames=0,renderstage="startup",jobstage="startup",scanstage="startup",nativecall="waiting",nativecreated=0,nativeremoved=0,texturechanges=0}
+toggle.jobnames={"Prompts","Idle Timeout","Doors","Player No-Collide","Client Features","Stun Aura","Auto-Heal","Auto-Power","Auto-Take Radio","Nightvision Claim","Recover Items","Auto-Buy","Sell Scrap","Auto-Sell Items","Camera","Post-Processing","Shift Lock"}
+toggle.version="v3.7.2"
 toggle.bootpanel={started=tick(),phase=1,draws={},closed=false,widths={}}
 toggle.bootcleanup=function()
     local state=toggle.bootpanel;if not state or state.closed then return end;state.closed=true
@@ -76,6 +78,10 @@ if not pcall(toggle.bootbegin)then toggle.bootcleanup()else
 end
 if toggle.previoussession then
     local previous=toggle.previoussession;toggle.previoussession=nil
+    if previous.health and type(writefile)=="function"then pcall(function()
+        local h=previous.health;local report={"The Rake Previous Session", "Render Stage: "..tostring(h.renderstage),"Feature Job: "..tostring(h.jobstage),"Scan Stage: "..tostring(h.scanstage),"Native Call: "..tostring(h.nativecall),"Frames: "..tostring(h.frames),"Seconds Since Frame: "..tostring(math.max(0,tick()-(h.renderat or tick()))),"Native Created: "..tostring(h.nativecreated),"Native Removed: "..tostring(h.nativeremoved),"Image Loads: "..tostring(h.texturechanges),"Drawing Owners: "..tostring(#(previous.drawingowners or{})),"Effect Lines: "..tostring(previous.effectlinecount),"Idle Lines: "..tostring(#(previous.linepool or{}))}
+        if type(makefolder)=="function"then pcall(makefolder,"therakesaint")end;writefile("therakesaint/stability-last.txt",table.concat(report,"\n"))
+    end)end
     if type(previous.bootcleanup)=="function"then pcall(previous.bootcleanup)end
     if type(previous.cleanup)=="function"then if not previous.retireaware then previous.running=true end;pcall(previous.cleanup)end;previous.running=false
 end
@@ -96,7 +102,7 @@ toggle.fireevent=function(remote,...)
     state.tokens=math.min(24,(state.tokens or 24)+math.max(0,now-(state.tokenat or now))*80);state.tokenat=now
     local budget=toggle.eventbudget or{tokens=32,at=now};toggle.eventbudget=budget;budget.tokens=math.min(32,budget.tokens+math.max(0,now-budget.at)*120);budget.at=now
     if state.tokens<1 or budget.tokens<1 then return false end;state.tokens=state.tokens-1;budget.tokens=budget.tokens-1;state.busy=true
-    local sent,called=pcall(function(...)if not toggle.running or toggle.replacing or type(_G)=="table"and _G.__therakeDrawingSession~=toggle or not remote.Parent then return false end;remote:FireServer(...);return true end,...);state.busy=false;sent=sent and called==true
+    local sent,called=pcall(function(...)if not toggle.running or toggle.replacing or type(_G)=="table"and _G.__therakeDrawingSession~=toggle or not remote.Parent then return false end;toggle.health.nativecall="remote event";remote:FireServer(...);toggle.health.nativecall="waiting";return true end,...);state.busy=false;sent=sent and called==true
     if sent then state.failures=0;state.next=0 else state.failures=math.min(4,state.failures+1);state.next=now+math.min(2,0.25*2^(state.failures-1))end;return sent
 end
 toggle.targetnight=false;toggle.hudlabels=true;toggle.distanceminimum=true;toggle.distancemin=0;toggle.poweravailable=true;toggle.powerhudavailable=false;toggle.startedat=tick()
@@ -104,7 +110,7 @@ toggle.client={noJumpCooldown=false,infiniteStamina=false,noFall=false,towerBarr
 toggle.worldinfo={scraps=0,points=0,flare=false,traps=0,crates=0,power=false};toggle.worldpanel=false;toggle.keybindpanel=false;toggle.worldpanelitems={scraps=true,flare=true,traps=true,crates=true,power=true}
 toggle.notifysettings={style="modern",opacity=0.8,position="bottom right",duration=4,rakedistance=30,types={supply=true,flare=true,rake=true,scrap=true,trap=true,teleports=true,watch=true,menu=true}}
 toggle.notifications={items={},ready=false,rakenear=false,targeted=false,raketeleporting=false,bloodturning=false,bloodhour=false,max=4}
-toggle.scanid=0;toggle.scanning=false;toggle.nextpowerread=0;toggle.nextpanelrefresh=0;toggle.voltmeterlevel=nil;toggle.nextvoltmeterscan=0
+toggle.scanid=0;toggle.scanning=false;toggle.nextpowerread=0;toggle.nextpanelrefresh=0;toggle.voltmeterlevel=nil;toggle.nextvoltmeterscan=0;toggle.powerreading={nextresolve=0}
 toggle.scrapvalues={12,15,19,23,27};toggle.scrapedit=1;toggle.locationedit=1;toggle.scrapelements={};for i=1,5 do toggle.scrapelements["Scrap"..i]={tiers=true,points=false}end
 toggle.idle={nextsample=0,lastactive=0,busy=false};toggle.tracers={order={"rake","flare","crates","scraps","traps","players","locations"},selected={},records={},count=0,frame=0,segments=48,opacity=0.8,speed=1,curve=1,phase=0}
 toggle.clientlabels={noJumpCooldown="no jump cooldown",infiniteStamina="infinite stamina",noFall="no fall damage",towerBarriers="no tower push",antiCollide="player no-collide",doorNoCollide="Door No-Collide",preventIdle="Prevent Idle Timeout"}
@@ -113,7 +119,7 @@ toggle.clientgc={cache={},bykey={},valid=false,scanning=false,nextapply=0,nextsc
 toggle.nofall={size=Vector3.new(100000,100000,100000),originals={},nextapply=0}
 toggle.towerbarriers={originals={},nextapply=0,applied=false,inv=nil,generation=0}
 toggle.zoom={thirdperson=false,amount=8,min=0,max=0,originalmin=nil,originalmax=nil,memoryvalid=false,directvalid=false,nextapply=0,minoffset=nil,maxoffset=nil,offsetverified=false}
-toggle.shiftlockstate={offset=nil,offsetverified=false,active=false,pending=false,nextapply=0}
+toggle.shiftlockstate={url="https://offsets.ntgetwritewatch.workers.dev/offsets.hpp",offset=nil,offsetverified=false,active=false,pending=false,nextapply=0,nextload=0}
 toggle.instacrate=false;toggle.instacratestate={active=nil,distance=math.huge,collecting=false,collectuntil=0,range=30,patched=setmetatable({},{__mode="k"})};toggle.inventorycache={next=0,items={}}
 toggle.autocollect={enabled=false,selected={},order={{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Tracker",label="tracker"},{name="FirstAidKit",label="medkit"},{name="Vitamins",label="vitamin"}}}
 toggle.prompts=false;toggle.promptsettings={master=false,housedoor=true,houselights=true,houseknock=true,trapdoor=true,forceopen=true,radar=true,towerlights=true};toggle.promptorder={{id="house",label="house controls"},{id="trapdoor",label="tower trapdoor"},{id="release",label="tower release"},{id="radar",label="radar"},{id="towerlights",label="lights"}};toggle.promptoptionorder={{id="housedoor",label="house door",panel="house"},{id="houselights",label="house lights",panel="house"},{id="houseknock",label="house knock",panel="house"},{id="trapdoor",label="tower trapdoor",panel="trapdoor"},{id="forceopen",label="release",panel="release"},{id="radar",label="tower radar",panel="radar"},{id="towerlights",label="tower lights",panel="towerlights"}};toggle.promptstate={records={},active=nil,distance=math.huge,nextresolve=0}
@@ -131,7 +137,7 @@ toggle.shop={
     lookup={},
     selected="RakeTrap",lastscan=0,part=nil
 }
-toggle.playeresp={stacking=true,stackanim=0,enabled=true,distance=150,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=0,showusername=false,showhealth=false,showdistance=false,background=true,style="modern",selected={},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
+toggle.playeresp={stacking=true,stackanim=0,enabled=true,distance=200,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=0,showusername=false,showhealth=false,showdistance=false,background=true,style="modern",selected={},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
 toggle.autorecover=false;toggle.autorecovernext=0;toggle.autorecoverfolder=nil;toggle.recovervalue=0;toggle.recovervaluenext=0;toggle.autosellscrap=false;toggle.autosellnext=0;toggle.autobuyitems={selected={},next=0};toggle.autosellitems={selected={},next=0}
 toggle.borderradius=10
 toggle.offseturl="https://offsets.femboythighs.org/offsets.cs"
@@ -165,7 +171,7 @@ local espgroups={locations=true,scraps=true,traps=true,flares=true,crates=true,r
 espgroups.items={BaseCampMSG=true,SafehouseMSG=true,StationMSG=true,ShopMSG=true,ObservationTowerMSG=true,RakeSpawnPart=true,Scrap1=true,Scrap2=true,Scrap3=true,Scrap4=true,Scrap5=true}
 local espfontsize=13
 toggle.shinesettings={enabled=true,brightness=0.07,width=0.6,speed=1.1,direction="right"}
-toggle.hudbackgroundalpha=0.9;toggle.espbackgroundalpha=0.6;toggle.executedat=tick();toggle.panelsize=13;toggle.menufontindex=1;toggle.fontedit="menu";toggle.visualstyle="modern";toggle.espvisualstyle="modern";toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};toggle.espicons={rake=true,players=false,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false}
+toggle.hudbackgroundalpha=0.9;toggle.espbackgroundalpha=0.6;toggle.executedat=tick();toggle.panelsize=13;toggle.menufontindex=1;toggle.fontedit="menu";toggle.visualstyle="modern";toggle.espvisualstyle="modern";toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false}
 local menuopacity=0.9
 local espcfg={}
 local roofstyle={labelcolor=Color3.fromHex("#f5d3ff"),defaultcolor=Color3.fromHex("#f5d3ff"),rgb=false,defaultrgb=false}
@@ -191,6 +197,9 @@ toggle.bindshort={backspace="bsp",space="spc",shift="sft",ctrl="ctl",enter="ent"
 toggle.bindname=function(id)local name=keynames[keybinds[id]]or"none";return toggle.bindshort[name]or #name<=3 and name or string.sub(string.gsub(string.lower(name)," ",""),1,3)end
 toggle.bindinfo="bind selector: click to change; press backspace to remove"
 local function clamp(value,minv,maxv)return math.max(minv,math.min(maxv,value))end
+toggle.nametagrange=function(value,migrate)
+    local n=tonumber(value)or 200;if n~=n or math.abs(n)==math.huge then n=200 end;if migrate and n==150 then n=200 end;return math.floor(clamp(n,10,200)+0.5)
+end
 toggle.textroles=setmetatable({},{__mode="k"});toggle.fontmetrics={cache={},order={},cursor=0};toggle.drawcolors=setmetatable({},{__mode="k"});toggle.removeddraw=setmetatable({},{__mode="k"})
 toggle.pixel=function(value)return math.floor((tonumber(value)or 0)+0.5)end
 toggle.fontvalue=function(role)
@@ -295,7 +304,7 @@ end
 toggle.memorywrite=function(kind,address,value)
     if not toggle.restoring and(not toggle.running or toggle.replacing or toggle.viewportvalid==false or type(_G)=="table"and _G.__therakeDrawingSession and _G.__therakeDrawingSession~=toggle)then return false end
     if not toggle.memoryaddress(address)or type(memory_write)~="function"or type(value)=="number"and(value~=value or math.abs(value)==math.huge)then return false end
-    return pcall(memory_write,kind,address,value)
+    toggle.health.nativecall="memory write";local ok,result=pcall(memory_write,kind,address,value);toggle.health.nativecall="waiting";return ok,result
 end
 toggle.instanceaddress=function(object)
     local ok,address=pcall(function()return object and object.Address end);return ok and toggle.memoryaddress(address)and address or nil
@@ -781,15 +790,30 @@ toggle.validdrawing=function(key,value)
     return true
 end
 toggle.forgetdrawingowner=function(state)
-    local index=state.nativeindex;if not index then return end;local owners=toggle.drawingowners;local last=owners[#owners];owners[index]=last;owners[#owners]=nil;if last and last~=state then last.nativeindex=index end;state.nativeindex=nil
+    local owners=toggle.drawingowners;local index=state.nativeindex;state.nativeindex=nil
+    if not index or owners[index]~=state then index=nil;for i=1,#owners do if owners[i]==state then index=i;break end end end
+    if not index then return end;local last=owners[#owners];owners[index]=last;owners[#owners]=nil;if last and last~=state then last.nativeindex=index end
 end
 toggle.reapdrawings=function(force)
     local now=tick();if not force and now<toggle.drawingreapnext then return end;toggle.drawingreapnext=now+0.25
     local owners=toggle.drawingowners;local cursor=toggle.drawingreapcursor;local budget=math.min(32,#owners);local started=now
-    for i=1,budget do if #owners==0 then break end;if cursor>#owners then cursor=1 end;local state=owners[cursor];if not state.owner[1]then state.dispose();if tick()-started>=0.001 then break end else cursor=cursor+1 end end
+    for i=1,budget do if #owners==0 then break end;if cursor>#owners then cursor=1 end;local state=owners[cursor]
+        if state.removed or not state.owner[1]then
+            toggle.forgetdrawingowner(state);local ok=pcall(state.dispose);if not ok then local native=state.native;state.native=nil;state.removed=true;if native then pcall(function()native.Visible=false end);pcall(function()native:Remove()end)end end
+            if tick()-started>=0.001 then break end
+        else cursor=cursor+1 end
+    end
     toggle.drawingreapcursor=cursor
 end
-toggle.cleardrawingowners=function()while #toggle.drawingowners>0 do toggle.drawingowners[#toggle.drawingowners].dispose()end;toggle.drawingreapcursor=1 end
+toggle.cleardrawingowners=function()
+    local owners=toggle.drawingowners;toggle.drawingowners={};toggle.drawingreapcursor=1
+    for i=1,#owners do owners[i].nativeindex=nil end
+    for i=1,#owners do local state=owners[i];local ok=pcall(state.dispose);if not ok then local native=state.native;state.native=nil;state.removed=true;if native then pcall(function()native.Visible=false end);pcall(function()native:Remove()end)end end;owners[i]=nil end
+end
+toggle.dropnative=function(state)
+    local native=state.native;state.native=nil;toggle.forgetdrawingowner(state)
+    if not native then return true end;toggle.health.nativecall="drawing release";pcall(function()native.Visible=false end);local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting";toggle.health.nativeremoved=toggle.health.nativeremoved+1;return ok
+end
 toggle.drawingequal=function(key,a,b)
     if a==b then return true end;if a==nil or b==nil then return false end
     if key=="Color"then return math.abs(a.R-b.R)<0.0001 and math.abs(a.G-b.G)<0.0001 and math.abs(a.B-b.B)<0.0001 end
@@ -802,19 +826,18 @@ toggle.newdrawing=function(kind)
     local function prime()
         if state.removed or not toggle.running or toggle.replacing then return nil end;if state.native then return state.native end
         if tick()<(state.primenext or 0)then return nil end
-        local created,native=pcall(Drawing.new,kind);if not created or not native then state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));return nil end
-        state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
+        toggle.health.nativecall="drawing allocation";local created,native=pcall(Drawing.new,kind);toggle.health.nativecall="waiting";if not created or not native then state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));return nil end
+        toggle.health.nativecreated=toggle.health.nativecreated+1;state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
             assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=false
             for key,value in pairs(props)do if key~="Visible"and key~="Font"and key~="Data"and key~="Size"and key~="Position"then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;native[key]=value end end
-            for _,key in ipairs({"Data","Font","Size","Position"})do local value=props[key];if value~=nil then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;native[key]=value end end
+            for _,key in ipairs({"Data","Font","Size","Position"})do local value=props[key];if value~=nil then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;if key=="Data"then toggle.health.nativecall="image decode"end;native[key]=value;if key=="Data"then toggle.health.nativecall="waiting"end end end
             if props.Visible and not toggle.loading then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=true end
         end)
-        if not ok then if state.native==native then state.native=nil;toggle.forgetdrawingowner(state);pcall(function()native:Remove()end)end;state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));assert(false,tostring(err))end;state.primefailures=0;state.primenext=0;return state.native
+        if not ok then if state.native==native then toggle.dropnative(state)end;state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));assert(false,tostring(err))end;state.primefailures=0;state.primenext=0;return state.native
     end
     local function dispose()
-        if state.removed then return end;local native=state.native;state.removed=true;state.native=nil;state.properties=nil
-        toggle.forgetdrawingowner(state);for key in pairs(props)do props[key]=nil end;props.Visible=false
-        if native then pcall(function()native.Visible=false end);pcall(function()native:Remove()end)end
+        if state.removed then toggle.forgetdrawingowner(state);return end;state.removed=true;state.properties=nil
+        toggle.dropnative(state);for key in pairs(props)do props[key]=nil end;props.Visible=false
     end
     state.prime=prime;state.dispose=dispose
     setmetatable(d,{__index=function(_,key)
@@ -823,7 +846,9 @@ toggle.newdrawing=function(kind)
         return props[key]
     end,__newindex=function(_,key,value)
         if state.removed or not toggle.running or toggle.replacing then return end;if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;if toggle.drawingequal(key,props[key],value)then if key=="Visible"and value==true and not state.native then prime()end;return end
-        local native=state.native;if native then if key=="Visible"then native.Visible=value==true and not toggle.loading else native[key]=value end end;props[key]=value
+        local native=state.native
+        if key=="Data"and kind=="Image"then toggle.health.texturechanges=toggle.health.texturechanges+1 end
+        if native then if key=="Visible"then native.Visible=value==true and not toggle.loading else native[key]=value end end;props[key]=value
         if key=="Visible"and value==true and not native then prime()end
     end})
     toggle.drawregistry[d]=true;toggle.drawingstates[d]=state;toggle.drawingqueue[#toggle.drawingqueue+1]=d
@@ -989,13 +1014,32 @@ toggle.icondata=function(name,c)
     local data=toggle.iconpng(24,24,table.concat(rows));local slot=toggle.iconcachecursor%384+1;toggle.iconcachecursor=slot;if toggle.iconpixelcache then toggle.iconpixelcache.cursor=slot end;local old=toggle.iconcacheorder[slot];if old then toggle.iconcache[old]=nil end;toggle.iconcacheorder[slot]=key;toggle.iconcache[key]=data;return data,key
 end
 toggle.newicon=function(z)local d=toggle.newdrawing("Image");d.Visible=false;toggle.setpos(d,0,0);d.Size=Vector2.new(1,1);d.Transparency=1;setz(d,z);return d end
-toggle.seticon=function(d,name,x,y,size,c,a,on)
-    if not d or toggle.removeddraw[d]then return end;if not on or not name then toggle.setvisible(d,false);return end
-    local state=toggle.iconstates[d]or{};local now=toggle.frametime or tick();local key=name..":"..math.floor(clamp(c.R,0,1)*31+0.5)..":"..math.floor(clamp(c.G,0,1)*31+0.5)..":"..math.floor(clamp(c.B,0,1)*31+0.5)
-    if toggle.iconframe~=now then toggle.iconframe=now;toggle.iconuploads=0 end
-    if(state.key~=key or state.revision~=(toggle.iconrevision or 0))and(toggle.iconuploads or 0)<6 and(state.name~=name or now>=(state.nextcolor or 0))then
-        local data,colorkey=toggle.icondata(name,c);d.Data=data;state.key=colorkey;state.name=name;state.revision=toggle.iconrevision or 0;state.nextcolor=now+0.08;toggle.iconuploads=(toggle.iconuploads or 0)+1
+toggle.iconqueue={head=1,count=0}
+toggle.flushicons=function()
+    local now=toggle.frametime or tick();local budget=toggle.iconbudget;if not budget then budget={tokens=8,at=now};toggle.iconbudget=budget end;budget.tokens=math.min(8,budget.tokens+math.max(0,now-budget.at)*120);budget.at=now
+    local queue=toggle.iconqueue;local visited,uploaded=0,0;local started=tick()
+    while queue.count>0 and budget.tokens>=1 and visited<32 and uploaded<2 do
+        local d=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%1024+1;queue.count=queue.count-1;visited=visited+1
+        local state=d and toggle.iconstates[d];if state then state.queued=false
+            if not toggle.removeddraw[d]and d.Visible and state.wantedkey and state.wantedkey~=state.key then
+                budget.tokens=budget.tokens-1;uploaded=uploaded+1;local name,c=state.wantedname,state.wantedcolor
+                local ok,key=pcall(function()local data,colorkey=toggle.icondata(name,c);d.Data=data;return colorkey end)
+                if ok then state.key=key;state.name=name;state.nextcolor=now+0.08 else state.nextcolor=now+0.5 end
+            end;state.wantedkey=nil;state.wantedname=nil;state.wantedcolor=nil
+        end
+        if uploaded>0 and tick()-started>=0.001 then break end
     end
+end
+toggle.seticon=function(d,name,x,y,size,c,a,on)
+    if not d or toggle.removeddraw[d]then return end;if not on or not name then local state=toggle.iconstates[d];if state then state.wantedkey=nil end;toggle.setvisible(d,false);return end
+    local state=toggle.iconstates[d]or{};local now=toggle.frametime or tick();local key=name..":"..math.floor(clamp(c.R,0,1)*31+0.5)..":"..math.floor(clamp(c.G,0,1)*31+0.5)..":"..math.floor(clamp(c.B,0,1)*31+0.5)
+    if state.key~=key then
+        if not state.key or state.name~=name then local data,colorkey=toggle.icondata(name,c);d.Data=data;state.key=colorkey;state.name=name;state.nextcolor=now+0.08;state.wantedkey=nil
+        elseif now>=(state.nextcolor or 0)then
+            state.wantedkey=key;state.wantedname=name;state.wantedcolor=c
+            local queue=toggle.iconqueue;if not state.queued and queue.count<1024 then local slot=(queue.head+queue.count-1)%1024+1;queue[slot]=d;queue.count=queue.count+1;state.queued=true end
+        end
+    else state.wantedkey=nil end;state.revision=toggle.iconrevision or 0
     local px,py=math.floor((tonumber(x)or 0)*2+0.5)/2,math.floor((tonumber(y)or 0)*2+0.5)/2
     if state.x~=px or state.y~=py then toggle.setpos(d,px,py);state.x=px;state.y=py end;if state.size~=size then d.Size=Vector2.new(size,size);state.size=size end;if state.alpha~=a then d.Transparency=a;state.alpha=a end
     toggle.iconstates[d]=state;toggle.setvisible(d,state.key~=nil)
@@ -1003,13 +1047,20 @@ end
 local function remove(d)
     if not d or toggle.removeddraw[d]then return end
     local sheen=toggle.espsheens and toggle.espsheens[d];if sheen then toggle.espsheens[d]=nil;toggle.espsheencount=math.max(0,toggle.espsheencount-1);if sheen.image then remove(sheen.image)end end
+    if toggle.effectlines and toggle.effectlines[d]then toggle.effectlines[d]=nil;toggle.effectlinecount=math.max(0,toggle.effectlinecount-1)end
     toggle.removeddraw[d]=true;toggle.drawregistry[d]=nil;toggle.iconstates[d]=nil;toggle.drawcolors[d]=nil;toggle.textroles[d]=nil;if toggle.playerprops then toggle.playerprops[d]=nil end;pcall(function()d.Visible=false end);pcall(function()d:Remove()end)
 end
 toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"});toggle.linepoolmax=512
+toggle.effectlines=setmetatable({},{__mode="k"});toggle.effectlinecount=0;toggle.effectlinemax=4096;toggle.effectlinenext=0
+toggle.counteffectlines=function()
+    local now=tick();if now<toggle.effectlinenext then return end;toggle.effectlinenext=now+1;local count=0
+    for d in pairs(toggle.effectlines)do if toggle.removeddraw[d]then toggle.effectlines[d]=nil else count=count+1 end end;toggle.effectlinecount=count
+end
  toggle.acquireline=function(c)
     local pool=toggle.linepool;local d
     while #pool>0 and not d do local candidate=pool[#pool];pool[#pool]=nil;toggle.linepooled[candidate]=nil;if not toggle.removeddraw[candidate]then d=candidate end end
-    d=d or newline(c);toggle.setprop(d,"Visible",false);toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",1);toggle.setprop(d,"Thickness",2);toggle.setprop(d,"From",Vector2.new(0,0));toggle.setprop(d,"To",Vector2.new(0,0));toggle.setprop(d,"ZIndex",0);return d
+    if not d then toggle.counteffectlines();if toggle.effectlinecount>=toggle.effectlinemax then return nil end;d=newline(c);toggle.effectlines[d]=true;toggle.effectlinecount=toggle.effectlinecount+1 end
+    toggle.setprop(d,"Visible",false);toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",1);toggle.setprop(d,"Thickness",2);toggle.setprop(d,"From",Vector2.new(0,0));toggle.setprop(d,"To",Vector2.new(0,0));toggle.setprop(d,"ZIndex",0);return d
 end
  toggle.recycleline=function(d)
     if not d or toggle.removeddraw[d]or toggle.linepooled[d]then return end
@@ -1043,12 +1094,17 @@ local powerlabel=newtext("Activity",Color3.fromHex("#ffffff"),false,false)
 local rooflabel=toggle.esptext("roof",Color3.fromHex("#f5d3ff"),true,false)
 local roofhp=toggle.esptext("",Color3.fromHex("#ebebeb"),true,false)
 setz(rooflabel,8);setz(roofhp,8)
-toggle.notify=function(text,tint)
-    local raw=tostring(text or""):gsub("^enabled (.+)$","%1 enabled"):gsub("^disabled (.+)$","%1 disabled"):gsub("^armed (.+) bind$","%1 ready"):gsub("^rake is ","rake "):gsub("^player already owns ","already own "):gsub("^teleported to ","at ");raw=toggle.uititle(raw):gsub("(%d)P%f[%W]","%1p"):gsub("(%d)M%f[%W]","%1m");local state=toggle.notifications;local now=tick();for i=1,#state.items do local item=state.items[i];if item.base==raw then item.count=(item.count or 1)+1;item.started=now;item.duration=toggle.notifysettings.duration;item.color=tint;local repeated=raw.." x"..tostring(item.count);local shown,longest,lines=repeated,#repeated,1;if toggle.wraptooltip then shown,longest,lines=toggle.wraptooltip(repeated,34)end;item.text=shown;item.lines=lines;item.width=math.max(240,math.min(340,longest*7+64));item.height=math.max(64,lines*(toggle.menulineheight+3)+42);return end end
-    local shown,longest,lines=raw,#raw,1;if toggle.wraptooltip then shown,longest,lines=toggle.wraptooltip(raw,34)end;state.items[#state.items+1]={base=raw,count=1,text=shown,lines=lines,color=tint,width=math.max(240,math.min(340,longest*7+64)),height=math.max(64,lines*(toggle.menulineheight+3)+42),started=now,duration=toggle.notifysettings.duration,anim=0,x=nil,y=nil}
+toggle.notificationicon=function(kind,text)
+    local icons={rake="skull",scrap="tag",supply="gift-box",flare="flame",trap="shield-check",teleports="crosshairs",watch="clock"};if icons[kind]then return icons[kind]end
+    local value=string.lower(tostring(text or""));for _,entry in ipairs({{"rake","skull"},{"scrap","tag"},{"crate","gift-box"},{"supply","gift-box"},{"flare","flame"},{"trap","shield-check"},{"heal","heart"},{"stun","lightning-bolt"},{"power","lightning-bolt"},{"radio","phone"},{"nightvision","moon"},{"config","folder"},{"preset","three-sliders-horizontal"},{"theme","three-sliders-horizontal"},{"camera","photo-camera"},{"third person","photo-camera"},{"teleport","crosshairs"},{"keybind","key"},{"esp","eye"},{"hud","sun"}})do if string.find(value,entry[1],1,true)then return entry[2]end end
+    return kind=="menu"and"gear"or"circle-i"
+end
+toggle.notify=function(text,tint,kind)
+    local raw=tostring(text or""):gsub("^enabled (.+)$","%1 enabled"):gsub("^disabled (.+)$","%1 disabled"):gsub("^armed (.+) bind$","%1 ready"):gsub("^rake is ","rake "):gsub("^player already owns ","already own "):gsub("^teleported to ","at ");raw=toggle.uititle(raw):gsub("(%d)P%f[%W]","%1p"):gsub("(%d)M%f[%W]","%1m");local state=toggle.notifications;local icon=toggle.notificationicon(kind,raw);local now=tick();for i=1,#state.items do local item=state.items[i];if item.base==raw then item.count=(item.count or 1)+1;item.started=now;item.duration=toggle.notifysettings.duration;item.color=tint;item.icon=icon;local repeated=raw.." x"..tostring(item.count);local shown,longest,lines=repeated,#repeated,1;if toggle.wraptooltip then shown,longest,lines=toggle.wraptooltip(repeated,34)end;item.text=shown;item.lines=lines;item.width=math.max(240,math.min(340,longest*7+64));item.height=math.max(64,lines*(toggle.menulineheight+3)+42);return end end
+    local shown,longest,lines=raw,#raw,1;if toggle.wraptooltip then shown,longest,lines=toggle.wraptooltip(raw,34)end;state.items[#state.items+1]={base=raw,count=1,text=shown,lines=lines,color=tint,icon=icon,width=math.max(240,math.min(340,longest*7+64)),height=math.max(64,lines*(toggle.menulineheight+3)+42),started=now,duration=toggle.notifysettings.duration,anim=0,x=nil,y=nil}
     while #state.items>state.max do table.remove(state.items,1)end
 end
-toggle.notifyevent=function(kind,text,tint)if toggle.notifysettings.types[kind]then toggle.notify(text,tint)end end
+toggle.notifyevent=function(kind,text,tint)if toggle.notifysettings.types[kind]then toggle.notify(text,tint,kind)end end
 local function bindlog(text,kind)
     toggle.notifyevent(kind or"menu",text)
 end
@@ -1336,7 +1392,7 @@ toggle.drawnotifications=function()
                 if on and not d then d=setz(newtext("",textcolor,false,false),300+i*10+7);frame.lines[line]=d end
                 if d then if on then toggle.setprop(d,"Text",item.textlines[line]);toggle.lefttext(d,x+pad+iconspace,bodyy+(line-1)*(lineh+gap)+lineh/2);toggle.setprop(d,"Color",textcolor);toggle.setprop(d,"Transparency",alpha);toggle.setprop(d,"Outline",false)end;toggle.setvisible(d,on)end
             end
-            toggle.seticon(frame.icon,"bell",x+pad,y+(h-8-16)/2,16,tint,alpha,modern)
+            toggle.seticon(frame.icon,item.icon or toggle.notificationicon(nil,item.base),x+pad,y+(h-8-16)/2,16,tint,alpha,modern)
             local ratio=clamp((item.started+item.duration-now)/math.max(0.01,item.duration),0,1);local trackw=w-pad*2
             toggle.setpos(frame.progressbg,x+pad,y+h-8);toggle.setprop(frame.progressbg,"Size",Vector2.new(trackw,2));toggle.setprop(frame.progressbg,"Color",color("muted"));toggle.setprop(frame.progressbg,"Transparency",opacity*0.14);toggle.setvisible(frame.progressbg,opacity>0.001)
             toggle.setpos(frame.progress,x+pad,y+h-8);toggle.setprop(frame.progress,"Size",Vector2.new(math.max(0,trackw*ratio),2));toggle.setprop(frame.progress,"Color",tint);toggle.setprop(frame.progress,"Transparency",alpha*(modern and 1 or 0.75));toggle.setvisible(frame.progress,true)
@@ -1520,15 +1576,15 @@ toggle.featurecatalog=function(tab)
             section("teleports",2,"teleports can be inconsistent; move around during the teleport if the object is not collected"),{id="scrap",kind="toggle",label="tp scrap",on=toggle.scrapteleportenabled,bind="scrap",inlinebind=true,col=2},{id="flare",kind="toggle",label="tp flare",on=toggle.flareteleportenabled,bind="flare",inlinebind=true,col=2},{id="scrapteleportselect",kind="dropdown",label="sort scrap teleport by",value=toggle.scrapteleport,col=2},{id="highlightscrap",kind="toggle",label="Highlight Target Scrap",on=toggle.highlightscrap,info="marks the scrap chosen by your teleport sorting mode with a target icon and a tinted ESP background",col=2},{id="teleportcooldown",kind="toggle",label="tp safe cooldown",on=toggle.teleportcooldown,info=teleportinfo,col=2},{id="cooldownseconds",kind="slider",label="cooldown time",value=toggle.cooldownseconds,min=10,max=30,display=tostring(toggle.cooldownseconds).."s",col=2},
             section("prompts",1,"shows interactive controls over supported house and tower mechanisms","hybrid"),{id="promptmaster",kind="toggle",label="bypass prompts",on=toggle.prompts,info="use the prompt bind near a mechanism; left or right click switches actions",col=1},{id="promptsselect",kind="dropdown",label="prompt panels",value=toggle.promptlabel(),col=1},{id="bindprompt",kind="bind",bind="prompt",inlinebind=true,label="prompt toggle bind",col=1},
             section("combat",1,"uses supported combat remote actions","hybrid"),{id="killaura",kind="toggle",label="stun aura",on=toggle.killaura,bind="aura",inlinebind=true,info="uses an equipped stun stick without consuming stamina",col=1},{id="killaurarange",kind="slider",label="stun range",value=toggle.killaurarange,min=6,max=30,display=tostring(toggle.killaurarange).." studs",col=1},{id="killauradelay",kind="slider",label="stun delay",value=toggle.killauradelay,min=0.05,max=0.6,display=string.format("%.2fs",toggle.killauradelay),col=1},{id="autoheal",kind="toggle",label="auto-heal",on=toggle.autoheal,info="uses an equipped first aid kit when your health drops below the selected amount",col=1},{id="autohealth",kind="slider",label="heal below",value=toggle.autohealth,min=20,max=70,display=tostring(toggle.autohealth).." hp",col=1},
-            section("camera",2,"equip an item after enabling third person; change shift lock in Roblox movement settings",nil),{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,bind="thirdperson",inlinebind=true,col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="toggle",label="shift lock",on=false,disabled=true,infowhendisabled=true,info="disabled because updated shift lock memory offsets are unavailable",col=2},
+            section("camera",2,"equip an item after enabling third person; change shift lock in Roblox movement settings",nil),{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,bind="thirdperson",inlinebind=true,col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="toggle",label="shift lock",on=toggle.shiftlockstate.active,info="allows Shift Lock in Roblox movement settings",col=2},
             section("supply",2),{id="supplylabel",kind="toggle",label="crate esp",on=toggle.supplylabel,colorindex=8,col=2},{id="flares",kind="toggle",label="flare esp",on=espgroups.flares,colorindex=1,col=2},{id="supplyitems",kind="toggle",label="crate inventory",on=toggle.supplyitems,disabled=toggle.instacrate,infowhendisabled=true,info="shows crate contents and taken items; locked on while instant crate is enabled",col=2},{id="instacrate",kind="toggle",label="instant crate",on=toggle.instacrate,info="left click selects the next item; right click selects the previous item",permission="hybrid",col=2},{id="bindcrate",kind="bind",label="take item bind",bind="crate",bindinfo="takes the selected crate item; click to change this required bind",inlinebind=true,col=2},{id="autocollect",kind="toggle",label="auto-collect",on=toggle.autocollect.enabled,disabled=not toggle.instacrate,col=2},{id="autocollectselect",kind="dropdown",label="auto-collect items",value=toggle.autocollectlabel(),disabled=not toggle.instacrate,col=2},
             section("client",2),{id="antiCollide",kind="toggle",label="player no-collide",on=toggle.client.antiCollide,bind="collide",inlinebind=true,info="disables collisions with other players; restores them when switched off",col=2},{id="doorNoCollide",kind="toggle",label="Door No-Collide",on=toggle.client.doorNoCollide,bind="door",inlinebind=true,info="walk through the house and tower doors; restores collisions to match their open state when disabled",col=2},{id="preventIdle",kind="toggle",label="Prevent Idle Timeout",on=toggle.client.preventIdle,info="prevents idle kicks; has not been tested",warning=true,unstable=true,col=2},{id="noFall",kind="toggle",label="no fall damage",on=toggle.client.noFall,col=2},{id="towerBarriers",kind="toggle",label="no tower push",on=toggle.client.towerBarriers,info="disables conveyors that push you off the tower fences",col=2},{id="autoradio",kind="toggle",label="auto-take radio",on=toggle.autoradio,info="instantly takes the radio when you are close to its prompt range",permission="hybrid",col=2},{id="noJumpCooldown",kind="toggle",label="no jump cooldown",on=toggle.client.noJumpCooldown,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},{id="infiniteStamina",kind="toggle",label="infinite stamina",on=toggle.client.infiniteStamina,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},
-            section("power usage",2),{id="hudpower",kind="toggle",label="power left",on=toggle.hudelements.power,info="reads an existing voltmeter in any player's inventory",col=2},{id="autopower",kind="toggle",label="auto-power station",on=toggle.autopower,info="automatically starts the station while you remain within 4 meters of it",permission="hybrid",col=2},{id="autopowertoolbox",kind="toggle",label="require toolbox",on=toggle.autopowerrequiretoolbox,info="only lets auto-power run while a toolbox is equipped",col=2},{id="poweractivity",kind="toggle",label="activity panel",on=toggle.poweractivity,col=2},{id="poweractivitymodeselect",kind="dropdown",label="show panel when",value=toggle.poweractivitymode,col=2},
-            section("players",2),{id="playerelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(false),col=2},{id="playeritemsselect",kind="dropdown",label="show player items",value=toggle.playeritemslabel(),col=2},{id="playerstyleselect",kind="dropdown",label="esp style",value=toggle.playeresp.style,col=2},{id="playerstacking",kind="toggle",label="Stacking Elements",on=toggle.playeresp.stacking,info="stacks nearby player panels to reduce overlap",col=2},{id="playerdistance",kind="slider",label="render distance",value=toggle.playeresp.distance,min=10,max=150,display=tostring(toggle.playeresp.distance).."m",col=2},
+            section("power usage",2),{id="hudpower",kind="toggle",label="power left",on=toggle.hudelements.power,info="reads station power, with a voltmeter fallback",col=2},{id="autopower",kind="toggle",label="auto-power station",on=toggle.autopower,info="automatically starts the station while you remain within 4 meters of it",permission="hybrid",col=2},{id="autopowertoolbox",kind="toggle",label="require toolbox",on=toggle.autopowerrequiretoolbox,info="only lets auto-power run while a toolbox is equipped",col=2},{id="poweractivity",kind="toggle",label="activity panel",on=toggle.poweractivity,col=2},{id="poweractivitymodeselect",kind="dropdown",label="show panel when",value=toggle.poweractivitymode,col=2},
+            section("players",2),{id="playerelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(false),col=2},{id="playeritemsselect",kind="dropdown",label="show player items",value=toggle.playeritemslabel(),col=2},{id="playerstyleselect",kind="dropdown",label="esp style",value=toggle.playeresp.style,col=2},{id="playerstacking",kind="toggle",label="Stacking Elements",on=toggle.playeresp.stacking,info="stacks nearby player panels to reduce overlap",col=2},{id="playerdistance",kind="slider",label="render distance",value=toggle.playeresp.distance,min=10,max=200,display=tostring(toggle.playeresp.distance).."m",col=2},
             section("tracers",2),{id="tracersselect",kind="dropdown",label="Show Tracers",value=toggle.multilabel(toggle.tracers.order,toggle.tracers.selected),col=2},{id="traceropacity",kind="slider",label="Tracer Opacity",value=toggle.tracers.opacity,min=0.1,max=1,display=tostring(math.floor(toggle.tracers.opacity*100+0.5)).."%",col=2},{id="tracerspeed",kind="slider",label="Tracer Speed",value=toggle.tracers.speed,min=0.5,max=2,display=string.format("%.2f",toggle.tracers.speed),col=2},section("distance esp",2),{id="distance",kind="toggle",label="distance",on=toggle.distance,colorindex="distance",col=2},{id="distancepositionselect",kind="dropdown",label="label position",value=toggle.distanceposition,col=2},{id="distancemin",kind="slider",label="show distance after",value=toggle.distancemin,min=0,max=100,display=tostring(toggle.distancemin).."m",col=2},
-            section("rake",1),{id="hudtarget",kind="toggle",label="show target hud",on=toggle.hudelements.target,col=1},{id="rakenotifydistance",kind="slider",label="warn distance",value=toggle.notifysettings.rakedistance,min=5,max=100,display=tostring(toggle.notifysettings.rakedistance).."m",col=1},{id="rakestyleselect",kind="dropdown",label="esp style",value=toggle.rakeespstyle,col=1},{id="rakeelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(true),col=1},{id="rakerenderdistance",kind="slider",label="render distance",value=toggle.rakerenderdistance,min=10,max=150,display=tostring(toggle.rakerenderdistance).."m",col=1},{id="traps",kind="toggle",label="trap esp",on=espgroups.traps,colorindex=7,col=1},
+            section("rake",1),{id="hudtarget",kind="toggle",label="show target hud",on=toggle.hudelements.target,col=1},{id="rakenotifydistance",kind="slider",label="warn distance",value=toggle.notifysettings.rakedistance,min=5,max=100,display=tostring(toggle.notifysettings.rakedistance).."m",col=1},{id="rakestyleselect",kind="dropdown",label="esp style",value=toggle.rakeespstyle,col=1},{id="rakeelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(true),col=1},{id="rakerenderdistance",kind="slider",label="render distance",value=toggle.rakerenderdistance,min=10,max=200,display=tostring(toggle.rakerenderdistance).."m",col=1},{id="traps",kind="toggle",label="trap esp",on=espgroups.traps,colorindex=7,col=1},
             section("scraps",1),{id="hudscrap",kind="toggle",label="scrap amount hud",on=toggle.hudelements.scrap,col=1},{id="scrapeditsselect",kind="dropdown",label="Choose Tier To Edit",value=scrap.label,col=1},{id="scrapedittoggle",kind="toggle",label=scrap.label.." ESP",on=espgroups.items[scrap.id],itemkey=scrap.id,colorindex=scrap.color,col=1},{id="scrapstyleselect",kind="dropdown",label="Display Scrap Elements",value=toggle.multilabel({"tiers","points"},elements),col=1},
-            section("timer",2),{id="powerlevelinfo",kind="info",label="Power Level",info="a player in this server needs a voltmeter in their inventory for the power reading to work",col=1},{id="hudelementsselect",kind="dropdown",label="display elements",value=toggle.hudselectionlabel(),col=1},{id="rakehealthcoloring",kind="toggle",label="health-based coloring",on=toggle.rakehealthcoloring,col=1},{id="playerhealthcoloring",kind="toggle",label="health-based coloring",on=toggle.playeresp.healthcoloring,col=1},{id="hudtimer",kind="toggle",label="timer hud",on=toggle.hudelements.timer,col=2}
+            section("timer",2),{id="hudelementsselect",kind="dropdown",label="display elements",value=toggle.hudselectionlabel(),col=1},{id="rakehealthcoloring",kind="toggle",label="health-based coloring",on=toggle.rakehealthcoloring,col=1},{id="playerhealthcoloring",kind="toggle",label="health-based coloring",on=toggle.playeresp.healthcoloring,col=1},{id="hudtimer",kind="toggle",label="timer hud",on=toggle.hudelements.timer,col=2}
         }
         items[#items+1]=section("locations",2);items[#items+1]={id="locationeditselect",kind="dropdown",label="Choose Location To Edit",value=location.label,col=2};items[#items+1]={id="locationedittoggle",kind="toggle",label=location.label.." ESP",on=espgroups.items[location.id],itemkey=location.id,colorindex=location.color,col=2}
         if location.id=="SafehouseMSG"then items[#items+1]={id="roof",kind="toggle",label="Roof Health",on=toggle.roof,col=2}end
@@ -1563,7 +1619,7 @@ end
 toggle.tabgroups={
     {{"rake",1,{"rakestyleselect","rakeelementsselect","rakehealthcoloring","rakerenderdistance","traps"}},{"players",1,{"playerstyleselect","playerelementsselect","playerhealthcoloring","playeritemsselect","playerstacking","playerdistance"}},{"locations",1,{"locationeditselect","locationedittoggle","roof"}},
      {"display",2,{"esp"}},{"supply",2,{"supplylabel","flares","supplyitems"}},{"scraps",2,{"scrapstyleselect","scrapeditsselect","scrapedittoggle"}},{"distance esp",2,{"distance","distancepositionselect","distancemin"}},{"tracers",2,{"tracersselect","traceropacity","tracerspeed","tracercurve"}}},
-    {{"display",1,{"hud","containerstyleselect"}},{"container",1,{"hudelementsselect","powerlevelinfo"}},{"rake",1,{"rakenotifydistance"}},
+    {{"display",1,{"hud","containerstyleselect"}},{"container",1,{"hudelementsselect"}},{"rake",1,{"rakenotifydistance"}},
      {"world",2,{"worldpanel","worldstatsselect"}},{"activity",2,{"poweractivity","poweractivitymodeselect"}},{"keybinds",2,{"keybindpanel"}}},
     {{"master",1,{"bindmenu","watermark"}},{"client",1,{"noFall","antiCollide","doorNoCollide","towerBarriers","autoradio","preventIdle","noJumpCooldown","infiniteStamina"}},{"combat",1,{"killaura","killaurarange","killauradelay","autoheal","autohealth"}},{"camera",1,{"thirdperson","zoomamount","shiftlock"}},{"world esp rings",1,{"ringenabled","ringshapeselect","ringfade","ringopacity","ringsize","ringspin","ringspinspeed"}},
      {"shop",2,{"autorecover","autobuyitemsselect","autosellitemsselect","autosellscrap","tpclaimnightvision","autoclaimnightvision","tpsellscrap","sell","shopitemselect","quickbuy","quicksell"}},{"teleports",2,{"scrap","flare","scrapteleportselect","highlightscrap","teleportcooldown","cooldownseconds"}},{"prompts",2,{"promptmaster","promptsselect","bindprompt"}},{"supply",2,{"instacrate","bindcrate","autocollect","autocollectselect"}},{"power station",1,{"autopower","autopowertoolbox"}}},
@@ -1577,7 +1633,7 @@ for tab=1,4 do
         if group[1]=="display"then table.remove(toggle.tabgroups[tab],i)
         elseif group[1]=="world esp rings"then table.remove(toggle.tabgroups[tab],i);group[2]=2;toggle.tabgroups[2][#toggle.tabgroups[2]+1]=group
         elseif group[1]=="notifications"then table.insert(group[3],1,"notificationopacity");table.insert(group[3],1,"notificationstyleselect");table.remove(toggle.tabgroups[tab],i);group[2]=1;toggle.tabgroups[3][#toggle.tabgroups[3]+1]=group
-        elseif group[1]=="container"then group[3]={"hudelementsselect","containerstyleselect","powerlevelinfo"}end
+        elseif group[1]=="container"then group[3]={"hudelementsselect","containerstyleselect"}end
     end
 end
 for _,group in ipairs({
@@ -1969,7 +2025,7 @@ local function pickerupdate(visible)
     pickerlayouts.popup={x=px,y=py,w=pw,h=ph};pickerlayouts.square={x=sx,y=sy,w=sw,h=sh};pickerlayouts.hue={x=hx,y=hy,w=hw,h=hh};pickerlayouts.rgb=rgbvisible and{x=px+chromax,y=fy,w=buttonw,h=32}or nil;pickerlayouts.hex={x=px+hexx,y=fy,w=hexw,h=32}
 end
 toggle.lockfeature=function(item)
-    if item and item.id=="shiftlock"then item.on=false;item.disabled=true;item.infowhendisabled=true;item.info="disabled because updated shift lock memory offsets are unavailable";item.permission=nil;item.warning=nil;item.unstable=nil end
+    if item and item.id=="shiftlock"then item.on=toggle.shiftlockstate.active;item.disabled=false;item.infowhendisabled=nil;item.info="allows Shift Lock in Roblox movement settings";item.permission=nil;item.warning=nil;item.unstable=nil end
     return item
 end
 
@@ -2472,7 +2528,6 @@ end
 
 toggle.iconenabled=function(rec)
     if toggle.istargetscrap(rec)then return true end
-    if toggle.espvisualstyle=="compact"then return false end
     if rec.rake then return toggle.espicons.rake elseif rec.username then return toggle.espicons.players end
     local group=rec.cfg and rec.cfg.group;if rec.cfg and rec.cfg.crate then return toggle.espicons.crates elseif group=="scraps"then return toggle.espicons.scraps elseif group=="flares"then return toggle.espicons.flare elseif group=="traps"then return toggle.espicons.traps end
     for index,entry in ipairs(toggle.locationorder)do if entry.id==rec.cfgname then return toggle.espicons.locationgroup==true or toggle.espicons.locations[index]==true end end
@@ -2560,8 +2615,8 @@ toggle.paintworldlabel=function(rec,screen,meters,wanted)
 end
 local function makering(rec,count)
     if rec.cfg.noring or not toggle.ringenabled then return end
-    if not rec.ring or rec.ring[1]and toggle.removeddraw[rec.ring[1]]then rec.ring={};rec.ringpoints={};rec.ringvisible=false;rec.ringactivecount=0 end
-    for i=#rec.ring+1,count do rec.ring[i]=toggle.acquireline(rec.cfg.labelcolor or toggle.white)end
+    if not rec.ring or rec.ring[1]and toggle.removeddraw[rec.ring[1]]then rec.ring={};rec.ringpoints={};rec.ringvisible=false;rec.ringactivecount=0;rec.ringstylecount=0 end
+    for i=#rec.ring+1,count do local line=toggle.acquireline(rec.cfg.labelcolor or toggle.white);if not line then break end;rec.ring[i]=line end
 end
 local function hidering(rec)if(rec.ringanim or 0)>0.01 then return end;if rec.ring then toggle.releasering(rec)end end
 local function makecrate(rec)
@@ -2693,7 +2748,7 @@ end
 toggle.drawprompts=function(viewer)
     local state=toggle.promptstate;if not toggle.prompts then state.active=nil;state.distance=math.huge;local fading=false;for _,rec in pairs(state.records)do if(rec.anim or 0)>0.01 then fading=true;break end end;if not fading then return end end;if toggle.prompts and not pcall(toggle.resolveprompts,false)then state.nextresolve=0 end;state.active=nil;state.distance=math.huge;state.priority=math.huge
     for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then rec.target=false
-        local ok=pcall(function()local part=rec.part;local rangeobject=rec.rangepart or part;if toggle.prompts and(toggle.worldinfo.power or rec.id=="trapdoor"or rec.id=="release")and #rec.options>0 and part and part.Parent and part:IsA("BasePart")and rangeobject and rangeobject.Parent and rangeobject:IsA("BasePart")and rec.remote and rec.remote.Parent and rec.remote:IsA("RemoteEvent")then local meters=dist(viewer,rangeobject.Position);local screen,on=WorldToScreen(part.Position);rec.meters=meters;rec.target=on and meters<=toggle.promptrange(rec);if rec.target then rec.screen=screen;local dx,dy=screen.X-cam.ViewportSize.X/2,screen.Y-cam.ViewportSize.Y/2;local priority=dx*dx+dy*dy;if priority<state.priority then state.active=rec;state.distance=meters;state.priority=priority end end end end)
+        local ok=pcall(function()local part=rec.part;local rangeobject=rec.rangepart or part;if toggle.prompts and(toggle.worldinfo.power or rec.id=="trapdoor"or rec.id=="release")and #rec.options>0 and part and part.Parent and part:IsA("BasePart")and rangeobject and rangeobject.Parent and rangeobject:IsA("BasePart")and rec.remote and rec.remote.Parent and rec.remote:IsA("RemoteEvent")then local meters=dist(viewer,rangeobject.Position);local screen,on=toggle.projectworld(part.Position);rec.meters=meters;rec.target=on and meters<=toggle.promptrange(rec);if rec.target then rec.screen=screen;local dx,dy=screen.X-cam.ViewportSize.X/2,screen.Y-cam.ViewportSize.Y/2;local priority=dx*dx+dy*dy;if priority<state.priority then state.active=rec;state.distance=meters;state.priority=priority end end end end)
         if not ok then rec.part=nil;rec.remote=nil;state.nextresolve=0 end
     end end
     for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then local ok,err=pcall(toggle.paintprompt,rec);if not ok then rec.drawerror=err;if state.active==rec then state.active=nil end;pcall(toggle.discardprompt,rec)end end end
@@ -2790,10 +2845,36 @@ toggle.ringpoint=function(world,y,radius,t,sides,angle)
     local scaled=t*sides;local side=math.floor(scaled)%sides;local blend=scaled-math.floor(scaled);local a=angle-math.pi/2+2*math.pi*side/sides;local b=angle-math.pi/2+2*math.pi*((side+1)%sides)/sides
     return Vector3.new(world.X+(math.cos(a)*(1-blend)+math.cos(b)*blend)*radius,y,world.Z+(math.sin(a)*(1-blend)+math.sin(b)*blend)*radius)
 end
+toggle.captureprojection=function()
+    toggle.projection=nil;local now=toggle.frametime or tick();if now<(toggle.projectionretry or 0)then return end
+    local ok,frame,viewport,fov=pcall(function()return cam.CFrame,toggle.lastviewport or cam.ViewportSize,cam.FieldOfView end)
+    if not ok or not frame or not viewport or not toggle.visualfinite(fov,5,175)then toggle.projectionretry=now+0.5;return end
+    local valid,p,r,u,l=pcall(function()return frame.Position,frame.RightVector,frame.UpVector,frame.LookVector end)
+    if not valid or not p or not r or not u or not l then toggle.projectionretry=now+0.5;return end
+    local state=toggle.projectioncache or{};toggle.projectioncache=state
+    for _,v in ipairs({p,r,u,l})do if not toggle.drawingfinite(v.X,1000000)or not toggle.drawingfinite(v.Y,1000000)or not toggle.drawingfinite(v.Z,1000000)then return end end
+    local width,height=viewport.X,viewport.Y;if not toggle.visualfinite(width,64,16384)or not toggle.visualfinite(height,64,16384)then return end
+    local focal=height*0.5/math.tan(fov*math.pi/360)
+    if cam~=state.camera or fov~=state.fov or width~=state.width or height~=state.height or now>=(state.nextcheck or 0)then
+        local sample=Vector3.new(p.X+l.X*20+r.X*3+u.X,p.Y+l.Y*20+r.Y*3+u.Y,p.Z+l.Z*20+r.Z*3+u.Z)
+        local checked,screen,on=pcall(WorldToScreen,sample);local sx,sy=width*0.5+focal*0.15,height*0.5-focal*0.05
+        if not checked or not on or not screen or not toggle.drawingfinite(screen.X,1000000)or not toggle.drawingfinite(screen.Y,1000000)or math.abs(screen.X-sx)>2 or math.abs(screen.Y-sy)>2 then toggle.projectionretry=now+0.25;return end
+        state.nextcheck=now
+    end
+    state.camera=cam;state.fov=fov;state.width=width;state.height=height;state.cx=width*0.5;state.cy=height*0.5;state.focal=focal;state.x=p.X;state.y=p.Y;state.z=p.Z;state.rx=r.X;state.ry=r.Y;state.rz=r.Z;state.ux=u.X;state.uy=u.Y;state.uz=u.Z;state.lx=l.X;state.ly=l.Y;state.lz=l.Z;state.frame=toggle.frametime;toggle.projection=state
+end
+toggle.projectworld=function(world)
+    local p=toggle.projection;if not p or p.frame~=toggle.frametime then return WorldToScreen(world)end
+    local dx,dy,dz=world.X-p.x,world.Y-p.y,world.Z-p.z;local z=dx*p.lx+dy*p.ly+dz*p.lz
+    if z<=0.001 or z~=z then return Vector2.new(0,0),false end
+    local x=p.cx+(dx*p.rx+dy*p.ry+dz*p.rz)*p.focal/z;local y=p.cy-(dx*p.ux+dy*p.uy+dz*p.uz)*p.focal/z
+    if not toggle.drawingfinite(x,1000000)or not toggle.drawingfinite(y,1000000)then return Vector2.new(0,0),false end
+    return Vector2.new(x,y),x>=0 and y>=0 and x<=p.width and y<=p.height
+end
 toggle.ringprojection=function(world,y,radius)
     if radius<0.01 then return nil end
-    local p0,o0=WorldToScreen(Vector3.new(world.X-radius,y,world.Z-radius));local p1,o1=WorldToScreen(Vector3.new(world.X+radius,y,world.Z-radius))
-    local p2,o2=WorldToScreen(Vector3.new(world.X+radius,y,world.Z+radius));local p3,o3=WorldToScreen(Vector3.new(world.X-radius,y,world.Z+radius))
+    local p0,o0=toggle.projectworld(Vector3.new(world.X-radius,y,world.Z-radius));local p1,o1=toggle.projectworld(Vector3.new(world.X+radius,y,world.Z-radius))
+    local p2,o2=toggle.projectworld(Vector3.new(world.X+radius,y,world.Z+radius));local p3,o3=toggle.projectworld(Vector3.new(world.X-radius,y,world.Z+radius))
     if not(o0 and o1 and o2 and o3)then return nil end
     local dx1,dx2,dx3=p1.X-p2.X,p3.X-p2.X,p0.X-p1.X+p2.X-p3.X
     local dy1,dy2,dy3=p1.Y-p2.Y,p3.Y-p2.Y,p0.Y-p1.Y+p2.Y-p3.Y
@@ -2802,23 +2883,23 @@ toggle.ringprojection=function(world,y,radius)
     return{a=p1.X-p0.X+g*p1.X,b=p3.X-p0.X+h*p3.X,c=p0.X,d=p1.Y-p0.Y+g*p1.Y,e=p3.Y-p0.Y+h*p3.Y,f=p0.Y,g=g,h=h}
 end
 toggle.projectring=function(matrix,world,y,radius,x,z)
-    if not matrix then return WorldToScreen(Vector3.new(world.X+x*radius,y,world.Z+z*radius))end
+    if not matrix then return toggle.projectworld(Vector3.new(world.X+x*radius,y,world.Z+z*radius))end
     local u,v=(x+1)/2,(z+1)/2;local denominator=matrix.g*u+matrix.h*v+1
     if math.abs(denominator)<0.000001 then return Vector2.new(0,0),false end
     local sx,sy=(matrix.a*u+matrix.b*v+matrix.c)/denominator,(matrix.d*u+matrix.e*v+matrix.f)/denominator
-    local viewport=cam.ViewportSize;return Vector2.new(sx,sy),sx>=0 and sy>=0 and sx<=viewport.X and sy<=viewport.Y
+    local viewport=toggle.lastviewport or cam.ViewportSize;return Vector2.new(sx,sy),sx>=0 and sy>=0 and sx<=viewport.X and sy<=viewport.Y
 end
 local function drawring(rec,world,meters,wanted)
     if not world then hidering(rec);return end;if(toggle.frametime or tick())<(rec.ringretry or 0)then hidering(rec);return end
     local on=wanted~=false and toggle.esp and(not rec.cfg.crate or toggle.supplylabel and not rec.inventoryvisible)and not rec.cfg.noring and toggle.ringenabled and meters<ringfade;rec.ringanim=toggle.ease(rec.ringanim or 0,on and 1 or 0,on and 0.22 or 0.18)
     if rec.ringanim<=0.01 then rec.ringanim=0;hidering(rec);return end
-    local sides=toggle.ringshape=="triangle"and 3 or toggle.ringshape=="square"and 4 or toggle.ringshape=="hexagon"and 6 or 0;local segments=sides>0 and sides or meters>40 and 32 or meters>20 and 48 or 64;if on then makering(rec,segments)end;if not rec.ring then return end;segments=math.min(segments,#rec.ring);local y=world.Y-(rec.cfg.ringyoffset or 0);local radius=(rec.cfg.ringradius or 2)*toggle.ringsize*rec.ringanim;local alpha=clamp(1-meters/ringfade,0,1)*toggle.ringopacity*rec.ringanim;local angle=toggle.ringspin and(toggle.frametime or tick())*toggle.ringspinspeed or 0;local cachekey=tostring(sides)..":"..tostring(segments);local unit=toggle.ringunit[cachekey]
+    local sides=toggle.ringshape=="triangle"and 3 or toggle.ringshape=="square"and 4 or toggle.ringshape=="hexagon"and 6 or 0;local segments=sides>0 and sides or meters>40 and 32 or meters>20 and 48 or 64;if on then makering(rec,segments)end;if not rec.ring then return end;segments=math.min(segments,#rec.ring);if segments<3 then for i=1,#rec.ring do toggle.setvisible(rec.ring[i],false)end;return end;local y=world.Y-(rec.cfg.ringyoffset or 0);local radius=(rec.cfg.ringradius or 2)*toggle.ringsize*rec.ringanim;local alpha=clamp(1-meters/ringfade,0,1)*toggle.ringopacity*rec.ringanim;local angle=toggle.ringspin and(toggle.frametime or tick())*toggle.ringspinspeed or 0;local cachekey=tostring(sides)..":"..tostring(segments);local unit=toggle.ringunit[cachekey]
     if not unit then unit={};for n=0,segments do local point=toggle.ringpoint(Vector3.new(0,0,0),0,1,n/segments,sides,0);unit[n+1]=Vector2.new(point.X,point.Z)end;toggle.ringunit[cachekey]=unit end
-    local cosa,sina=1,0;if angle~=0 then cosa,sina=math.cos(angle),math.sin(angle)end;local ringcolor=rec.cfg.rgb and toggle.ringrgbcolor or rec.cfg.labelcolor;local matrix=segments>16 and toggle.ringprojection(world,y,radius)or nil;local first=unit[1];local firstx=first.X*cosa-first.Y*sina;local firstz=first.X*sina+first.Y*cosa;local previous,previouson=toggle.projectring(matrix,world,y,radius,firstx,firstz)
+    local cosa,sina=1,0;if angle~=0 then cosa,sina=math.cos(angle),math.sin(angle)end;local ringcolor=rec.cfg.rgb and toggle.ringrgbcolor or rec.cfg.labelcolor;local previouscolor=rec.ringpaintcolor;local changed=rec.ringstylecount~=#rec.ring;local recolor=changed or not previouscolor or math.abs(previouscolor.R-ringcolor.R)>0.0001 or math.abs(previouscolor.G-ringcolor.G)>0.0001 or math.abs(previouscolor.B-ringcolor.B)>0.0001;local refade=changed or rec.ringpaintalpha~=alpha;if recolor then rec.ringcolorrevision=(rec.ringcolorrevision or 0)+1 end;if refade then rec.ringalpharevision=(rec.ringalpharevision or 0)+1 end;local matrix=segments>16 and toggle.ringprojection(world,y,radius)or nil;local first=unit[1];local firstx=first.X*cosa-first.Y*sina;local firstz=first.X*sina+first.Y*cosa;local previous,previouson=toggle.projectring(matrix,world,y,radius,firstx,firstz)
     for i=1,segments do
         local point=unit[i+1];local px=point.X*cosa-point.Y*sina;local pz=point.X*sina+point.Y*cosa;local current,currenton=toggle.projectring(matrix,world,y,radius,px,pz);local line=rec.ring[i];local visible=previouson and currenton
-        if visible then local points=rec.ringpoints[i];if not points then points={};rec.ringpoints[i]=points end;if points.fx~=previous.X or points.fy~=previous.Y then line.From=previous;points.fx,points.fy=previous.X,previous.Y end;if points.tx~=current.X or points.ty~=current.Y then line.To=current;points.tx,points.ty=current.X,current.Y end;toggle.setprop(line,"Color",ringcolor);toggle.setprop(line,"Transparency",alpha)end;toggle.setvisible(line,visible);previous,previouson=current,currenton
-    end;if(rec.ringactivecount or 0)>segments then for i=segments+1,rec.ringactivecount do toggle.setvisible(rec.ring[i],false)end end;rec.ringactivecount=segments;rec.ringvisible=true
+        if visible then local points=rec.ringpoints[i];if not points then points={};rec.ringpoints[i]=points end;if points.fx~=previous.X or points.fy~=previous.Y then line.From=previous;points.fx,points.fy=previous.X,previous.Y end;if points.tx~=current.X or points.ty~=current.Y then line.To=current;points.tx,points.ty=current.X,current.Y end;if points.cv~=rec.ringcolorrevision then line.Color=ringcolor;points.cv=rec.ringcolorrevision end;if points.av~=rec.ringalpharevision then line.Transparency=alpha;points.av=rec.ringalpharevision end end;toggle.setvisible(line,visible);previous,previouson=current,currenton
+    end;if(rec.ringactivecount or 0)>segments then for i=segments+1,rec.ringactivecount do toggle.setvisible(rec.ring[i],false)end end;rec.ringactivecount=segments;rec.ringvisible=true;rec.ringpaintcolor=ringcolor;rec.ringpaintalpha=alpha;rec.ringstylecount=#rec.ring
 end
 toggle.cleartracers=function()
     local state=toggle.tracers;for key,rec in pairs(state.records)do for _,line in ipairs(rec.lines or{})do toggle.recycleline(line)end;state.records[key]=nil end;state.count=0
@@ -2829,7 +2910,7 @@ toggle.touchtracer=function(kind,key,x,y,tint,alpha)
     rec.seen=state.frame;rec.x=x;rec.y=y;rec.tint=tint;rec.alpha=alpha or 1
 end
 toggle.tracerpart=function(kind,key,part,tint,viewer,range)
-    if not part or not part.Parent then return end;local world=part.Position;if range and dist(viewer,world)>range then return end;local screen,on=WorldToScreen(world);if on then toggle.touchtracer(kind,key,screen.X,screen.Y,tint,1)end
+    if not part or not part.Parent then return end;local world=part.Position;if range and dist(viewer,world)>range then return end;local screen,on=toggle.projectworld(world);if on then toggle.touchtracer(kind,key,screen.X,screen.Y,tint,1)end
 end
 toggle.updatetracertargets=function(viewer)
     local state=toggle.tracers;local selected=state.selected;if not toggle.esp or not next(selected)then return end
@@ -2851,9 +2932,10 @@ toggle.drawtracers=function()
         else
             rec.drawx=rec.x;rec.drawy=rec.y
             local dx,dy=rec.drawx-mx,rec.drawy-my;local length=math.sqrt(dx*dx+dy*dy);local bend=math.min(75,length*0.13)*(state.drawcurve or state.curve or 1);local last=Vector2.new(mx,my)
-            for i=1,state.segments do
-                local sample=samples[i];local point=Vector2.new(mx+dx*sample.u,my+dy*sample.u-bend*sample.bend)
-                local line=rec.lines[i];if not line then line=setz(toggle.acquireline(rec.tint),0.5);rec.lines[i]=line end
+            for i=#rec.lines+1,state.segments do local line=toggle.acquireline(rec.tint);if not line then break end;rec.lines[i]=setz(line,0.5)end
+            local count=math.min(state.segments,#rec.lines)
+            for i=1,count do
+                local u=i/count;local point=Vector2.new(mx+dx*u,my+dy*u-bend*2*u*(1-u));local sample=samples[math.max(1,math.min(state.segments,math.floor(u*state.segments+0.5)))];local line=rec.lines[i]
                 toggle.setprop(line,"From",last);toggle.setprop(line,"To",point);toggle.setprop(line,"Color",rec.tint);toggle.setprop(line,"Thickness",1.5);toggle.setprop(line,"Transparency",rec.anim*rec.alpha*state.opacity*sample.alpha);toggle.setvisible(line,length>3 and rec.anim>0.01);last=point
             end
         end
@@ -2866,7 +2948,7 @@ local function drawrec(rec,viewer)
     local world=object.Position;local meters=dist(viewer,world);if meters==math.huge then hiderec(rec);return true end;rec.lastworld=world;rec.lastmeters=meters;local crateinventory=rec.cfg.crate and toggle.supplyitems;if(not espgroups[group]or espgroups.items[rec.cfgname]==false)and not crateinventory then hiderec(rec);toggle.paintworldlabel(rec,nil,meters,false);drawring(rec,world,meters,false);return true end
     if not toggle.esp and not(rec.cfg.crate and toggle.instacrate and toggle.supplyitems)then hiderec(rec);toggle.paintworldlabel(rec,nil,meters,false);drawring(rec,world,meters,false);return true end
     meters=rec.cfg.crate and rec.cratelayouttime==toggle.frametime and rec.cratemeters or meters
-    local screen,on;if rec.cfg.crate and rec.cratelayouttime==toggle.frametime then screen,on=rec.cratescreen,rec.crateonscreen else screen,on=WorldToScreen(world)end
+    local screen,on;if rec.cfg.crate and rec.cratelayouttime==toggle.frametime then screen,on=rec.cratescreen,rec.crateonscreen else screen,on=toggle.projectworld(world)end
     if not on or not screen or screen.X~=screen.X or screen.Y~=screen.Y or math.abs(screen.X)==math.huge or math.abs(screen.Y)==math.huge then hiderec(rec);toggle.paintworldlabel(rec,nil,meters,false);drawring(rec,world,meters,false);return true end
     rec.hidden=false
     local yoffset=rec.cfg.textyoffset or 0;local crateok=true;if rec.cfg.crate then crateok=pcall(drawcrate,rec,screen,meters,yoffset)end;local sx,sy=screen.X,screen.Y
@@ -2943,11 +3025,11 @@ toggle.refreshplayers=function(now,viewer)
 end
 toggle.playersort=function(a,b)local ad,bd=a.rec.meters or math.huge,b.rec.meters or math.huge;if ad~=bd then return ad<bd end;return a.id<b.id end
 toggle.layoutnametag=function(rec)
-    local compact=rec.style=="compact";local icons=toggle.iconenabled(rec);rec.icons=icons;local pad=compact and 8 or 10;rec.textpad=pad;rec.nameiconw=icons and 19 or 0;rec.valueiconw=icons and 17 or 0;local gap=compact and 6 or 4
-    rec.namew=(toggle.espwidth(rec.shortname)*(font==Drawing.Fonts.Minecraft and 0.78 or 1)+pad*2+rec.nameiconw)*(rec.nameanim or 0)
-    rec.healthw=(toggle.espwidth(rec.healthlabel or"")+pad*2+rec.valueiconw)*(rec.healthanim or 0)
-    rec.distancepanelw=(toggle.espwidth(rec.distancelabel or"")+pad*2+rec.valueiconw)*(rec.distanceanim or 0)
-    local d,n,h=rec.distanceanim or 0,rec.nameanim or 0,rec.healthanim or 0;rec.namex=rec.distancepanelw+gap*math.min(d,math.min(1,n+h));rec.healthx=rec.namex+rec.namew+gap*math.min(n,h);rec.headerw=rec.healthx+rec.healthw;rec.headerwidth=rec.headerw
+    local compact=rec.style=="compact";local icons=toggle.iconenabled(rec);rec.icons=icons;local pad=compact and 8 or 10;rec.textpad=compact and 0 or pad;rec.nameiconw=icons and 19 or 0;rec.valueiconw=icons and 17 or 0;local gap=compact and 10 or 4;local cellpad=compact and 0 or pad*2
+    rec.namew=(toggle.espwidth(rec.shortname)*(font==Drawing.Fonts.Minecraft and 0.78 or 1)+cellpad+rec.nameiconw)*(rec.nameanim or 0)
+    rec.healthw=(toggle.espwidth(rec.healthlabel or"")+cellpad+rec.valueiconw)*(rec.healthanim or 0)
+    rec.distancepanelw=(toggle.espwidth(rec.distancelabel or"")+cellpad+rec.valueiconw)*(rec.distanceanim or 0)
+    local d,n,h=rec.distanceanim or 0,rec.nameanim or 0,rec.healthanim or 0;local visible=math.min(1,d+n+h);local edge=compact and pad*visible or 0;rec.distancex=edge;rec.namex=edge+rec.distancepanelw+gap*math.min(d,math.min(1,n+h));rec.healthx=rec.namex+rec.namew+gap*math.min(n,h);rec.headerw=rec.healthx+rec.healthw+edge;rec.headerwidth=rec.headerw
 end
 toggle.nametagoutline=function(d,fade,c,rec)
     toggle.playeroutline(d,fade,c,rec and rec.style)
@@ -2982,17 +3064,17 @@ toggle.paintplayer=function(entry)
     local rec=entry.rec;toggle.makeplayerpanel(rec);local x=toggle.pixel(entry.basex+(rec.stackx or 0));local y=toggle.pixel(entry.basey+(rec.stackoffset or 0));local w,h=entry.w,entry.h;local alpha=rec.anim;local panelalpha=alpha*(1-0.28*(rec.rake and 0 or(rec.faranim or 0)));local palette=rec.palette or toggle.playeresp.palette;rec.targetanim=toggle.ease(rec.targetanim or 0,rec.targeted and 1 or 0,0.12);local targetmix=rec.targetanim;local namecolor=rec.rake and palette.target or toggle.colormix(palette.title,palette.target,targetmix);if not rec.rake and(rec.faranim or 0)>0 then namecolor=toggle.colormix(namecolor,Color3.new(0,0,0),rec.faranim*0.28)end;local statuscolor=toggle.colormix(palette.title,palette.target,rec.statusanim or 0);local darktarget=toggle.colormix(toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor,Color3.new(0,0,0),0.62);local panelcolor=toggle.colormix(palette.bg,darktarget,targetmix*0.65);local topcolor=toggle.colormix(palette.top,darktarget,targetmix*0.65);local bordertint=toggle.colormix(palette.outline,darktarget,targetmix*0.65);local statusmix=rec.rake and(rec.statusanim or 0)*0.65 or 0;local statusbg=statusmix>0 and toggle.colormix(palette.bg,darktarget,statusmix)or palette.bg;local statustop=statusmix>0 and toggle.colormix(palette.top,darktarget,statusmix)or palette.top;local statusborder=statusmix>0 and toggle.colormix(palette.outline,darktarget,statusmix)or palette.outline;rec.panelbgcolor=panelcolor;rec.statusbgcolor=statusbg
     local statuscx=x+w/2;if rec.rake then local namecx=x+(w-rec.headerw)/2+rec.namex+rec.namew/2;statuscx=statuscx+(namecx-statuscx)*(rec.nameanim or 0)end
     if rec.radius~=toggle.borderradius then rec.radius=toggle.borderradius;for i=1,#rec.frames do local frame=rec.frames[i];pcall(function()frame[1].Corner=math.max(0,toggle.borderradius-1)end)end end
-    for i=1,#rec.frames do local entry=rec.frames[i];local d,inset,detail,kind=entry[1],entry[2],entry[3],entry[4];local pane=kind and rec[kind.."pane"];local framew=detail and rec.detailw or kind=="health"and rec.healthw or kind=="distance"and rec.distancepanelw or rec.namew;local groupx=x+(w-rec.headerw)/2;local framex=detail and(rec.rake and statuscx-framew/2 or x+(w-framew)/2)or groupx+(kind=="health"and rec.healthx or kind=="distance"and 0 or rec.namex);local framey=y+(detail and rec.detaily or(rec.headertop or 0));local frameh=detail and rec.detailh or rec.headerh;local framealpha=panelalpha*(detail and rec.detailanim or kind=="health"and rec.healthanim or kind=="distance"and rec.distanceanim or rec.nameanim)
+    for i=1,#rec.frames do local entry=rec.frames[i];local d,inset,detail,kind=entry[1],entry[2],entry[3],entry[4];local pane=kind and rec[kind.."pane"];local framew=detail and rec.detailw or kind=="health"and rec.healthw or kind=="distance"and rec.distancepanelw or rec.namew;local groupx=x+(w-rec.headerw)/2;local framex=detail and(rec.rake and statuscx-framew/2 or x+(w-framew)/2)or groupx+(kind=="health"and rec.healthx or kind=="distance"and 0 or rec.namex);local framey=y+(detail and rec.detaily or(rec.headertop or 0));local frameh=detail and rec.detailh or rec.headerh;local framealpha=panelalpha*(detail and rec.detailanim or kind=="health"and rec.healthanim or kind=="distance"and rec.distanceanim or rec.nameanim);local unified=rec.style=="compact"and not detail;if unified and not kind then framew=rec.headerw;framex=groupx;framealpha=panelalpha*rec.headeranim end
         local isbg=d==rec.bg or d==rec.detailbg or pane and d==pane.bg;local istop=d==rec.top or d==rec.detailtop or pane and d==pane.top;local isborder=d==rec.middle or d==rec.detailmiddle or pane and d==pane.middle;local bg=kind and palette.bg or detail and statusbg or panelcolor;local top=kind and palette.top or detail and statustop or topcolor;local border=kind and palette.outline or detail and statusborder or bordertint
         if isbg then toggle.registerespsheen(d)end
-        if isbg or isborder then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
+        if(isbg or isborder)and not(unified and kind)then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
     end
     local hx=x+(w-rec.headerw)/2+rec.namex+(rec.textpad or 10);local hy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);local username=(rec.nameanim or 0)>0.01;local namealpha=alpha*(rec.nameanim or 0);local healthalpha=alpha*(rec.healthanim or 0)
     toggle.seticon(rec.person,rec.rake and"skull"or rec.health~=nil and rec.health<=0 and"skull"or"person",hx,hy+(toggle.esplineheight-14)/2,14,namecolor,namealpha,rec.icons and username and namealpha>0.01);toggle.playerprop(rec.person,"Visible",rec.icons and username and namealpha>0.01);toggle.playertext(rec.title,rec.shortname,rec.icons and hx+(rec.nameiconw or 0)or x+(w-rec.headerw)/2+rec.namex+(rec.namew-toggle.espwidth(rec.shortname))/2,hy+(1-(rec.nameanim or 0))*3,namecolor,namealpha,username,rec);hx=x+(w-rec.headerw)/2+rec.healthx+(rec.textpad or 10)
     local hp=rec.health or 0;if rec.tinthealth~=hp then rec.tinthealth=hp;rec.healthcolor=toggle.healthtint(hp/(rec.rake and 400 or 100),not rec.rake and hp>100)end;toggle.seticon(rec.heart,"heart",hx,hy+(toggle.esplineheight-13)/2,13,toggle.heartcolor,healthalpha,rec.icons and rec.healthlabel~=""and healthalpha>0.01);toggle.playerprop(rec.heart,"Visible",rec.icons and rec.healthlabel~=""and healthalpha>0.01);toggle.playertext(rec.healthtext,rec.healthlabel,rec.icons and hx+(rec.valueiconw or 0)or x+(w-rec.headerw)/2+rec.healthx+(rec.healthw-toggle.espwidth(rec.healthlabel))/2,hy+(1-(rec.healthanim or 0))*3,(rec.rake and toggle.rakehealthcoloring or not rec.rake and toggle.playeresp.healthcoloring)and rec.healthcolor or palette.title,healthalpha,rec.healthlabel~="",rec)
     for j=1,#(rec.itemnodes or{})do local node=rec.itemnodes[j];local text=node.text;local itemalpha=alpha*node.anim;if rec.far or rec.health~=nil and rec.health<=0 then itemalpha=0 end;if node.slot then local style=toggle.playeritemstyle(node.item.name);local itemcolor=toggle.hudtextcolor(style.rgb and rgb((j-1)/math.max(1,#rec.itemnodes))or style.labelcolor);toggle.playerprop(text,"Text",node.label);toggle.playerprop(text,"Font",font);toggle.playerprop(text,"Size",espfontsize);toggle.playerprop(text,"Color",itemcolor);toggle.playerprop(text,"Transparency",itemalpha);toggle.nametagoutline(text,itemalpha,itemcolor,rec);toggle.centertext(text,x+w/2+node.x,y+rec.itemy+node.y+toggle.esplineheight/2+(1-node.anim)*3);toggle.playerprop(text,"Visible",itemalpha>0.01)else toggle.playerprop(text,"Visible",false)end end
     if rec.rake then local tagx=x+(w-rec.headerw)/2+rec.namex+(rec.namew-rec.footerwidth)/2;local tagy=y+rec.footery;toggle.playertext(rec.statustext,toggle.uititle(rec.statuslabel or""),statuscx-toggle.espwidth(toggle.uititle(rec.statuslabel or""))/2,tagy+(1-(rec.statuslabelanim or 0))*3,statuscolor,alpha*(rec.statuslabelanim or 0),(rec.statuslabelanim or 0)>0.01,rec)end
-    local da=alpha*(rec.distanceanim or 0);local distanceon=da>0.01;local dx=x+(w-rec.headerw)/2+(rec.textpad or 10);local distancecolor=toggle.colormix(palette.title,Color3.new(0,0,0),0.18);local dy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);toggle.seticon(rec.distanceicon,"target",dx,dy+(toggle.esplineheight-13)/2,13,distancecolor,da,rec.icons and distanceon);toggle.playerprop(rec.distanceicon,"Visible",rec.icons and distanceon);toggle.playertext(rec.distancetext,rec.distancelabel or"",rec.icons and dx+(rec.valueiconw or 0)or x+(w-rec.headerw)/2+(rec.distancepanelw-toggle.espwidth(rec.distancelabel or""))/2,dy,distancecolor,da,distanceon,rec)
+    local da=alpha*(rec.distanceanim or 0);local distanceon=da>0.01;local dx=x+(w-rec.headerw)/2+(rec.distancex or 0)+(rec.textpad or 10);local distancecolor=toggle.colormix(palette.title,Color3.new(0,0,0),0.18);local dy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);toggle.seticon(rec.distanceicon,"target",dx,dy+(toggle.esplineheight-13)/2,13,distancecolor,da,rec.icons and distanceon);toggle.playerprop(rec.distanceicon,"Visible",rec.icons and distanceon);toggle.playertext(rec.distancetext,rec.distancelabel or"",rec.icons and dx+(rec.valueiconw or 0)or x+(w-rec.headerw)/2+(rec.distancex or 0)+(rec.distancepanelw-toggle.espwidth(rec.distancelabel or""))/2,dy,distancecolor,da,distanceon,rec)
 end
 toggle.stackplayersort=function(a,b)
     local ad,bd=a.rec.sortmeters or 0,b.rec.sortmeters or 0;if ad~=bd then return ad<bd end;return a.id<b.id
@@ -3021,7 +3103,7 @@ toggle.drawplayers=function(viewer)
     local state=toggle.playeresp;local enabled=toggle.esp and(state.selectedcount>0 or state.showusername or state.showdistance or state.showhealth);local now=toggle.frametime or tick();if enabled then toggle.refreshplayers(now,viewer)end
     local list=state.visible;local count=0;local layoutchanged=false
     for _,rec in pairs(state.records)do
-        local ok,screen,on=pcall(function()if now<(rec.drawretry or 0)then return nil,false end;local root=rec.root;if not root or not root.Parent or not root:IsA("BasePart")then return nil,false end;local position=root.Position;rec.meters=dist(viewer,position);if not enabled or rec.meters~=rec.meters or rec.meters==math.huge or rec.meters>state.distance or rec.meters>25 and not(state.showusername or state.showdistance)then return nil,false end;if not rec.sortmeters or math.abs(rec.meters-rec.sortmeters)>5 then rec.sortmeters=math.floor(rec.meters/5+0.5)*5 end;toggle.playerheader(rec,now);local show=enabled and((rec.nameanim or 0)>0.01 or(rec.healthanim or 0)>0.01 or(rec.distanceanim or 0)>0.01 or rec.detailanim>0.01)and rec.meters<=state.distance;if not show then return nil,false end;return WorldToScreen(position-Vector3.new(0,rec.footheight or 3.4,0))end)
+        local ok,screen,on=pcall(function()if now<(rec.drawretry or 0)then return nil,false end;local root=rec.root;if not root or not root.Parent or not root:IsA("BasePart")then return nil,false end;local position=root.Position;rec.meters=dist(viewer,position);if not enabled or rec.meters~=rec.meters or rec.meters==math.huge or rec.meters>state.distance or rec.meters>25 and not(state.showusername or state.showdistance)then return nil,false end;if not rec.sortmeters or math.abs(rec.meters-rec.sortmeters)>5 then rec.sortmeters=math.floor(rec.meters/5+0.5)*5 end;toggle.playerheader(rec,now);local show=enabled and((rec.nameanim or 0)>0.01 or(rec.healthanim or 0)>0.01 or(rec.distanceanim or 0)>0.01 or rec.detailanim>0.01)and rec.meters<=state.distance;if not show then return nil,false end;return toggle.projectworld(position-Vector3.new(0,rec.footheight or 3.4,0))end)
         if ok and on and screen and type(screen.X)=="number"and type(screen.Y)=="number"and screen.X==screen.X and screen.Y==screen.Y and math.abs(screen.X)<math.huge and math.abs(screen.Y)<math.huge then rec.anim=toggle.ease(rec.anim or 0,1,0.18);count=count+1;local entry=rec.renderentry or{};rec.renderentry=entry;if not rec.wasvisible or math.abs((entry.layoutw or 0)-(rec.panelw or 0))>=1 or math.abs((entry.layouth or 0)-(rec.panelh or 0))>=1 or entry.sortmeters~=rec.sortmeters then layoutchanged=true end;rec.wasvisible=true;entry.rec=rec;entry.id=rec.id;entry.sortmeters=rec.sortmeters;entry.w=rec.panelw or 96;entry.h=rec.panelh or 29;entry.basex=screen.X-entry.w/2;entry.basey=screen.Y+4;entry.x=entry.basex+(rec.targetx or 0);entry.y=entry.basey+(rec.targetoffset or 0);list[count]=entry
         else if rec.wasvisible then layoutchanged=true end;rec.wasvisible=false;local entry=rec.renderentry;rec.anim=toggle.ease(rec.anim or 0,0,0.16)
             if entry and rec.anim>0.01 then count=count+1;entry.rec=rec;entry.id=rec.id;entry.w=rec.panelw or entry.w;entry.h=rec.panelh or entry.h;list[count]=entry
@@ -3039,7 +3121,7 @@ toggle.drawplayers=function(viewer)
         local layer=math.max(0,4*256-4-(i-1)*3);if rec.zlayer~=layer or rec.layercount~=#rec.draws or rec.layertextcount~=#rec.texts then rec.zlayer=layer;rec.layercount=#rec.draws;rec.layertextcount=#rec.texts;for j=1,#rec.draws do setz(rec.draws[j],(layer+2)/256)end;for j=1,#rec.texts do setz(rec.texts[j],(layer+2)/256)end;for j=1,#rec.frames do local frame=rec.frames[j];local bg=frame[1]==rec.bg or frame[1]==rec.detailbg or frame[4]and frame[1]==rec[frame[4].."pane"].bg;setz(frame[1],(layer+(bg and 0 or 1))/256)end end
     end end
 end
-toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=150;toggle.rakepanel={rake=true,shortname="rake",texts={},itemnodes={},anim=0,background=true}
+toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=200;toggle.rakepanel={rake=true,shortname="rake",texts={},itemnodes={},anim=0,background=true}
 toggle.raketarget=nil;toggle.rakeroof=nil;toggle.rakehp=nil
 local function rakeinfo()
     local rake=ws:FindFirstChild("Rake")
@@ -3058,7 +3140,7 @@ local function getchar(part)
     for depth=1,64 do if not current then break end;if current:FindFirstChild("Humanoid")then return current end;local parent=current.Parent;if parent==current then break end;current=parent end
 end
 local function drawroof()
-    if not toggle.roofpanel then toggle.roofpanel={bg=setz(newsquare(color("bg"),1),6),border=setz(newborder(color("outline"),1),7),anim=0}end;local frame=toggle.roofpanel;local on=toggle.esp and toggle.roof and toggle.rakeroof and toggle.rakehp;local part=toggle.roofpart;if on and(not part or not part.Parent)then part=findclass(toggle.rakeroof,"BasePart");toggle.roofpart=part end;local screen,visible;if part and part.Parent then screen,visible=WorldToScreen(part.Position);on=on and dist(viewpos(),part.Position)<=12 and visible end
+    if not toggle.roofpanel then toggle.roofpanel={bg=setz(newsquare(color("bg"),1),6),border=setz(newborder(color("outline"),1),7),anim=0}end;local frame=toggle.roofpanel;local on=toggle.esp and toggle.roof and toggle.rakeroof and toggle.rakehp;local part=toggle.roofpart;if on and(not part or not part.Parent)then part=findclass(toggle.rakeroof,"BasePart");toggle.roofpart=part end;local screen,visible;if part and part.Parent then screen,visible=toggle.projectworld(part.Position);on=on and dist(viewpos(),part.Position)<=12 and visible end
     frame.anim=toggle.ease(frame.anim or 0,on and 1 or 0,on and 0.24 or 0.22);if visible then frame.screen=screen end;screen=visible and screen or frame.screen;local alpha=frame.anim;if not screen or alpha<=0.01 then for _,d in ipairs({frame.bg,frame.border,rooflabel,roofhp})do toggle.setvisible(d,false)end;return end
     if on then frame.hp=tonumber(toggle.rakehp.Value)or 0 end;local hp=frame.hp or 0;local text=hp<=0 and"Broken"or tostring(hp).."/30";local titlecolor=color("text");local valuecolor=titlecolor;toggle.setprop(rooflabel,"Text","Roof");toggle.setprop(roofhp,"Text",text);toggle.setprop(rooflabel,"Size",espfontsize);toggle.setprop(roofhp,"Size",espfontsize);local width=toggle.textwidth(rooflabel)+toggle.textwidth(roofhp)+38;local modern=toggle.espvisualstyle=="modern";local height=toggle.esplineheight+(modern and 16 or 12);local x,y=screen.X-width/2,screen.Y-height/2+(1-alpha)*4
     toggle.registerespsheen(frame.bg);toggle.setpos(frame.bg,x,y);toggle.setprop(frame.bg,"Size",Vector2.new(width,height));toggle.setprop(frame.bg,"Color",toggle.visualsurface());toggle.setprop(frame.bg,"Transparency",alpha*toggle.espbackgroundopacity(toggle.espvisualstyle));toggle.setpos(frame.border,x,y);toggle.setprop(frame.border,"Size",Vector2.new(width,height));toggle.setprop(frame.border,"Color",color("outline"));toggle.setprop(frame.border,"Transparency",0.16*alpha*toggle.espbackgroundopacity(toggle.espvisualstyle));toggle.setprop(frame.bg,"Corner",toggle.borderradius);toggle.setprop(frame.border,"Corner",toggle.borderradius);toggle.setvisible(frame.bg,toggle.espbackgroundopacity(toggle.espvisualstyle)>0.01);toggle.setvisible(frame.border,toggle.espbackgroundopacity(toggle.espvisualstyle)>0.01)
@@ -3067,7 +3149,7 @@ end
 toggle.drawrake=function(viewer)
     local rec=toggle.rakepanel;local part=toggle.rakepart;local hum=toggle.rakehumanoid
     if not toggle.esp or not part or not part.Parent or not hum or not hum.Parent then toggle.fadenametag(rec);return end
-    local world=part.Position;local meters=dist(viewer,world);if meters~=meters or meters>toggle.rakerenderdistance then toggle.fadenametag(rec);return end;local screen,on=WorldToScreen(Vector3.new(world.X,world.Y+4,world.Z));if not on then toggle.fadenametag(rec);return end
+    local world=part.Position;local meters=dist(viewer,world);if meters~=meters or meters>toggle.rakerenderdistance then toggle.fadenametag(rec);return end;local screen,on=toggle.projectworld(Vector3.new(world.X,world.Y+4,world.Z));if not on then toggle.fadenametag(rec);return end
     local minimal=toggle.rakeespstyle=="compact";local charw=espfontsize*7/13;rec.style=toggle.rakeespstyle;rec.background=true;rec.shortname=toggle.rakenamevalue=="rake"and"Rake"or toggle.rakenamevalue;rec.targeted=false;rec.far=meters>25;rec.faranim=toggle.ease(rec.faranim or 0,rec.far and 1 or 0,0.2);rec.nameanim=toggle.ease(rec.nameanim or 0,toggle.rakename and 1 or 0,0.2);rec.headeranim=rec.nameanim;rec.headerwidth=(toggle.espwidth(rec.shortname)+19)*rec.nameanim;rec.headery=minimal and 6 or 9
     local has=toggle.targetplayername~=nil;local now=toggle.frametime or tick();if rec.hastarget~=has then rec.hastarget=has;rec.nextsample=0 end;if rec.samplehumanoid~=hum or now>=(rec.nextsample or 0)then rec.samplehumanoid=hum;rec.nextsample=now+0.08;local ok,hp=pcall(function()return hum.Health end);rec.health=ok and tonumber(hp)or 0;if toggle.rakestatus then local chased,chasing=false,false;if has then chased,chasing=pcall(function()return hum:GetAttribute("CHZNG")end)end;rec.statuslabel=has and(chased and chasing==true and"chasing"or"stalking")or nil end end
     rec.anim=toggle.ease(rec.anim or 0,1,0.18);rec.healthanim=toggle.ease(rec.healthanim or 0,toggle.rakehealth and rec.health>0 and 1 or 0,0.2);rec.healthlabel=rec.health>0 and (tostring(math.floor(rec.health+0.5))..(toggle.iconenabled(rec)and""or"hp"))or"";rec.headerwidth=rec.headerwidth+(toggle.espwidth(rec.healthlabel)+25)*rec.healthanim
@@ -3095,6 +3177,21 @@ local function targethud()
     local present=toggle.rakepart and toggle.rakepart.Parent;local meters=present and dist(viewpos(),toggle.rakepart.Position)or nil;if meters then local teleporting=meters>=800;if teleporting and not state.raketeleporting then toggle.notifyevent("rake","rake is teleporting",raketint)elseif not teleporting and state.raketeleporting then toggle.notifyevent("rake","rake finished teleporting ["..tostring(math.floor(meters)).."m]",raketint)end;state.raketeleporting=teleporting;if meters<=toggle.notifysettings.rakedistance and not state.rakenear then state.rakenear=true;toggle.notifyevent("rake","rake is nearby ["..tostring(math.floor(meters)).."m]",raketint)elseif meters>toggle.notifysettings.rakedistance+5 then state.rakenear=false end else state.rakenear=false end
     local night=rs:FindFirstChild("Night");local safe,nighton=pcall(function()return night and night.Value==true end);nighton=safe and nighton==true;local nightchanged=toggle.targetnight~=nighton;toggle.targetnight=nighton;local worldchanged=toggle.refreshworldstats();if targettxt.Text~=shown then targettxt.Text=shown;return true end;return worldchanged or nightchanged
 end
+toggle.readstationpower=function()
+    local state=toggle.powerreading;local offsets=state.offsets;if not offsets then toggle.requestshiftlockoffset();return nil end
+    local now=tick();local ok,address=pcall(function()
+        local object=toggle.powerlevel
+        if object and(object.Parent==nil or object.Parent~=state.folder)then object=nil;toggle.powerlevel=nil;state.nextresolve=0 end
+        if now>=state.nextresolve then state.nextresolve=now+1;state.folder=rs:FindFirstChild("PowerValues");object=state.folder and state.folder:FindFirstChild("PowerLevel");toggle.powerlevel=object end
+        if not object or not object.Parent or not object:IsA("IntConstrainedValue")then return nil end
+        return toggle.instanceaddress(object)
+    end)
+    if not ok or not address then return nil end
+    local minimum=toggle.memoryread("uintptr_t",address+offsets.minimum);local maximum=toggle.memoryread("uintptr_t",address+offsets.maximum);local value=toggle.memoryread("uintptr_t",address+offsets.value)
+    for _,number in ipairs({minimum,maximum,value})do if not toggle.visualfinite(number,0,9007199254740991)or number%1~=0 then return nil end end
+    if minimum==nil or maximum==nil or value==nil or maximum<=minimum or value<minimum or value>maximum then return nil end
+    local percent=(value-minimum)/(maximum-minimum)*100;return toggle.visualfinite(percent,0,100)and percent or nil
+end
 toggle.readvoltmeter=function()
     local now=tick();if now<(toggle.nextvoltmeterscan or 0)then return toggle.voltmetervalue end;toggle.nextvoltmeterscan=now+0.2;toggle.voltmetervalue=nil;toggle.voltmeterlevel=nil
     local ok,list=pcall(function()return players:GetPlayers()end);if not ok then return nil end;local samples=toggle.voltmetersamples or{};local current={};toggle.voltmetersamples=current;local best,besttime=nil,-1
@@ -3119,7 +3216,7 @@ local function scraphud()
     local oldscrap,oldpower=scraptxt.Text,toggle.powerdraw.value.Text;local availabilitychanged=false
     scraptxt.Text=tostring(toggle.scrapamount())
     local now=tick();if now>=toggle.nextpowerread then
-        toggle.nextpowerread=now+0.1;local value=toggle.readvoltmeter();local available=value~=nil;if toggle.powerhudavailable~=available then toggle.powerhudavailable=available;availabilitychanged=true;menustate.itemsdirty=true end;local station=rs:FindFirstChild("StationPower");local stationon=true;if station then local ok,result=pcall(function()return station.Value end);if ok then stationon=result==true end end;toggle.poweravailable=stationon;if available then value=stationon and clamp(value,0,100)or 0;toggle.powerdraw.value.Text=string.format("%g%%",value)else toggle.powerdraw.value.Text="?"end
+        toggle.nextpowerread=now+0.1;local value=toggle.readstationpower();local direct=value~=nil;if not direct then value=toggle.readvoltmeter()end;toggle.powerreadsource=direct and"station"or value~=nil and"voltmeter"or nil;local available=value~=nil;if toggle.powerhudavailable~=available then toggle.powerhudavailable=available;availabilitychanged=true;menustate.itemsdirty=true end;local station=rs:FindFirstChild("StationPower");local stationon=true;if station then local ok,result=pcall(function()return station.Value end);if ok then stationon=result==true end end;toggle.poweravailable=stationon;if available then value=stationon and clamp(value,0,100)or 0;toggle.powerdraw.value.Text=string.format(direct and"%.1f%%"or"%g%%",value)else toggle.powerdraw.value.Text="?"end
     end
     return availabilitychanged or oldscrap~=scraptxt.Text or oldpower~=toggle.powerdraw.value.Text
 end
@@ -3149,7 +3246,7 @@ toggle.choosescrap=function(force)
     local mx,my=mouse and mouse.X,mouse and mouse.Y;local validcursor=not cursor or toggle.drawingfinite(mx,1000000)and toggle.drawingfinite(my,1000000)
     if root and validcursor then for i=1,#tracked do local rec=tracked[i];local tier=rec.active and tonumber(string.match(rec.cfgname or"","^Scrap(%d+)$"));local part=rec.object
         if tier and part then local ok,position=pcall(function()return part.Parent and part.Position end);if ok and position then local meters=dist(root.Position,position);local metric=0;local eligible=meters<math.huge
-            if cursor then local good,screen,on=pcall(WorldToScreen,position);eligible=eligible and good and on==true and screen and toggle.drawingfinite(screen.X,1000000)and toggle.drawingfinite(screen.Y,1000000);if eligible then local dx,dy=screen.X-mx,screen.Y-my;metric=dx*dx+dy*dy end end
+            if cursor then local good,screen,on=pcall(toggle.projectworld,position);eligible=eligible and good and on==true and screen and toggle.drawingfinite(screen.X,1000000)and toggle.drawingfinite(screen.Y,1000000);if eligible then local dx,dy=screen.X-mx,screen.Y-my;metric=dx*dx+dy*dy end end
             if eligible then count=count+1;if not chosen or cursor and(metric<bestcursor or metric==bestcursor and meters<bestdistance)or toggle.scrapteleport=="nearest"and meters<bestdistance or toggle.scrapteleport=="value"and(tier>besttier or tier==besttier and meters<bestdistance)or toggle.scrapteleport=="random"and math.random(count)==1 then chosen,besttier,bestdistance,bestcursor=rec,tier,meters,metric end end
         end end
     end end;state.rec=chosen;state.tier=chosen and besttier or nil;return chosen,state.tier
@@ -3378,8 +3475,49 @@ end
 toggle.setthirdperson=function(value,quiet)
     toggle.zoom.thirdperson=value==true;toggle.zoom.min=toggle.zoom.thirdperson and toggle.zoom.amount or 0;toggle.zoom.max=toggle.zoom.thirdperson and 10000 or 0;toggle.zoom.nextapply=0;toggle.applyzoom(true);menuupdate();if not quiet then bindlog(toggle.zoom.thirdperson and"enabled third person"or"disabled third person")end
 end
+toggle.restoreshiftlock=function()
+    local state=toggle.shiftlockstate;state.active=false;state.pending=false;local saved=state.capture;if not saved then return true end
+    local address=toggle.instanceaddress(lp);if address~=saved.address then state.capture=nil;return false end
+    local current=toggle.memoryread("byte",address+saved.offset);if current~=0 and current~=1 then return false end
+    if current~=saved.value and not toggle.memorywrite("byte",address+saved.offset,saved.value)then return false end
+    if toggle.memoryread("byte",address+saved.offset)==saved.value then state.capture=nil;return true end;return false
+end
+toggle.parsepoweroffsets=function(source)
+    local fields={minimum=toggle.offsetstructvalue("IntConstrainedValue","MinValue",source),maximum=toggle.offsetstructvalue("IntConstrainedValue","MaxValue",source),value=toggle.offsetstructvalue("IntConstrainedValue","Value",source)or toggle.offsetstructvalue("IntConstrainedValue","ConstrainedValue",source)}
+    for _,key in ipairs({"minimum","maximum","value"})do local offset=fields[key];if type(offset)~="number"or offset<=0 or offset>=0x10000 or offset%8~=0 then return false end end
+    if fields.minimum==fields.maximum or fields.value==fields.minimum or fields.value==fields.maximum then return false end
+    toggle.powerreading.offsets=fields;toggle.powerreading.nextresolve=0;toggle.nextpowerread=0;return true
+end
+toggle.loadshiftlockoffset=function(force)
+    local state=toggle.shiftlockstate;local now=tick();if state.loading then return false end;if state.offsetverified and toggle.powerreading.offsets and not force then return true end;if not force and now<state.nextload then return false end
+    state.loading=true;state.nextload=now+30;local ok,source=pcall(function()return game:HttpGet(state.url)end);state.loading=false
+    if not toggle.running or toggle.replacing then return false end
+    if not ok or type(source)~="string"or #source<100 or #source>1048576 then return false end
+    local powerok=toggle.parsepoweroffsets(source)
+    local offset=toggle.offsetstructvalue("Player","DevEnableMouseLock",source)
+    if type(offset)~="number"or offset%1~=0 or offset<=0 or offset>=0x10000 then return false end
+    if state.capture and state.capture.offset~=offset then return false end
+    state.offset=offset;state.offsetverified=true;state.nextload=powerok and 0 or now+30;state.nextapply=0;return true
+end
+toggle.requestshiftlockoffset=function()
+    local state=toggle.shiftlockstate;if state.loading or state.queued or state.offsetverified and toggle.powerreading.offsets or tick()<state.nextload then return false end;state.queued=true
+    toggle.spawn(function()toggle.wait();local ok,loaded=pcall(toggle.loadshiftlockoffset,false);state.queued=false;if ok and loaded and state.active then toggle.applyshiftlock(true)end end);return true
+end
+toggle.applyshiftlock=function(force)
+    local state=toggle.shiftlockstate;if not toggle.running or toggle.replacing or toggle.viewportvalid==false then return false end
+    local now=tick();if not force and now<state.nextapply then return false end;state.nextapply=now+0.25
+    if not state.active then if state.capture then return toggle.restoreshiftlock()end;return true end
+    if not state.offsetverified then state.pending=true;toggle.requestshiftlockoffset();return false end
+    local address=toggle.instanceaddress(lp);if not address then return false end
+    local alive,valid=pcall(function()return lp.Parent~=nil and lp:IsA("Player")end);if not alive or not valid then return false end
+    local current=toggle.memoryread("byte",address+state.offset);if current~=0 and current~=1 then state.pending=true;return false end
+    local saved=state.capture;if saved and(saved.address~=address or saved.offset~=state.offset)then state.capture=nil;saved=nil end
+    if not saved then state.capture={address=address,offset=state.offset,value=current}end
+    if current~=1 and not toggle.memorywrite("byte",address+state.offset,1)then state.pending=true;return false end
+    state.pending=toggle.memoryread("byte",address+state.offset)~=1;return not state.pending
+end
 toggle.setshiftlock=function(value,quiet)
-    toggle.shiftlockstate.active=false;toggle.shiftlockstate.pending=false;menuupdate();return false
+    local state=toggle.shiftlockstate;state.active=value==true;state.pending=state.active;state.nextapply=0;toggle.applyshiftlock(true);menuupdate();if not quiet then bindlog(state.active and"enabled shift lock"or"disabled shift lock")end;return state.active
 end
 
 toggle.setinstacrate=function(value,quiet)
@@ -3515,7 +3653,7 @@ toggle.setplayersesp=function(value,quiet)
     toggle.playeresp.enabled=true;toggle.refreshplayerselection();menuupdate()
 end
 toggle.setplayerdistance=function(value,quiet)
-    toggle.playeresp.distance=math.floor(clamp(tonumber(value)or toggle.playeresp.distance,10,150)+0.5);menuupdate();if not quiet then bindlog("player ESP distance set to "..tostring(toggle.playeresp.distance).."m")end
+    toggle.playeresp.distance=toggle.nametagrange(value or toggle.playeresp.distance,false);menuupdate();if not quiet then bindlog("player ESP distance set to "..tostring(toggle.playeresp.distance).."m")end
 end
 toggle.refreshfonts=function()
     if toggle.uibatch then toggle.fontrefreshpending=true;menustate.itemsdirty=true;return end;toggle.fontrefreshpending=false
@@ -3731,7 +3869,7 @@ local function configdata()
     for _,id in ipairs({"themebg","themetop","themeborder","themeoutline","themetext"})do local cfg=entrycfg(id);local c=cfg.labelcolor;themecolors[id]={r=channel(c.R),g=channel(c.G),b=channel(c.B)}end
     themecolors.border_radius=toggle.borderradius
     for id,cfg in pairs(toggle.cratestyles)do local c=cfg.labelcolor;crateitemcolors[id]={r=channel(c.R),g=channel(c.G),b=channel(c.B),rgb=cfg.rgb==true}end
-    return {highlight_target_scrap=toggle.highlightscrap,preset_esp_colors=toggle.presetespcolors,esp_color_overrides=toggle.paletteoverrides(),shine_effect=toggle.shinesettings,custom_visuals=toggle.visualconfig(),tracer_opacity=toggle.tracers.opacity,tracer_speed=toggle.tracers.speed,tracer_curve=toggle.tracers.curve,show_tracers=toggle.tracers.selected,nametag_defaults_version=2,interface_design_schema=1,crate_label_version=2,menu_default_version=5,gui_outline_default_version=3,hud_style_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_schema=2,esp_font_name=fontnames[fontindex],hud_font_name=fontnames[toggle.hudfontindex],font_size=espfontsize,visual_style=toggle.visualstyle,visual_styles={menu=toggle.visualstyle,hud=toggle.hudstyle,esp=toggle.espvisualstyle},esp_icons=toggle.espicons,esp_background_opacity=toggle.espbackgroundalpha,hud_background_opacity=toggle.hudbackgroundalpha,overlay_defaults_schema=1,compact_layout_schema=8,watermark_defaults_schema=1,watermark_schema=2,watermark_elements=toggle.watermarkelements,fonts={menu=toggle.menufontindex,panels=toggle.hudfontindex,esp=fontindex,panel_size=toggle.panelsize,esp_size=espfontsize},preset=themeindex,preset_schema=4,theme_schema=6,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,menu_opacity=menuopacity,opacity_scope_schema=1,watermark=toggle.watermark,hybrid_mode=true,hybrid_features=toggle.hybridfeatures,unsafe_luau=true,client=toggle.client,auto_radio=toggle.autoradio,auto_claim_nightvision=toggle.autoclaimnightvision,auto_recover=toggle.autorecover,auto_buy_items=toggle.autobuyitems.selected,auto_sell_scrap=toggle.autosellscrap,auto_sell_items=toggle.autosellitems.selected,action_toggles={sell=toggle.sellenabled,scrap=toggle.scrapteleportenabled,flare=toggle.flareteleportenabled},shop_item=toggle.shop.selected,kill_aura=toggle.killaura,kill_aura_range=toggle.killaurarange,kill_aura_delay=toggle.killauradelay,auto_heal=toggle.autoheal,auto_heal_health=toggle.autohealth,auto_power=toggle.autopower,auto_power_require_toolbox=toggle.autopowerrequiretoolbox,player_esp=true,player_stacking=toggle.playeresp.stacking,player_stacking_defaults_schema=1,player_layout_schema=3,player_item_defaults_schema=2,player_health_coloring=toggle.playeresp.healthcoloring,rake_health_coloring=toggle.rakehealthcoloring,player_show_username=toggle.playeresp.showusername,player_show_health=toggle.playeresp.showhealth,player_show_distance=toggle.playeresp.showdistance,player_show_background=toggle.playeresp.background,player_esp_style=toggle.playeresp.style,rake_esp_style=toggle.rakeespstyle,rake_status=toggle.rakestatus,rake_render_distance=toggle.rakerenderdistance,player_esp_distance=toggle.playeresp.distance,player_esp_items=toggle.playeresp.selected,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,shift_lock=toggle.shiftlockstate.active,insta_crate=toggle.instacrate,auto_collect={enabled=toggle.autocollect.enabled,selected=toggle.autocollect.selected},prompts=toggle.promptsettings,panel_style=toggle.hudstyle,container_style=toggle.containerstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=ringseg,ring_fade=ringfade,ring_opacity=toggle.ringopacity,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y,dragged=toggle.powerpanel.dragged},keybind_panel={enabled=toggle.keybindpanel,x=toggle.keybindpanelstate.x,y=toggle.keybindpanelstate.y,dragged=toggle.keybindpanelstate.dragged},world_panel={enabled=toggle.worldpanel,x=toggle.worldpanelstate.x,y=toggle.worldpanelstate.y,dragged=toggle.worldpanelstate.dragged,items=toggle.worldpanelitems},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,chroma_accent=themes.accentstyle.rgb,chroma_gradient_bar=toggle.barrgb,bar_rgb=toggle.barrgb,accent_bars=toggle.accentbars,accent_direction=toggle.rgbdirection,accent_speed=rgbspeed,accent_bar_speed=rgbspeed,chroma_saturation=toggle.chromasaturation,chroma_speed=toggle.chromaspeed,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,teleport_cooldown=toggle.teleportcooldown,teleport_cooldown_seconds=toggle.cooldownseconds,notifications={style=toggle.notifysettings.style,opacity=toggle.notifysettings.opacity,position=toggle.notifysettings.position,duration=toggle.notifysettings.duration,rakedistance=toggle.notifysettings.rakedistance,types=toggle.notifysettings.types},distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_elements=toggle.scrapelements,scrap_edit=toggle.scrapedit,location_edit=toggle.locationedit,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,height=menustate.h,minimized=menustate.minimized}}
+    return {nametag_range_schema=1,highlight_target_scrap=toggle.highlightscrap,preset_esp_colors=toggle.presetespcolors,esp_color_overrides=toggle.paletteoverrides(),shine_effect=toggle.shinesettings,custom_visuals=toggle.visualconfig(),tracer_opacity=toggle.tracers.opacity,tracer_speed=toggle.tracers.speed,tracer_curve=toggle.tracers.curve,show_tracers=toggle.tracers.selected,nametag_defaults_version=2,interface_design_schema=1,crate_label_version=2,menu_default_version=5,gui_outline_default_version=3,hud_style_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_schema=2,esp_font_name=fontnames[fontindex],hud_font_name=fontnames[toggle.hudfontindex],font_size=espfontsize,visual_style=toggle.visualstyle,visual_styles={menu=toggle.visualstyle,hud=toggle.hudstyle,esp=toggle.espvisualstyle},esp_icons=toggle.espicons,esp_background_opacity=toggle.espbackgroundalpha,hud_background_opacity=toggle.hudbackgroundalpha,overlay_defaults_schema=1,compact_layout_schema=8,watermark_defaults_schema=1,watermark_schema=2,watermark_elements=toggle.watermarkelements,fonts={menu=toggle.menufontindex,panels=toggle.hudfontindex,esp=fontindex,panel_size=toggle.panelsize,esp_size=espfontsize},preset=themeindex,preset_schema=4,theme_schema=6,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,menu_opacity=menuopacity,opacity_scope_schema=1,watermark=toggle.watermark,hybrid_mode=true,hybrid_features=toggle.hybridfeatures,unsafe_luau=true,client=toggle.client,auto_radio=toggle.autoradio,auto_claim_nightvision=toggle.autoclaimnightvision,auto_recover=toggle.autorecover,auto_buy_items=toggle.autobuyitems.selected,auto_sell_scrap=toggle.autosellscrap,auto_sell_items=toggle.autosellitems.selected,action_toggles={sell=toggle.sellenabled,scrap=toggle.scrapteleportenabled,flare=toggle.flareteleportenabled},shop_item=toggle.shop.selected,kill_aura=toggle.killaura,kill_aura_range=toggle.killaurarange,kill_aura_delay=toggle.killauradelay,auto_heal=toggle.autoheal,auto_heal_health=toggle.autohealth,auto_power=toggle.autopower,auto_power_require_toolbox=toggle.autopowerrequiretoolbox,player_esp=true,player_stacking=toggle.playeresp.stacking,player_stacking_defaults_schema=1,player_layout_schema=3,player_item_defaults_schema=2,player_health_coloring=toggle.playeresp.healthcoloring,rake_health_coloring=toggle.rakehealthcoloring,player_show_username=toggle.playeresp.showusername,player_show_health=toggle.playeresp.showhealth,player_show_distance=toggle.playeresp.showdistance,player_show_background=toggle.playeresp.background,player_esp_style=toggle.playeresp.style,rake_esp_style=toggle.rakeespstyle,rake_status=toggle.rakestatus,rake_render_distance=toggle.rakerenderdistance,player_esp_distance=toggle.playeresp.distance,player_esp_items=toggle.playeresp.selected,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,shift_lock=toggle.shiftlockstate.active,insta_crate=toggle.instacrate,auto_collect={enabled=toggle.autocollect.enabled,selected=toggle.autocollect.selected},prompts=toggle.promptsettings,panel_style=toggle.hudstyle,container_style=toggle.containerstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=ringseg,ring_fade=ringfade,ring_opacity=toggle.ringopacity,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y,dragged=toggle.powerpanel.dragged},keybind_panel={enabled=toggle.keybindpanel,x=toggle.keybindpanelstate.x,y=toggle.keybindpanelstate.y,dragged=toggle.keybindpanelstate.dragged},world_panel={enabled=toggle.worldpanel,x=toggle.worldpanelstate.x,y=toggle.worldpanelstate.y,dragged=toggle.worldpanelstate.dragged,items=toggle.worldpanelitems},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,chroma_accent=themes.accentstyle.rgb,chroma_gradient_bar=toggle.barrgb,bar_rgb=toggle.barrgb,accent_bars=toggle.accentbars,accent_direction=toggle.rgbdirection,accent_speed=rgbspeed,accent_bar_speed=rgbspeed,chroma_saturation=toggle.chromasaturation,chroma_speed=toggle.chromaspeed,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,teleport_cooldown=toggle.teleportcooldown,teleport_cooldown_seconds=toggle.cooldownseconds,notifications={style=toggle.notifysettings.style,opacity=toggle.notifysettings.opacity,position=toggle.notifysettings.position,duration=toggle.notifysettings.duration,rakedistance=toggle.notifysettings.rakedistance,types=toggle.notifysettings.types},distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_elements=toggle.scrapelements,scrap_edit=toggle.scrapedit,location_edit=toggle.locationedit,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,height=menustate.h,minimized=menustate.minimized}}
 end
 toggle.configsnapshot=function(value,ancestors)
     local kind=type(value);if kind=="boolean"or kind=="string"then return value elseif kind=="number"then return value==value and math.abs(value)~=math.huge and value or nil elseif kind~="table"then return nil end
@@ -3831,13 +3969,13 @@ local function loadconfig(quiet)
     toggle.sellenabled=true;toggle.scrapteleportenabled=true;toggle.flareteleportenabled=true
     toggle.refreshshop(true);toggle.shop.selected=type(data.shop_item)=="string"and toggle.shop.lookup[data.shop_item]and toggle.shop.lookup[data.shop_item].name or"RakeTrap";toggle.autobuyitems.selected={};toggle.autosellitems.selected={};if type(data.auto_buy_items)=="table"then for i=1,#toggle.shop.items do local name=toggle.shop.items[i].name;if data.auto_buy_items[name]==true then toggle.autobuyitems.selected[name]=true end end end;if type(data.auto_sell_items)=="table"then for i=1,#toggle.shop.items do local name=toggle.shop.items[i].name;if data.auto_sell_items[name]==true then toggle.autosellitems.selected[name]=true end end end;toggle.autobuyitems.next=0;toggle.autosellitems.next=0
     toggle.setkillaurarange(type(data.kill_aura_range)=="number"and data.kill_aura_range or 16,true);toggle.setkillauradelay(type(data.kill_aura_delay)=="number"and data.kill_aura_delay or 0.05,true);toggle.setkillaura(data.kill_aura==true,true);toggle.setautohealth(type(data.auto_heal_health)=="number"and data.auto_heal_health or 50,true);toggle.setautoheal(data.auto_heal==true,true);toggle.setautopower(data.auto_power==true,true);toggle.setautopowertoolbox(data.auto_power_require_toolbox~=false,true)
-    toggle.playeresp.selected={};if type(data.player_esp_items)=="table"then for i=1,#toggle.playeresp.order do local name=toggle.playeresp.order[i].name;if data.player_esp_items[name]==true then toggle.playeresp.selected[name]=true end end end;toggle.playeresp.stacking=data.player_stacking_defaults_schema~=1 or data.player_stacking~=false;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=data.player_show_username==true;toggle.playeresp.showhealth=data.player_show_health==true;toggle.playeresp.healthcoloring=data.player_health_coloring==true;toggle.rakehealthcoloring=data.rake_health_coloring==true;toggle.playeresp.showdistance=data.player_show_distance==true;toggle.playeresp.background=true;toggle.playeresp.style=(data.player_esp_style=="compact"or data.player_esp_style=="legacy")and"compact"or"modern";toggle.rakeespstyle=(data.rake_esp_style=="compact"or data.rake_esp_style=="legacy")and"compact"or"modern";toggle.rakestatus=data.rake_status==true;toggle.rakerenderdistance=math.floor(clamp(tonumber(data.rake_render_distance)or 150,10,150));toggle.rakepanel.nextsample=0;toggle.setplayerdistance(type(data.player_esp_distance)=="number"and data.player_esp_distance or 150,true);toggle.setplayersesp(true,true)
+    toggle.playeresp.selected={};if type(data.player_esp_items)=="table"then for i=1,#toggle.playeresp.order do local name=toggle.playeresp.order[i].name;if data.player_esp_items[name]==true then toggle.playeresp.selected[name]=true end end end;toggle.playeresp.stacking=data.player_stacking_defaults_schema~=1 or data.player_stacking~=false;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=data.player_show_username==true;toggle.playeresp.showhealth=data.player_show_health==true;toggle.playeresp.healthcoloring=data.player_health_coloring==true;toggle.rakehealthcoloring=data.rake_health_coloring==true;toggle.playeresp.showdistance=data.player_show_distance==true;toggle.playeresp.background=true;toggle.playeresp.style=(data.player_esp_style=="compact"or data.player_esp_style=="legacy")and"compact"or"modern";toggle.rakeespstyle=(data.rake_esp_style=="compact"or data.rake_esp_style=="legacy")and"compact"or"modern";toggle.rakestatus=data.rake_status==true;toggle.rakerenderdistance=toggle.nametagrange(data.rake_render_distance,data.nametag_range_schema~=1);toggle.rakepanel.nextsample=0;toggle.setplayerdistance(toggle.nametagrange(data.player_esp_distance,data.nametag_range_schema~=1),true);toggle.setplayersesp(true,true)
     local zoomamount=type(data.zoom_amount)=="number"and data.zoom_amount or type(data.min_zoom)=="number"and data.min_zoom>=0.5 and data.min_zoom or type(data.minZoom)=="number"and data.minZoom>=0.5 and data.minZoom or 8;toggle.setzoomamount(zoomamount,true);local thirdperson=false;if type(data.third_person)=="boolean"then thirdperson=data.third_person elseif type(data.min_zoom)=="number"then thirdperson=data.min_zoom>=9.5 elseif type(data.minZoom)=="number"then thirdperson=data.minZoom>=9.5 end;toggle.setthirdperson(thirdperson,true);toggle.setshiftlock(data.shift_lock==true,true)
     toggle.setinstacrate(data.insta_crate==true,true)
     toggle.autocollect.selected={};local savedauto=type(data.auto_collect)=="table"and data.auto_collect or{};local selected=type(savedauto.selected)=="table"and savedauto.selected or{};for i=1,#toggle.autocollect.order do local name=toggle.autocollect.order[i].name;if selected[name]==true then toggle.autocollect.selected[name]=true end end;toggle.autocollect.enabled=toggle.instacrate and savedauto.enabled==true
     for i=1,#toggle.promptoptionorder do local entry=toggle.promptoptionorder[i];local saved=type(data.prompts)=="table"and data.prompts[entry.id];if type(saved)~="boolean"and type(data.prompts)=="table"then saved=data.prompts[entry.panel]end;toggle.promptsettings[entry.id]=type(saved)=="boolean"and saved or true end;toggle.setpromptmaster(type(data.prompts)=="table"and data.prompts.master==true,true)
     toggle.applyvisualstyles(data)
-    toggle.espicons={rake=true,players=false,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false};if type(data.esp_icons)=="table"then for _,key in ipairs({"rake","players","crates","flare","traps","scraps"})do toggle.espicons[key]=data.esp_icons[key]==true end;toggle.espicons.locationgroup=data.esp_icons.locationgroup==true;if type(data.esp_icons.locations)=="table"then for i=1,#toggle.locationorder do toggle.espicons.locations[i]=data.esp_icons.locations[i]==true end end end
+    toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false};if type(data.esp_icons)=="table"then for _,key in ipairs({"rake","players","crates","flare","traps","scraps"})do if data.esp_icons[key]~=nil then toggle.espicons[key]=data.esp_icons[key]==true end end;toggle.espicons.locationgroup=data.esp_icons.locationgroup==true;if type(data.esp_icons.locations)=="table"then for i=1,#toggle.locationorder do toggle.espicons.locations[i]=data.esp_icons.locations[i]==true end end end
     toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};if type(data.watermark_elements)=="table"then local e=data.watermark_elements;toggle.watermarkelements.avatar=e.avatar==true;toggle.watermarkelements.displayname=(e.displayname==true or e.username==true);toggle.watermarkelements.title=e.title==true;toggle.watermarkelements.uptime=e.uptime==true end;if data.watermark_schema~=2 and data.watermark==false then toggle.watermarkelements={title=false,avatar=false,displayname=false,uptime=false}end;toggle.syncwatermark()
     if type(data.widget_group)=="table"and data.widget_group.dragged==true then toggle.widgetgroup.dragged=true;if type(data.widget_group.x)=="number"then toggle.widgetgroup.x=data.widget_group.x end;if type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end else toggle.widgetgroup.dragged=false;toggle.widgetgroup.x=nil;if type(data.widget_group)=="table"and type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end end
     if type(data.distance_min)=="number"then toggle.distancemin=math.floor(clamp(data.distance_min,0,100)+0.5)else toggle.distancemin=0 end
@@ -3918,8 +4056,8 @@ toggle.resettheme=function(quiet)
 end
 toggle.resettoggles=function(quiet)
     toggle.resetposteffects()
-    setesp(true,true);sethud(true,true);toggle.applyvisualstyles({visual_style="modern"});toggle.espbackgroundalpha=0.6;toggle.hudbackgroundalpha=0.9;toggle.setnotificationstyle("modern",true);toggle.setnotificationopacity(0.8,true);toggle.espicons={rake=true,players=false,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false};toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};for _,id in ipairs({"timer","target","scrap","power"})do toggle.sethudelement(id,id=="timer",true)end;toggle.watermark=true;toggle.hybridfeatures=false;toggle.hybridmode=true;toggle.unsafeluau=true;toggle.hudlabels=true;toggle.setcontainerstyle("modern",true);toggle.distanceminimum=true;toggle.distancemin=0;toggle.setpoweractivity(false,true);toggle.setpoweractivitymode("activity",true);toggle.cooldownuntil=0;toggle.cooldownremaining=0;toggle.setteleportcooldown(false,true);toggle.setcooldownseconds(10,true);toggle.setnotificationposition("bottom right",true);toggle.setkeybindpanel(false,true);toggle.setworldpanel(false,true);for _,entry in ipairs(toggle.worldorder)do toggle.worldpanelitems[entry.id]=true end;toggle.setnotificationduration(4,true);toggle.setrakenotifydistance(30,true);for _,id in ipairs(toggle.notifyorder)do toggle.notifysettings.types[id]=true end;toggle.setroof(true,true);toggle.setrakename(true,true);toggle.setrakehealth(false,true);toggle.setrakedistance(false,true);toggle.rakenamevalue="rake";toggle.rakedraw.name.Text="rake";toggle.setrakenamey(0,true);setbarrgb(false,true);toggle.setchromaaccent(false,true);toggle.setrgbdirection("right",true);toggle.setrgbspeed(0.6,true);toggle.setchromaspeed(0.6,true);setdistance(false,true);toggle.distancefade=false;toggle.setunit("meters",true);toggle.setdistanceposition("below",true);toggle.setscrapstyle("tiers",true);toggle.setscrapteleport("value",true);toggle.sethighlightscrap(false,true);toggle.setsupplylabel(true,true);toggle.setsupplyitems(true,true);toggle.setringenabled(true,true);toggle.setringshape("circle",true);toggle.setringfade(40,true);toggle.setringopacity(0.6,true);toggle.setringsize(1,true);toggle.setringspin(false,true);toggle.setringspinspeed(1,true);
-    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall","towerBarriers","antiCollide","doorNoCollide","preventIdle"})do toggle.setclient(id,false,true)end;toggle.setautoradio(false,true);toggle.setautoclaimnightvision(false,true);toggle.setautorecover(false,true);toggle.setautosellscrap(false,true);toggle.tracers.selected={};toggle.tracers.opacity=0.8;toggle.tracers.speed=1;toggle.tracers.curve=1;toggle.tracers.drawcurve=1;toggle.autobuyitems.selected={};toggle.autobuyitems.next=0;toggle.autosellitems.selected={};toggle.autosellitems.next=0;toggle.sellenabled=true;toggle.scrapteleportenabled=true;toggle.flareteleportenabled=true;toggle.shop.selected="RakeTrap";toggle.setkillaura(false,true);toggle.setkillaurarange(16,true);toggle.setkillauradelay(0.05,true);toggle.setautoheal(false,true);toggle.setautohealth(50,true);toggle.setautopower(false,true);toggle.setautopowertoolbox(true,true);toggle.playeresp.selected={};toggle.playeresp.stacking=true;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=false;toggle.playeresp.showhealth=false;toggle.playeresp.showdistance=false;toggle.playeresp.background=true;toggle.playeresp.style="modern";toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=150;toggle.rakehealthcoloring=false;toggle.playeresp.healthcoloring=false;toggle.setplayerdistance(150,true);toggle.setplayersesp(true,true);toggle.setzoomamount(8,true);toggle.setthirdperson(false,true);toggle.setshiftlock(false,true);toggle.setinstacrate(false,true);toggle.autocollect.selected={};for i=1,#toggle.promptoptionorder do toggle.promptsettings[toggle.promptoptionorder[i].id]=true end;toggle.setpromptmaster(false,true);for _,entry in ipairs(toggle.accentbarorder)do toggle.accentbars[entry.id]=entry.id=="menu"or entry.id=="hud"or entry.id=="keybinds"end
+    setesp(true,true);sethud(true,true);toggle.applyvisualstyles({visual_style="modern"});toggle.espbackgroundalpha=0.6;toggle.hudbackgroundalpha=0.9;toggle.setnotificationstyle("modern",true);toggle.setnotificationopacity(0.8,true);toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,locations={},locationgroup=false};toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};for _,id in ipairs({"timer","target","scrap","power"})do toggle.sethudelement(id,id=="timer",true)end;toggle.watermark=true;toggle.hybridfeatures=false;toggle.hybridmode=true;toggle.unsafeluau=true;toggle.hudlabels=true;toggle.setcontainerstyle("modern",true);toggle.distanceminimum=true;toggle.distancemin=0;toggle.setpoweractivity(false,true);toggle.setpoweractivitymode("activity",true);toggle.cooldownuntil=0;toggle.cooldownremaining=0;toggle.setteleportcooldown(false,true);toggle.setcooldownseconds(10,true);toggle.setnotificationposition("bottom right",true);toggle.setkeybindpanel(false,true);toggle.setworldpanel(false,true);for _,entry in ipairs(toggle.worldorder)do toggle.worldpanelitems[entry.id]=true end;toggle.setnotificationduration(4,true);toggle.setrakenotifydistance(30,true);for _,id in ipairs(toggle.notifyorder)do toggle.notifysettings.types[id]=true end;toggle.setroof(true,true);toggle.setrakename(true,true);toggle.setrakehealth(false,true);toggle.setrakedistance(false,true);toggle.rakenamevalue="rake";toggle.rakedraw.name.Text="rake";toggle.setrakenamey(0,true);setbarrgb(false,true);toggle.setchromaaccent(false,true);toggle.setrgbdirection("right",true);toggle.setrgbspeed(0.6,true);toggle.setchromaspeed(0.6,true);setdistance(false,true);toggle.distancefade=false;toggle.setunit("meters",true);toggle.setdistanceposition("below",true);toggle.setscrapstyle("tiers",true);toggle.setscrapteleport("value",true);toggle.sethighlightscrap(false,true);toggle.setsupplylabel(true,true);toggle.setsupplyitems(true,true);toggle.setringenabled(true,true);toggle.setringshape("circle",true);toggle.setringfade(40,true);toggle.setringopacity(0.6,true);toggle.setringsize(1,true);toggle.setringspin(false,true);toggle.setringspinspeed(1,true);
+    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall","towerBarriers","antiCollide","doorNoCollide","preventIdle"})do toggle.setclient(id,false,true)end;toggle.setautoradio(false,true);toggle.setautoclaimnightvision(false,true);toggle.setautorecover(false,true);toggle.setautosellscrap(false,true);toggle.tracers.selected={};toggle.tracers.opacity=0.8;toggle.tracers.speed=1;toggle.tracers.curve=1;toggle.tracers.drawcurve=1;toggle.autobuyitems.selected={};toggle.autobuyitems.next=0;toggle.autosellitems.selected={};toggle.autosellitems.next=0;toggle.sellenabled=true;toggle.scrapteleportenabled=true;toggle.flareteleportenabled=true;toggle.shop.selected="RakeTrap";toggle.setkillaura(false,true);toggle.setkillaurarange(16,true);toggle.setkillauradelay(0.05,true);toggle.setautoheal(false,true);toggle.setautohealth(50,true);toggle.setautopower(false,true);toggle.setautopowertoolbox(true,true);toggle.playeresp.selected={};toggle.playeresp.stacking=true;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=false;toggle.playeresp.showhealth=false;toggle.playeresp.showdistance=false;toggle.playeresp.background=true;toggle.playeresp.style="modern";toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=200;toggle.rakehealthcoloring=false;toggle.playeresp.healthcoloring=false;toggle.setplayerdistance(200,true);toggle.setplayersesp(true,true);toggle.setzoomamount(8,true);toggle.setthirdperson(false,true);toggle.setshiftlock(false,true);toggle.setinstacrate(false,true);toggle.autocollect.selected={};for i=1,#toggle.promptoptionorder do toggle.promptsettings[toggle.promptoptionorder[i].id]=true end;toggle.setpromptmaster(false,true);for _,entry in ipairs(toggle.accentbarorder)do toggle.accentbars[entry.id]=entry.id=="menu"or entry.id=="hud"or entry.id=="keybinds"end
     for _,id in ipairs({"locations","scraps","traps","flares","crates"})do setgroup(id,true,true)end;espgroups.rake=true;for id in pairs(espgroups.items)do toggle.setitem(id,true,true)end
     menuupdate();if not quiet then bindlog("reset toggles")end
 end
@@ -3980,7 +4118,7 @@ local function sliderapply(mx,my,quiet)
     elseif inputstate.sliding=="autohealth"then toggle.setautohealth(value,quiet)
     elseif inputstate.sliding=="ringfade"then toggle.setringfade(value,quiet)
     elseif inputstate.sliding=="ringopacity"then toggle.setringopacity(value,quiet)
-    elseif inputstate.sliding=="rakerenderdistance"then toggle.rakerenderdistance=math.floor(clamp(value,10,150)+0.5);menuupdate()
+    elseif inputstate.sliding=="rakerenderdistance"then toggle.rakerenderdistance=toggle.nametagrange(value,false);menuupdate()
     elseif inputstate.sliding=="playerdistance"then toggle.setplayerdistance(value,quiet)
     elseif inputstate.sliding=="ringsize"then toggle.setringsize(value,quiet)
     elseif inputstate.sliding=="ringspinspeed"then toggle.setringspinspeed(value,quiet)
@@ -4084,7 +4222,7 @@ local function clickmenu(mx,my)
     for i=1,#itemlayouts do
         local layout=itemlayouts[i];local item=layout.item
         if item.kind~="section"and toggle.controlhit(layout,mx,my)then
-            if item.id=="shiftlock"or item.disabled then return end
+            if item.disabled then return end
             if item.colorindex and inside(mx,my,layout.colorx,layout.colory,layout.colorw,layout.colorh)then toggle.search.open=false;toggle.search.active=false;pickerentry=item.colorindex;picker.label=item.label;picker.opened=false;picker.hexactive=false;picker.hexreplace=false;picker.hexvalue=toggle.hexof(entrycfg(pickerentry).labelcolor);capture=nil;dropdownkind=nil;menuupdate();return end
             if item.inlinebind and layout.bindx and inside(mx,my,layout.bindx,layout.bindy,layout.bindw,layout.bindh)then capture=item.bind;configcapture=false;dropdownkind=nil;menuupdate();return end
             if toggle.presetcapture and item.id~="presetname"then toggle.finishpresetinput(false)end
@@ -4154,8 +4292,8 @@ toggle.cleanup=function()
     toggle.promptstate.queue={};toggle.promptstate.holding=false;toggle.promptstate.holdid=nil;toggle.promptstate.busy=false
     local state=toggle.instacratestate;state.collectid=(state.collectid or 0)+1;state.request=nil;state.worker=false;state.collecting=false
     toggle.eventstates=setmetatable({},{__mode="k"});toggle.aurastate.parts={};toggle.aurastate.stick=nil;toggle.aurastate.remote=nil;toggle.aurastate.character=nil;toggle.aurastate.rake=nil
-    toggle.restoring=true;pcall(toggle.restorezoom);pcall(toggle.restorevisuals);pcall(toggle.restoreidle);pcall(toggle.cleartracers);pcall(toggle.restoredoors);pcall(toggle.restorecollisions);pcall(toggle.applynofall,false,true);pcall(toggle.applytowerbarriers,false,true);toggle.restoring=false;toggle.releaseclientgc()
-    for d in pairs(toggle.drawregistry)do remove(d)end;toggle.cleardrawingowners();toggle.drawingqueue={};toggle.drawingcursor=1;toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"})
+    toggle.restoring=true;pcall(toggle.restorezoom);pcall(toggle.restoreshiftlock);pcall(toggle.restorevisuals);pcall(toggle.restoreidle);pcall(toggle.cleartracers);pcall(toggle.restoredoors);pcall(toggle.restorecollisions);pcall(toggle.applynofall,false,true);pcall(toggle.applytowerbarriers,false,true);toggle.restoring=false;toggle.releaseclientgc()
+    for d in pairs(toggle.drawregistry)do remove(d)end;toggle.cleardrawingowners();toggle.drawingqueue={};toggle.drawingcursor=1;toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"});toggle.effectlines=setmetatable({},{__mode="k"});toggle.effectlinecount=0;toggle.jobstates={};toggle.iconqueue={head=1,count=0}
 end
 toggle.inputletter=function(code)
     local upper=iskeypressed(0x10)or iskeypressed(0xA0)or iskeypressed(0xA1)
@@ -4213,7 +4351,7 @@ toggle.layoutcrates=function(viewer)
     local state=toggle.instacratestate;local cratebypass=toggle.instacrate and toggle.supplyitems;if not toggle.supplyitems then return end
     for i=1,#tracked do local rec=tracked[i];rec.cratestack=0;if rec.active and rec.cfg.crate and rec.object and rec.object.Parent then
         local meters=dist(viewer,rec.object.Position);if cratebypass and not rec.crateused and meters<=cratedist and meters<state.distance then state.active=rec;state.distance=meters end
-        if meters<=toggle.crateinventorydistance then local screen,on=WorldToScreen(rec.object.Position);rec.cratelayouttime=toggle.frametime;rec.cratescreen=screen;rec.crateonscreen=on;rec.cratemeters=meters end
+        if meters<=toggle.crateinventorydistance then local screen,on=toggle.projectworld(rec.object.Position);rec.cratelayouttime=toggle.frametime;rec.cratescreen=screen;rec.crateonscreen=on;rec.cratemeters=meters end
     end end
     local active=state.active;if active then if not active.folder or not active.folder.Parent then active.folder=itemfolder(active.model)end;local now=toggle.frametime or tick();if active.folder and(not active.itemscache or now-(active.itemcachetime or 0)>=0.08)then toggle.refreshcrateitems(active,now)end;if active.itemscache and(not active.crateselected or toggle.crateunavailable(active,active.itemscache[active.crateselected]))then active.crateselected=toggle.nextcrateitem(active,active.crateselected or 0,1)end end
 end
@@ -4249,6 +4387,7 @@ toggle.orderworlddepth=function()
 end
 toggle.drawesp=function()
     if toggle.viewportvalid==false then return end
+    toggle.captureprojection()
     toggle.hudbackgroundanim=toggle.ease(toggle.hudbackgroundanim or toggle.hudbackgroundalpha,toggle.hudbackgroundalpha,0.24);toggle.espbackgroundalphaanim=toggle.ease(toggle.espbackgroundalphaanim or toggle.espbackgroundalpha,toggle.espbackgroundalpha,0.24);toggle.tracers.frame=toggle.tracers.frame+1
     local viewer=viewpos();local state=toggle.instacratestate;local cratebypass=toggle.instacrate and toggle.supplyitems;state.active=nil;state.distance=math.huge
     if toggle.esp or cratebypass then pcall(toggle.layoutcrates,viewer)end
@@ -4270,7 +4409,16 @@ toggle.updateviewport=function()
     local resized=current~=cam or not toggle.lastviewport or v.X~=toggle.lastviewport.X or v.Y~=toggle.lastviewport.Y;cam=current;toggle.lastviewport=v;toggle.viewportvalid=true
     if resized then pcall(hudpos);pcall(worldpos);pcall(powerpos);pcall(toggle.keybindpos);pcall(menupos);menustate.positionanimating=true end;return true
 end
-toggle.lastviewport=cam.ViewportSize;toggle.viewportvalid=true
+toggle.lastviewport=cam.ViewportSize;toggle.viewportvalid=true;toggle.viewportretry=0
+toggle.jobstates={}
+toggle.runjob=function(callback,...)
+    if not toggle.running or toggle.replacing then return false end
+    local now=tick();local state=toggle.jobstates[callback];if not state then state={busy=false,failures=0,next=0};toggle.jobstates[callback]=state end
+    if state.busy or now<state.next then return false end;state.busy=true
+    local ok,result=pcall(callback,...);state.busy=false
+    if ok then state.failures=0;state.next=0 else state.failures=math.min(7,state.failures+1);state.next=tick()+math.min(5,0.1*2^(state.failures-1))end
+    return ok,result
+end
 toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;if not toggle.running then return end
     while toggle.running do
@@ -4285,7 +4433,7 @@ toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;if not toggle.running then return end
     local nextrake=tick()+1;toggle.wait(scanrate)
     while toggle.running do
-        toggle.scanning=true;pcall(scan);toggle.scanning=false;if not toggle.running or toggle.replacing then break end;local now=tick();if now>=nextrake then pcall(rakeinfo);nextrake=now+1 end
+        toggle.scanning=true;toggle.health.scanstage="scanning";pcall(scan);toggle.scanning=false;toggle.health.scanstage="waiting";if not toggle.running or toggle.replacing then break end;local now=tick();if now>=nextrake then pcall(rakeinfo);nextrake=now+1 end
         toggle.wait(scanrate)
     end
 end)
@@ -4301,10 +4449,10 @@ toggle.worker(function()
 end)
 toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;if not toggle.running then return end
-    local jobs={toggle.runpromptqueue,toggle.applyidle,toggle.applydoors,toggle.applycollisions,toggle.applyclient,toggle.applykillaura,toggle.applyautoheal,toggle.applyautopower,toggle.applyautoradio,toggle.applyautoclaimnightvision,toggle.applyautorecover,toggle.applyautobuyitems,toggle.applyautosellscrap,toggle.applyautosellitems,toggle.applyzoom,toggle.applyvisuals}
+    local jobs={toggle.runpromptqueue,toggle.applyidle,toggle.applydoors,toggle.applycollisions,toggle.applyclient,toggle.applykillaura,toggle.applyautoheal,toggle.applyautopower,toggle.applyautoradio,toggle.applyautoclaimnightvision,toggle.applyautorecover,toggle.applyautobuyitems,toggle.applyautosellscrap,toggle.applyautosellitems,toggle.applyzoom,toggle.applyvisuals,toggle.applyshiftlock}
     while toggle.running do
         local started=tick();local budgetstart=started;local work=0
-        for i=1,#jobs do if not toggle.running then break end;if toggle.viewportvalid~=false or jobs[i]==toggle.applyidle then pcall(jobs[i],false)end;work=work+1;if work>=4 or tick()-budgetstart>=0.002 then toggle.wait();budgetstart=tick();work=0 end end
+        for i=1,#jobs do if not toggle.running then break end;if toggle.viewportvalid~=false or jobs[i]==toggle.applyidle then toggle.health.jobstage=toggle.jobnames[i];toggle.runjob(jobs[i],false);toggle.health.jobstage="waiting"end;work=work+1;if work>=4 or tick()-budgetstart>=0.002 then toggle.wait();budgetstart=tick();work=0 end end
         toggle.wait(math.max(0.001,0.05-(tick()-started)))
     end
 end)
@@ -4312,9 +4460,10 @@ toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;if not toggle.running then return end
     local lastframe=tick()
     while toggle.running do
-        local now=tick();local renderstart=now;if now-lastframe>0.75 then toggle.viewportvalid=false end;toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);lastframe=now;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1;toggle.chromaphase=(now*toggle.chromaspeed)%1
-        if toggle.viewportvalid~=false then if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);pcall(toggle.drawesp);if not toggle.running or toggle.replacing then break end;pcall(drawrgb)end
-        toggle.wait(math.max(0.001,1/144-(tick()-renderstart)))
+        local now=tick();local renderstart=now;toggle.health.renderat=now;toggle.health.frames=toggle.health.frames+1;if now-lastframe>0.75 then toggle.viewportvalid=false end;toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);lastframe=now;if toggle.viewportvalid==false and now>=toggle.viewportretry then toggle.viewportretry=now+0.25;pcall(toggle.updateviewport)end;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1;toggle.chromaphase=(now*toggle.chromaspeed)%1
+        if toggle.viewportvalid~=false then if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;toggle.health.renderstage="terrain";pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);toggle.health.renderstage="ESP";pcall(toggle.drawesp);if not toggle.running or toggle.replacing then break end;toggle.health.renderstage="interface";pcall(drawrgb);toggle.health.renderstage="icons";pcall(toggle.flushicons)end;toggle.health.renderstage="waiting"
+        local elapsed=math.max(0,tick()-renderstart);local interval=1/144
+        toggle.wait(math.max(0.001,interval-elapsed))
     end
 end)
 toggle.loadcustompresets();toggle.updatescraplabels()
@@ -4333,6 +4482,7 @@ end
 toggle.preparestartup=function()
     toggle.preparing=true
     toggle.startupstep(toggle.prefetchcamera)
+    toggle.startupstep(toggle.loadshiftlockoffset,false)
     if toggle.zoom.thirdperson and not toggle.offsetloaded then toggle.startupstep(toggle.loadoffsets,false)end
     toggle.startupstep(toggle.avatarload)
     toggle.startupstep(toggle.loadvisualoffsets,true)
