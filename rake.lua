@@ -21,7 +21,7 @@ if type(_G)=="table"then
 end
 toggle.health={renderat=0,frames=0,renderstage="startup",jobstage="startup",scanstage="startup",nativecall="waiting",nativecreated=0,nativeremoved=0,texturechanges=0}
 toggle.jobnames={"Prompts","Idle Timeout","Doors","Player No-Collide","Client Features","Stun Aura","Auto-Heal","Auto-Power","Auto-Take Radio","Nightvision Claim","Recover Items","Auto-Buy","Sell Scrap","Auto-Sell Items","Camera","Post-Processing","Shift Lock"}
-toggle.version="v3.8"
+toggle.version="v4.0.1"
 toggle.bootpanel={started=tick(),phase=1,draws={},closed=false,widths={}}
 toggle.bootcleanup=function()
     local state=toggle.bootpanel;if not state or state.closed then return end;state.closed=true
@@ -114,7 +114,7 @@ toggle.scanid=0;toggle.scanning=false;toggle.nextpowerread=0;toggle.nextpanelref
 toggle.scrapvalues={12,15,19,23,27};toggle.scrapedit=1;toggle.locationedit=1;toggle.scrapelements={};for i=1,5 do toggle.scrapelements["Scrap"..i]={tiers=true,points=false}end
 toggle.idle={nextsample=0,lastactive=0,busy=false};toggle.tracers={order={"rake","flare","crates","scraps","traps","players","locations","safe spot"},selected={["safe spot"]=true},records={},count=0,frame=0,segments=48,opacity=0.8,speed=1,curve=1,phase=0}
 toggle.clientlabels={noJumpCooldown="no jump cooldown",infiniteStamina="infinite stamina",noFall="no fall damage",towerBarriers="no tower push",antiCollide="player no-collide",doorNoCollide="Door No-Collide",preventIdle="Prevent Idle Timeout"}
-toggle.clientgcnames={"vars","canMove","can_jump","can_jump2","lastJump","handlingSRegen","regeningS","stamina","MAX_STAMINA"}
+toggle.clientgcnames={"vars","canMove","can_jump","can_jump2","lastJump","handlingSRegen","regeningS","stamina","MAX_STAMINA"};toggle.staminagcnames={"stamina","MAX_STAMINA"}
 toggle.clientgc={cache={},bykey={},valid=false,scanning=false,nextapply=0,nextscan=0,scanfailures=0,applyfailures=0,misses=0,recoveries=0,stableat=nil,lastscan=0,character=lp and lp.Character or nil,characterkey=nil,rescanat=nil,maxstamina=100}
 toggle.nofall={size=Vector3.new(100000,100000,100000),originals={},nextapply=0}
 toggle.towerbarriers={originals={},nextapply=0,applied=false,inv=nil,generation=0}
@@ -745,47 +745,85 @@ toggle.applytowerbarriers=function(enabled,force)
 end
 toggle.capturezoom()
 toggle.indexclientgc=function(cache)
-    local indexed={};for i=1,#cache do if i%128==0 then toggle.wait()end;local entry=cache[i];if type(entry)=="table"and type(entry.key)=="string"then local list=indexed[entry.key];if not list then list={};indexed[entry.key]=list end;list[#list+1]=entry end end;toggle.clientgc.bykey=indexed
+    local indexed={};for i=1,#cache do if i%128==0 then toggle.wait()end;local entry=cache[i];if type(entry)=="table"and type(entry.key)=="string"then local list=indexed[entry.key];if not list then list={};indexed[entry.key]=list end;list[#list+1]=entry end end;return indexed
 end
 toggle.compactclientgc=function(cache)
     local compact={};for i=1,#cache do if i%128==0 then toggle.wait()end;local entry=cache[i];if type(entry)=="table"and type(entry.key)=="string"then local keep=entry.key~="vars";if not keep and type(entry.value)=="table"then local vars=entry.value;keep=rawget(vars,"canMove")~=nil or rawget(vars,"can_jump")~=nil or rawget(vars,"can_jump2")~=nil or rawget(vars,"lastJump")~=nil or rawget(vars,"handlingSRegen")~=nil or rawget(vars,"regeningS")~=nil or rawget(vars,"stamina")~=nil or rawget(vars,"MAX_STAMINA")~=nil end;if keep then compact[#compact+1]=entry end end end;return #compact>0 and compact or cache
 end
 toggle.refreshclientgc=function(force)
-    local state=toggle.clientgc;local now=tick();if state.valid and not force then return true end;if state.scanning then return false end;if type(getgc)~="function"then state.rescanat=nil;return false end;if now<(state.nextscan or 0)then return false end
-    state.scanning=true;local ok,cache=pcall(getgc,toggle.clientgcnames)
-    if not ok or type(cache)~="table"then state.scanning=false;state.valid=false;state.scanfailures=(state.scanfailures or 0)+1;state.nextscan=now+math.min(2+state.scanfailures*2,10);state.rescanat=state.scanfailures<3 and state.nextscan or nil;return false end
-    local processed,compact=pcall(toggle.compactclientgc,cache);if not processed then state.scanning=false;state.valid=false;state.rescanat=nil;return false end;cache=compact;state.cache=cache;local indexed=pcall(toggle.indexclientgc,cache);state.scanning=false;if not indexed then state.valid=false;state.rescanat=nil;return false end;state.valid=true;state.character=lp.Character;state.characterkey=toggle.instanceaddress(state.character)or state.character;state.rescanat=nil;state.nextscan=now+2;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.stableat=nil;state.lastscan=now;state.nextapply=0;state.maxstamina=100
+    local state=toggle.clientgc;local now=tick();if state.valid and not force then return true end;if state.scanning or state.retryblocked then return false end;if type(getgc)~="function"then state.rescanat=nil;return false end;if now<(state.nextscan or 0)then return false end
+    state.scanning=true;local fullscan=toggle.client.noJumpCooldown==true;local character=lp.Character;local characterkey=toggle.instanceaddress(character)or character;local ok,cache=pcall(getgc,fullscan and toggle.clientgcnames or toggle.staminagcnames)
+    if not ok or type(cache)~="table"then state.scanning=false;state.valid=false;state.scanfailures=(state.scanfailures or 0)+1;state.nextscan=now+math.min(0.5*2^math.min(state.scanfailures-1,5),10);state.retryblocked=state.scanfailures>=3;state.rescanat=not state.retryblocked and state.nextscan or nil;return false end
+    local processed,compact=pcall(toggle.compactclientgc,cache);if not processed then state.scanning=false;state.valid=false;state.scanfailures=(state.scanfailures or 0)+1;state.nextscan=now+10;state.retryblocked=state.scanfailures>=3;state.rescanat=not state.retryblocked and state.nextscan or nil;return false end;cache=compact;local current=lp.Character;if(toggle.instanceaddress(current)or current)~=characterkey or not toggle.clientneedsgc()then state.scanning=false;state.valid=false;state.nextscan=now;state.rescanat=current and now or nil;return false end;local indexed,bykey=pcall(toggle.indexclientgc,cache);state.scanning=false;if not indexed then state.valid=false;state.scanfailures=(state.scanfailures or 0)+1;state.nextscan=now+10;state.retryblocked=state.scanfailures>=3;state.rescanat=not state.retryblocked and state.nextscan or nil;return false end;local latest=lp.Character;if(toggle.instanceaddress(latest)or latest)~=characterkey or not toggle.clientneedsgc()then state.valid=false;state.nextscan=now;state.rescanat=latest and now or nil;return false end;state.cache=cache;state.bykey=bykey;state.valid=true;state.fullscan=fullscan;state.character=character;state.characterkey=characterkey;state.rescanat=nil;state.nextscan=now+2;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.stableat=nil;state.lastscan=now;state.nextapply=0;state.maxstamina=100
     local maximum=state.bykey.MAX_STAMINA or{};for i=1,#maximum do local value=maximum[i].value;if type(value)=="number"and value>0 then state.maxstamina=value;break end end
     return true
 end
 toggle.recoverclientgc=function(now)
-    local state=toggle.clientgc;state.valid=false;state.cache={};state.bykey={};state.misses=0;state.applyfailures=0;state.stableat=nil;state.recoveries=(state.recoveries or 0)+1;state.rescanat=state.recoveries<=3 and now+math.min(2+state.recoveries*2,8)or nil
+    local state=toggle.clientgc;state.valid=false;state.cache={};state.bykey={};state.misses=0;state.applyfailures=0;state.stableat=nil;state.recoveries=(state.recoveries or 0)+1;state.nextscan=now+math.min(2*state.recoveries,10);state.retryblocked=state.recoveries>3;state.rescanat=not state.retryblocked and state.nextscan or nil
 end
 toggle.clientgcapply=function(values)
-    if type(applygc)~="function"or not toggle.clientgc.valid then return false end
-    local state=toggle.clientgc;local now=tick();if #state.cache==0 then toggle.recoverclientgc(now);return false end;local ok,count=pcall(applygc,state.cache,values)
-    if not ok then state.applyfailures=(state.applyfailures or 0)+1;if state.applyfailures>=3 then toggle.recoverclientgc(now)end;return false end
-    state.applyfailures=0;local wrote=type(count)~="number"or count>0;local expected=false;for key in pairs(values)do local entries=state.bykey[key];if entries and #entries>0 then expected=true;break end end
-    if expected and not wrote then state.misses=(state.misses or 0)+1;if state.misses>=8 and now-(state.lastscan or 0)>=1 then toggle.recoverclientgc(now)end
-    else state.misses=0;if wrote then if not state.stableat then state.stableat=now elseif now-state.stableat>=15 then state.recoveries=0;state.stableat=now end end end
-    return wrote
+    if type(applygc)~="function"or not toggle.clientgc.valid or toggle.clientgc.scanning then return false end
+    local current=lp.Character;if(toggle.instanceaddress(current)or current)~=toggle.clientgc.characterkey then return false end
+    local state=toggle.clientgc;local now=tick();if #state.cache==0 then toggle.recoverclientgc(now);return false end
+    local pending=values;local stamina=values.stamina
+    if stamina~=nil then pending={};for key,value in pairs(values)do if key~="stamina"then pending[key]=value end end end
+    local wrote,failed,missing,staminamissed=false,false,false,false
+    if next(pending)then
+        local ok,count=pcall(applygc,state.cache,pending)
+        failed=not ok;wrote=ok and type(count)=="number"and count>0
+        missing=ok and not wrote
+    end
+    if stamina~=nil then
+        local entries=state.bykey.stamina
+        if entries and #entries>0 then
+            local ok,count=pcall(applygc,entries,"stamina",stamina)
+            local applied=ok and type(count)=="number"and count>0
+            failed=failed or not ok;missing=missing or not applied;staminamissed=not applied;wrote=wrote or applied
+        else missing=true;staminamissed=true end
+    end
+    if failed then state.applyfailures=(state.applyfailures or 0)+1 else state.applyfailures=0 end
+    if missing or failed or not wrote then
+        state.stableat=nil;state.misses=(state.misses or 0)+1
+        if staminamissed or state.applyfailures>=3 or state.misses>=8 and now-(state.lastscan or 0)>=1 then toggle.recoverclientgc(now)end
+        return false
+    end
+    state.misses=0
+    if not state.stableat then state.stableat=now elseif now-state.stableat>=15 then state.recoveries=0;state.stableat=now end
+    return true
 end
 toggle.releaseclientgc=function()
-    local state=toggle.clientgc;state.cache={};state.bykey={};state.valid=false;state.scanning=false;state.rescanat=nil;state.nextapply=0;state.nextscan=0;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.recoveries=0;state.stableat=nil;state.lastscan=0
+    local state=toggle.clientgc;state.cache={};state.bykey={};state.valid=false;state.fullscan=nil;state.retryblocked=false;state.scanning=false;state.rescanat=nil;state.nextapply=0;state.nextscan=0;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.recoveries=0;state.stableat=nil;state.lastscan=0
+end
+toggle.clientgcvalues=function()
+    local values={}
+    if toggle.client.noJumpCooldown then values.canMove=true;values.can_jump=true;values.can_jump2=true;values.lastJump=0;values.handlingSRegen=false;values.regeningS=false end
+    if toggle.client.infiniteStamina then values.stamina=toggle.clientgc.maxstamina or 100 end
+    return values
+end
+toggle.armclientgc=function()
+    local state=toggle.clientgc;local now=tick();state.nextapply=0;state.recoveries=0;state.scanfailures=0;state.retryblocked=false;state.stableat=nil
+    local character=lp.Character;local key=toggle.instanceaddress(character)or character
+    if character and state.valid and not state.scanning and state.characterkey==key and(not toggle.client.noJumpCooldown or state.fullscan)then
+        if toggle.clientgcapply(toggle.clientgcvalues())then return true end
+    end
+    state.valid=false;state.nextscan=now;state.rescanat=character and now or nil
+    return false
 end
 toggle.applyclient=function(rescan)
     if not toggle.anyclient()then return false end
     if toggle.client.noFall or next(toggle.nofall.originals)then toggle.applynofall(toggle.client.noFall,rescan==true)end
     if toggle.client.towerBarriers then toggle.applytowerbarriers(true,rescan==true)end
     if not toggle.clientneedsgc()then return true end
-    local state=toggle.clientgc;local now=tick();local character=lp.Character;local characterkey=toggle.instanceaddress(character)or character
-    if characterkey~=state.characterkey then state.character=character;state.characterkey=characterkey;state.cache={};state.bykey={};state.valid=false;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.recoveries=0;state.stableat=nil;state.rescanat=character and math.max(now+1,state.nextscan or 0)or nil end
+    local state=toggle.clientgc;if state.scanning then return false end;local now=tick();local character=lp.Character;local characterkey=toggle.instanceaddress(character)or character
+    if characterkey~=state.characterkey then state.character=character;state.characterkey=characterkey;state.cache={};state.bykey={};state.valid=false;state.scanfailures=0;state.applyfailures=0;state.misses=0;state.recoveries=0;state.retryblocked=false;state.stableat=nil;state.nextscan=now;state.rescanat=character and now or nil end
+    if not character then return false end
+    if not state.valid and not state.rescanat and not state.scanning and not state.retryblocked then state.rescanat=math.max(now,state.nextscan or 0)end
+    if toggle.client.noJumpCooldown and state.valid and not state.fullscan then state.valid=false;state.nextscan=now;state.rescanat=now end
     if not rescan and now<(state.nextapply or 0)then return true end;state.nextapply=now+0.05
     if rescan==true then if not toggle.refreshclientgc(true)then return false end
     elseif not state.valid then if state.rescanat and character and now>=state.rescanat then if not toggle.refreshclientgc(true)then return false end else return true end end
-    local values={}
-    if toggle.client.noJumpCooldown then values.canMove=true;values.can_jump=true;values.can_jump2=true;values.lastJump=0;values.handlingSRegen=false;values.regeningS=false end
-    if toggle.client.infiniteStamina then values.stamina=state.maxstamina end
+    if toggle.client.noJumpCooldown and not state.fullscan then state.valid=false;state.nextscan=now;state.rescanat=now;return false end
+    local values=toggle.clientgcvalues()
     if next(values)~=nil then toggle.clientgcapply(values)end
     local variables=state.bykey.vars or{};for i=1,#variables do local vars=variables[i].value;if type(vars)=="table"then pcall(function()
         if toggle.client.noJumpCooldown then vars.canMove=true;vars.can_jump=true;vars.can_jump2=true;vars.lastJump=0;vars.handlingSRegen=false;vars.regeningS=false end
@@ -2156,7 +2194,7 @@ local function menupos()
         advances[i]=toggle.rowheight(item)*(item.widgetphase or 1)+(last and sectiongap+sectionpadding*(item.kind=="section"and(item.openphase or 1)or(item.widgetphase or 1))or 0);natural[col]=natural[col]+advances[i]
     end
     for col=1,2 do local total=0;for i=#menuitems,1,-1 do if(compact and 1 or menuitems[i].col or 1)==col then total=total+advances[i];if menuitems[i].kind=="section"then groups[i]=total;total=0 end end end end
-    local viewport=math.max(0,clipbottom-cliptop);local content=menustate.tab==4 and toggle.browsercontentheight()or math.max(natural[1],natural[2]);local maxscroll=math.max(0,content-viewport)
+    local viewport=math.max(0,clipbottom-cliptop);local content=menustate.tab==4 and viewport or math.max(natural[1],natural[2]);local maxscroll=math.max(0,content-viewport)
     menustate.scrollmax[menustate.tab]=maxscroll;menustate.scrolltarget[menustate.tab]=clamp(menustate.scrolltarget[menustate.tab]or 0,0,maxscroll)
     local targetscroll=menustate.scrolltarget[menustate.tab];local scroll=toggle.scrollgrabbing and targetscroll or toggle.ease(menustate.scroll[menustate.tab]or targetscroll,targetscroll,0.40);menustate.scroll[menustate.tab]=scroll
     if math.abs(scroll-targetscroll)>0.001 then menustate.positionanimating=true end
@@ -2353,7 +2391,7 @@ local function menuobjects(visible)
     if not expanded then local preview=toggle.presetpreviews.selected;if preview then toggle.setvisible(preview.image,false)end end
     toggle.setvisible(menubg,visible);toggle.setvisible(menutop,false);toggle.setvisible(menuchrome.border,visible);toggle.setvisible(menutitle,visible and(menustate.minimized and toggle.watermarkelements.title or not menustate.minimized and toggle.visualstyle~="compact"));toggle.setvisible(menuclose,visible)
     toggle.setvisible(menuside,expanded);toggle.setvisible(menuchrome.content,false);toggle.setvisible(menuchrome.divider,false)
-    local canscroll=expanded and(menustate.scrollmax[menustate.tab]or 0)>0
+    local canscroll=expanded and menustate.tab~=4 and(menustate.scrollmax[menustate.tab]or 0)>0
     toggle.setvisible(menuchrome.scrolltrack,canscroll);toggle.setvisible(menuchrome.scrollthumb,canscroll);toggle.setvisible(menuchrome.scrollborder,false)
     for i=1,2 do toggle.setvisible(menuchrome.columns[i],false);toggle.setvisible(menuchrome.columnborders[i],false);toggle.setvisible(toggle.uimodern.buttons[i],visible and(i==2 or expanded))end
     for i=1,#tabnames do toggle.setvisible(tabbg[i],expanded);toggle.setvisible(tabborder[i],expanded and(toggle.tabselectanim[i]or 0)>0.002);toggle.setvisible(tabtext[i],expanded and(toggle.tablabelanim[i]or 0)>0.001);if not expanded then toggle.setvisible(toggle.tabicons[i],false)end end
@@ -2433,6 +2471,75 @@ toggle.browserwrap=function(value,width)
     end
     lines[#lines+1]=line;return lines
 end
+toggle.browserscrollstate=function(key)
+    local p=toggle.playerbrowser;p.scrolls=p.scrolls or{}
+    local state=p.scrolls[key];if not state then state={value=0,target=0,max=0};p.scrolls[key]=state end
+    return state
+end
+toggle.browserpanes=function()
+    local p=toggle.playerbrowser;local compact=toggle.visualstyle=="compact";local left=menustate.x+(compact and 8 or 18);local top=menustate.y+menustate.bodytop
+    local _,displayh=displaysize();local bottom=math.max(top,math.min(menustate.y+menustate.h,menustate.y+displayh)-(menustate.footerheight or 26))
+    local gap=compact and 10 or 14;local width=compact and menustate.w-16 or(menustate.w-36-gap)/2
+    return {list={x=left,y=top+52,w=width,h=math.max(0,bottom-top-52),on=not compact or not p.detailopen},detail={x=compact and left or left+width+gap,y=top+(compact and 42 or 0),w=width,h=math.max(0,bottom-top-(compact and 42 or 0)),on=not compact or p.detailopen}}
+end
+toggle.browserupdatescrolls=function()
+    local p=toggle.playerbrowser;local panes=toggle.browserpanes();local rows=p.view=="List"and #p.list or math.ceil(#p.list/2)
+    for _,key in ipairs({"list","detail"})do
+        local state=toggle.browserscrollstate(key);local pane=panes[key];local content=key=="list"and 10+rows*(p.pitch or(p.view=="List"and 60 or 122))or(p.detailheight or 300)+(toggle.visualstyle=="compact"and -10 or 0)
+        state.max=math.max(0,content-pane.h);state.target=clamp(state.target,0,state.max)
+        local grab=toggle.playerbrowser.scrollgrab
+        state.value=grab and grab.key==key and state.target or toggle.ease(state.value,state.target,0.40)
+        state.value=clamp(state.value,0,state.max);if math.abs(state.value-state.target)<0.01 then state.value=state.target end
+    end
+end
+toggle.browserpaneat=function(x,y)
+    if menustate.tab~=4 or menustate.minimized then return nil end
+    for key,pane in pairs(toggle.browserpanes())do if pane.on and inside(x,y,pane.x,pane.y,pane.w,pane.h)then return key end end
+end
+toggle.browserwheel=function(x,y,wheel)
+    local key=toggle.browserpaneat(x,y);if not key then return false end
+    local state=toggle.browserscrollstate(key);state.target=clamp(state.target+wheel*58,0,state.max);return true
+end
+toggle.browserbegindrag=function(x,y)
+    local key=toggle.browserpaneat(x,y);if not key then return false end
+    local state=toggle.browserscrollstate(key);if state.max<=0 then return false end
+    toggle.playerbrowser.scrollgrab={key=key,mode="content",y=y,start=state.target};return true
+end
+toggle.browserbarpress=function(x,y)
+    if menustate.tab~=4 or menustate.minimized then return false end
+    for key,bar in pairs(toggle.playerbrowser.bars or{})do
+        if inside(x,y,bar.x-7,bar.tracky,17,bar.trackh)then
+            local state=toggle.browserscrollstate(key)
+            if not inside(x,y,bar.x-7,bar.y,17,bar.h)then state.target=clamp((y-bar.tracky-bar.h/2)/math.max(1,bar.trackh-bar.h)*state.max,0,state.max)end
+            toggle.playerbrowser.scrollgrab={key=key,mode="thumb",y=y,start=state.target,travel=math.max(1,bar.trackh-bar.h)};return true
+        end
+    end
+    return false
+end
+toggle.browserdrag=function(y,down)
+    local grab=toggle.playerbrowser.scrollgrab;if not grab then return end
+    if not down or menustate.tab~=4 or menustate.minimized then toggle.playerbrowser.scrollgrab=nil;return end
+    local pane=toggle.browserpanes()[grab.key];if not pane.on then toggle.playerbrowser.scrollgrab=nil;return end
+    local state=toggle.browserscrollstate(grab.key);local delta=(y-grab.y)*menustate.dragsensitivity
+    state.target=clamp(grab.start+(grab.mode=="content"and -delta or delta/math.max(1,grab.travel)*state.max),0,state.max)
+end
+toggle.paintbrowserscrollbars=function(alpha,used)
+    local p=toggle.playerbrowser;p.bars={}
+    if menustate.tab~=4 or menustate.minimized or alpha<=0.001 then return end
+    p.scrollui=p.scrollui or{}
+    for key,pane in pairs(toggle.browserpanes())do
+        local state=toggle.browserscrollstate(key)
+        if pane.on and pane.h>0 and state.max>0 then
+            local ui=p.scrollui[key];if not ui then ui={track=toggle.browserdrawing("square"),thumb=toggle.browserdrawing("square")};p.scrollui[key]=ui;setz(ui.track,124);setz(ui.thumb,124)end
+            local h=math.min(pane.h,math.max(32,pane.h*pane.h/(pane.h+state.max)));local x=pane.x+pane.w-6;local y=pane.y+(pane.h-h)*state.value/state.max
+            for _,entry in ipairs({{ui.track,pane.y,pane.h,0.12},{ui.thumb,y,h,0.6}})do
+                local d=entry[1];toggle.setpos(d,x,entry[2]);toggle.setprop(d,"Size",Vector2.new(3,entry[3]));toggle.setprop(d,"Corner",math.min(2,toggle.borderradius));toggle.setprop(d,"Color",color("muted"));toggle.setprop(d,"Transparency",alpha*menuopacity*entry[4]);toggle.setvisible(d,true);used[d]=true
+            end
+            p.bars[key]={x=x,y=y,h=h,tracky=pane.y,trackh=pane.h}
+        end
+    end
+end
+
 toggle.browsercontentheight=function()
     if toggle.visualstyle=="compact"and toggle.playerbrowser.detailopen then return (toggle.playerbrowser.detailheight or 300)+32 end
     local p=toggle.playerbrowser;return 68+(p.view=="List"and #p.list or math.ceil(#p.list/2))*(p.pitch or(p.view=="List"and 60 or 122))
@@ -2440,17 +2547,19 @@ end
 toggle.playerbrowserhit=function(x,y)
     if menustate.tab~=4 or menustate.minimized then return false end
     local p=toggle.playerbrowser
+    if toggle.browserbarpress(x,y)then return true end
     if p.viewhit and inside(x,y,p.viewhit.x,p.viewhit.y,p.viewhit.w,p.viewhit.h)then
         if dropdownkind=="rosterview"then dropdownkind=nil else dropdownkind="rosterview"end
         dropdown.opened=false;return true
     end
-    if toggle.playerbrowser.returnhit then local h=toggle.playerbrowser.returnhit;if inside(x,y,h.x,h.y,h.w,h.h)then toggle.playerbrowser.detailopen=false;menustate.scrolltarget[4]=toggle.playerbrowser.gridscroll or 0;return true end end
-    for _,hit in ipairs(toggle.playerbrowser.hits)do if inside(x,y,hit.x,hit.y,hit.w,hit.h)then toggle.playerbrowser.selected=hit.id;toggle.playerbrowser.next=0;toggle.playerbrowser.detailphase=0;toggle.playerbrowser.detailopen=true;menustate.positionanimating=true;menustate.itemsdirty=true;toggle.playerbrowser.gridscroll=menustate.scrolltarget[4]or 0;if toggle.visualstyle=="compact"then menustate.scrolltarget[4]=0 end;return true end end
+    if toggle.playerbrowser.returnhit then local h=toggle.playerbrowser.returnhit;if inside(x,y,h.x,h.y,h.w,h.h)then toggle.playerbrowser.detailopen=false;toggle.playerbrowser.scrollgrab=nil;return true end end
+    for _,hit in ipairs(toggle.playerbrowser.hits)do if inside(x,y,hit.x,hit.y,hit.w,hit.h)then toggle.playerbrowser.selected=hit.id;toggle.playerbrowser.next=0;toggle.playerbrowser.detailphase=0;toggle.playerbrowser.detailopen=true;menustate.positionanimating=true;menustate.itemsdirty=true;local detail=toggle.browserscrollstate("detail");detail.value=0;detail.target=0;toggle.playerbrowser.scrollgrab=nil;return true end end
     return false
 end
 toggle.paintplayerbrowser=function(alpha)
     local p=toggle.playerbrowser;p.hits={};p.returnhit=nil;p.viewhit=nil;p.viewsource=nil;local useddraws={}
     local function finish()
+        toggle.paintbrowserscrollbars(alpha,useddraws)
         for _,d in ipairs(p.draws)do if not useddraws[d]then toggle.setvisible(d,false)end end
         for d in pairs(p.profiledraws)do if toggle.removeddraw[d]then p.profiledraws[d]=nil;p.avatarowners[d]=nil elseif not useddraws[d]then toggle.setvisible(d,false)end end
     end
@@ -2468,7 +2577,7 @@ toggle.paintplayerbrowser=function(alpha)
     local function smooth(t)t=clamp(t,0,1);return t*t*(3-2*t)end
     local function elementfade(y,h)
         if not fadinggrid and not fadingdetails then return 1 end
-        local scroll=menustate.scroll[4]or 0;local maxscroll=math.max(0,(fadinggrid and 16+(p.view=="List"and #p.list or math.ceil(#p.list/2))*(p.pitch or 122)or(p.detailheight or 300)+32)-(bottom-cliptop))
+        local state=toggle.browserscrollstate(fadinggrid and "list"or"detail");local scroll=state.value;local maxscroll=state.max
         local band=40
         local upper=1-(1-smooth((y-cliptop)/band))*smooth(scroll/band)
         local lower=1-(1-smooth((bottom-y-h)/band))*smooth((maxscroll-scroll)/band)
@@ -2500,14 +2609,14 @@ toggle.paintplayerbrowser=function(alpha)
     setz(p.left,119);setz(p.right,119)
     if grid then box(p.left,left,top,width,bottom-top,surface,1)end;if details then box(p.right,right,top,width,bottom-top,surface,1)end
     local originalclip=cliptop;local rostertop=top+52;local listmode=p.view=="List"
-    local scroll=math.floor((menustate.scroll[4]or 0)*2+0.5)/2;local cardw=listmode and width-pad*2 or(width-pad*2-8)/2
+    local scroll=0;local cardw=listmode and width-pad*2 or(width-pad*2-8)/2
     local thumbh=cardw-2;local textrows=2
     for _,rec in ipairs(p.list)do
         local signature=p.view..":"..tostring(cardw)..":"..(rec.displayname or rec.username)..":"..rec.username
         if rec.browserwrapkey~=signature then rec.browserwrapkey=signature;rec.browsernames=toggle.browserwrap(listmode and(rec.displayname or rec.username)or toggle.browsergridname(rec.displayname or rec.username),cardw-(listmode and 64 or 14));rec.browserusers=toggle.browserwrap("@"..(listmode and rec.username or toggle.browsergridname(rec.username)),cardw-(listmode and 64 or 14))end
         textrows=math.max(textrows,#rec.browsernames+#rec.browserusers)
     end
-    local cardh=listmode and math.max(54,textrows*16+16)or thumbh+textrows*16+8;local pitch=cardh+(listmode and 6 or 8);if p.pitch~=pitch then menustate.positionanimating=true end;p.pitch=pitch
+    local cardh=listmode and math.max(54,textrows*16+16)or thumbh+textrows*16+8;local pitch=cardh+(listmode and 6 or 8);if p.pitch~=pitch then menustate.positionanimating=true end;p.pitch=pitch;toggle.browserupdatescrolls();scroll=math.floor(toggle.browserscrollstate("list").value*2+0.5)/2
     local basealpha=alpha;local gray=Color3.fromRGB(52,52,56)
     cliptop=rostertop;fadinggrid=true;local slot=0;for i,rec in ipairs(p.list)do
         local x=left+pad+(listmode and 0 or((i-1)%2)*(cardw+8));local y=rostertop+10+(listmode and(i-1)or math.floor((i-1)/2))*pitch-scroll
@@ -2549,7 +2658,7 @@ toggle.paintplayerbrowser=function(alpha)
         toggle.setprop(ui.arrow,"Color",opened and accent or muted);toggle.setprop(ui.arrow,"Transparency",alpha);toggle.setvisible(ui.arrow,true);useddraws[ui.arrow]=true
         p.viewhit={x=vx,y=vy,w=vw,h=vh};p.viewsource={x=vx-14,y=vy,w=vw+28,h=vh+6,visible=true}
     elseif dropdownkind=="rosterview"then dropdownkind=nil end
-    fadingdetails=compact and details
+    fadingdetails=details
     if not details then toggle.browserreleaseitems();finish();return end
     alpha=alpha*p.detailphase;local detailoffset=(1-p.detailphase)*8
     local rec=p.owner
@@ -2559,7 +2668,7 @@ toggle.paintplayerbrowser=function(alpha)
         box(p.backbg,right+12,top+8,30,30,toggle.colormix(color("bg"),ink,0.06),0.85)
         toggle.seticon(p.backicon,"chevron-large-left",right+19,top+15,16,ink,alpha,true);useddraws[p.backicon]=true;p.returnhit={x=right+8,y=top+4,w=38,h=38}
     end
-    local cx=right+width/2;top=top+(compact and 32-scroll or 0)+detailoffset;if compact then cliptop=cliptop+42 end
+    local cx=right+width/2;top=top+(compact and 32 or 0)-toggle.browserscrollstate("detail").value+detailoffset;if compact then cliptop=cliptop+42 end
     local avatarx=right+12;local avatarsize=64
     setz(p.detail.avatarbg,121);box(p.detail.avatarbg,avatarx,top+18,avatarsize,avatarsize,gray,0.95,false,avatarsize/2)
     avatar(p.detail.avatar,rec,avatarx,top+18,avatarsize,avatarsize,false)
@@ -3136,7 +3245,12 @@ toggle.iconenabled=function(rec)
 end
 toggle.worldlabelicon=function(rec)
     if toggle.istargetscrap(rec)then return"crosshairs"end
-    local group=rec.cfg.group;if rec.cfg.crate then return"gift-box"elseif group=="scraps"then return"tag"elseif group=="flares"then return"flame"elseif group=="traps"then return"shield-check"else return"location-pin"end
+    local group=rec.cfg.group;if rec.cfg.crate then return"gift-box"elseif group=="scraps"then return"gear"elseif group=="flares"then return"flame"elseif group=="traps"then return"shield-check"else return"location-pin"end
+end
+toggle.scraplabelparts=function(rec)
+    local tier=tonumber((rec.cfgname or ""):match("^Scrap(%d)$"));local elements=tier and toggle.scrapelements[rec.cfgname]
+    if not elements then return toggle.uititle(rec.cfg.text),nil end
+    return "Scrap"..(elements.tiers and " "..tier or ""),elements.points and tostring(toggle.scrapvalues[tier])or nil
 end
 toggle.placeworldlabel=function(rec,x,y,w,h)return x,y end
 toggle.worldlabelobjects=function(rec)
@@ -3146,6 +3260,12 @@ toggle.worldlabelobjects=function(rec)
         if(toggle.distance or(rec.labeldistanceanim or 0)>0.01)and(not rec.distancebg or toggle.removeddraw[rec.distancebg])then rec.distancebg=setz(newsquare(color("bg"),1),z);rec.distanceborder=setz(newborder(color("outline"),1),z+0.1);allocated=true end
     end
     if toggle.iconenabled(rec)and(not rec.labelicon or toggle.removeddraw[rec.labelicon])then rec.labelicon=toggle.newicon(z+1);allocated=true end
+    local _,points=toggle.scraplabelparts(rec)
+    if points then
+        if not rec.pointstext or toggle.removeddraw[rec.pointstext]then rec.pointstext=setz(toggle.esptext("",rec.cfg.labelcolor,true,false,true),z+1);allocated=true end
+        if toggle.espicons.scraps and(not rec.pointsicon or toggle.removeddraw[rec.pointsicon])then rec.pointsicon=toggle.newicon(z+1);allocated=true end
+        if toggle.espbackgroundopacity(toggle.espvisualstyle)>0.001 and(not rec.pointsbg or toggle.removeddraw[rec.pointsbg])then rec.pointsbg=setz(newsquare(color("bg"),1),z);rec.pointsborder=setz(newborder(color("outline"),1),z+0.1);allocated=true end
+    end
     if allocated and rec.worldz then toggle.depthworld(rec,rec.worldz)end
 end
 toggle.setbackgroundshine=function(value,quiet)
@@ -3201,16 +3321,21 @@ end
 toggle.paintworldlabel=function(rec,screen,meters,wanted)
     rec.labelanim=toggle.ease(rec.labelanim or 0,wanted and 1 or 0,wanted and 0.18 or 0.65)
     if screen then rec.labelscreen=screen end;screen=screen or rec.labelscreen;local alpha=rec.labelanim
-    if not screen or alpha<=0.01 then for _,d in pairs({rec.name,rec.distance,rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon})do toggle.setvisible(d,false)end;return end
+    if not screen or alpha<=0.01 then for _,d in pairs({rec.name,rec.distance,rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon,rec.pointstext,rec.pointsicon,rec.pointsbg,rec.pointsborder})do toggle.setvisible(d,false)end;return end
     toggle.worldlabelobjects(rec);makelabels(rec)
     rec.scrapmarkanim=toggle.ease(rec.scrapmarkanim or 0,toggle.istargetscrap(rec)and 1 or 0,0.18)
-    local minimal=toggle.espvisualstyle=="compact";local pad=minimal and 9 or 11;local tint=rec.cfg.rgb and rgb(0)or rec.cfg.labelcolor;local label=toggle.uititle(rec.cfg.text);local textw=toggle.espwidth(label);local height=toggle.esplineheight+(minimal and 12 or 18);local icons=toggle.iconenabled(rec);local iconw=icons and 21 or 0;local width=textw+pad*2+iconw;local x=screen.X-width/2;local y=screen.Y+2+(rec.cfg.textyoffset or 0)-(height-toggle.esplineheight)/2+(1-alpha)*4;local groupdistance=toggle.distance and meters>=toggle.distancemin or(rec.labeldistanceanim or 0)>0.01;local groupheight=height+(groupdistance and height+(minimal and 3 or 4)or 0);local above=groupdistance and toggle.distanceposition=="above"and groupheight-height or 0
-    local groupwidth=math.max(width,groupdistance and toggle.espwidth(tostring(math.floor(meters)).."m")+pad*2+(toggle.espicons.distance and 18 or 0)or 0);local groupx=screen.X-groupwidth/2;local _,placed=toggle.placeworldlabel(rec,groupx,y-above,groupwidth,groupheight);y=placed;y=y+above;local fill=alpha*toggle.espbackgroundopacity(toggle.espvisualstyle)
+    local minimal=toggle.espvisualstyle=="compact";local pad=minimal and 9 or 11;local tint=rec.cfg.rgb and rgb(0)or rec.cfg.labelcolor;local label,points=toggle.scraplabelparts(rec);local pointsicons=points and toggle.espicons.scraps;local pointsw=points and(toggle.espwidth(points)+pad*2+(pointsicons and 21 or 0))or 0;local pointsgap=points and(minimal and 3 or 4)or 0;local textw=toggle.espwidth(label);local height=toggle.esplineheight+(minimal and 12 or 18);local icons=toggle.iconenabled(rec);local iconw=icons and 21 or 0;local width=textw+pad*2+iconw;local totalwidth=width+pointsgap+pointsw;local x=screen.X-totalwidth/2;local y=screen.Y+2+(rec.cfg.textyoffset or 0)-(height-toggle.esplineheight)/2+(1-alpha)*4;local groupdistance=toggle.distance and meters>=toggle.distancemin or(rec.labeldistanceanim or 0)>0.01;local groupheight=height+(groupdistance and height+(minimal and 3 or 4)or 0);local above=groupdistance and toggle.distanceposition=="above"and groupheight-height or 0
+    local groupwidth=math.max(totalwidth,groupdistance and toggle.espwidth(tostring(math.floor(meters)).."m")+pad*2+(toggle.espicons.distance and 18 or 0)or 0);local groupx=screen.X-groupwidth/2;local _,placed=toggle.placeworldlabel(rec,groupx,y-above,groupwidth,groupheight);y=placed;y=y+above;local fill=alpha*toggle.espbackgroundopacity(toggle.espvisualstyle)
     local surfaceson=toggle.espbackgroundopacity(toggle.espvisualstyle)>0.01
-    toggle.paintespsurface(rec.labelbg,x,y,width,height,toggle.colormix(toggle.visualsurface(tint),tint,0.14*rec.scrapmarkanim),fill,surfaceson)
-    toggle.paintespsurface(rec.labelborder,x,y,width,height,toggle.colormix(color("outline"),tint,0.2+0.35*rec.scrapmarkanim),fill*(0.17+0.2*rec.scrapmarkanim),surfaceson)
+    toggle.paintespsurface(rec.labelbg,x,y,minimal and totalwidth or width,height,toggle.colormix(toggle.visualsurface(tint),tint,0.14*rec.scrapmarkanim),fill,surfaceson)
+    toggle.paintespsurface(rec.labelborder,x,y,minimal and totalwidth or width,height,toggle.colormix(color("outline"),tint,0.2+0.35*rec.scrapmarkanim),fill*(0.17+0.2*rec.scrapmarkanim),surfaceson)
     toggle.seticon(rec.labelicon,toggle.worldlabelicon(rec),x+pad,y+(height-14)/2,14,tint,alpha,icons and alpha>0.01)
-    toggle.setprop(rec.name,"Text",label);toggle.setprop(rec.name,"Size",espfontsize);toggle.centertext(rec.name,icons and x+pad+iconw+textw/2 or screen.X,y+height/2);toggle.setprop(rec.name,"Color",tint);toggle.setprop(rec.name,"Transparency",alpha);toggle.applyespoutline(rec.name,alpha,tint);toggle.setvisible(rec.name,true)
+    toggle.setprop(rec.name,"Text",label);toggle.setprop(rec.name,"Size",espfontsize);toggle.centertext(rec.name,x+pad+iconw+textw/2,y+height/2);toggle.setprop(rec.name,"Color",tint);toggle.setprop(rec.name,"Transparency",alpha);toggle.applyespoutline(rec.name,alpha,tint);toggle.setvisible(rec.name,true)
+    local px=x+width+pointsgap
+    toggle.paintespsurface(rec.pointsbg,px,y,pointsw,height,toggle.visualsurface(tint),fill,surfaceson and points~=nil and not minimal)
+    toggle.paintespsurface(rec.pointsborder,px,y,pointsw,height,color("outline"),fill*0.17,surfaceson and points~=nil and not minimal)
+    if rec.pointstext then toggle.setprop(rec.pointstext,"Text",points or "");toggle.setprop(rec.pointstext,"Size",espfontsize);toggle.setprop(rec.pointstext,"Color",tint);toggle.setprop(rec.pointstext,"Transparency",alpha);toggle.centertext(rec.pointstext,px+pointsw/2+(pointsicons and 10.5 or 0),y+height/2);toggle.applyespoutline(rec.pointstext,alpha,tint);toggle.setvisible(rec.pointstext,points~=nil)end
+    toggle.seticon(rec.pointsicon,"tag",px+pad,y+(height-14)/2,14,tint,alpha,pointsicons and alpha>0.01)
     local distanceon=wanted and toggle.distance and meters>=toggle.distancemin;rec.labeldistanceanim=toggle.ease(rec.labeldistanceanim or 0,distanceon and 1 or 0,0.18);local da=alpha*rec.labeldistanceanim;local text=tostring(math.floor(meters)).."m";local di=toggle.espicons.distance and 18 or 0;local dw=toggle.espwidth(text)+pad*2+di;local dy=toggle.distanceposition=="above"and y-height-(minimal and 3 or 4)or y+height+(minimal and 3 or 4);local dtint=toggle.distancestyle.rgb and rgb(0)or toggle.distancestyle.labelcolor
     local distancefill=da*toggle.espbackgroundopacity(toggle.espvisualstyle)
     toggle.paintespsurface(rec.distancebg,screen.X-dw/2,dy,dw,height,toggle.visualsurface(dtint),distancefill,surfaceson and da>0.01)
@@ -3233,12 +3358,12 @@ end
 local function hiderec(rec)
     if rec.itempictures then for i,d in pairs(rec.itempictures)do toggle.releaseitemimage(d);rec.itempictures[i]=nil end end
     if rec.hidden then return end;rec.hidden=true;rec.inventoryvisible=false
-    hide(rec.name);hide(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon})do hide(d)end;hidering(rec);hide(rec.bg);hide(rec.bgouter);hide(rec.bgmiddle);hide(rec.bginner);hide(rec.take);hide(rec.crateheadbg);hide(rec.crateheadborder);hide(rec.cratetitle);hide(rec.crategift);hide(rec.takekey)
+    hide(rec.name);hide(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon,rec.pointstext,rec.pointsicon,rec.pointsbg,rec.pointsborder})do hide(d)end;hidering(rec);hide(rec.bg);hide(rec.bgouter);hide(rec.bgmiddle);hide(rec.bginner);hide(rec.take);hide(rec.crateheadbg);hide(rec.crateheadborder);hide(rec.cratetitle);hide(rec.crategift);hide(rec.takekey)
     if rec.items then for i=1,#rec.items do hide(rec.items[i]);hide(rec.status and rec.status[i])end end
 end
 local function removerec(rec)
     if rec.itempictures then for _,d in pairs(rec.itempictures)do toggle.releaseitemimage(d)end;rec.itempictures=nil end
-    remove(rec.name);remove(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon})do remove(d)end;
+    remove(rec.name);remove(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon,rec.pointstext,rec.pointsicon,rec.pointsbg,rec.pointsborder})do remove(d)end;
     toggle.releasering(rec)
     remove(rec.bg);remove(rec.bgouter);remove(rec.bgmiddle);remove(rec.bginner);remove(rec.take);remove(rec.crateheadbg);remove(rec.crateheadborder);remove(rec.cratetitle);remove(rec.crategift);remove(rec.takekey)
     if rec.items then for i=1,#rec.items do remove(rec.items[i]);remove(rec.status and rec.status[i])end end
@@ -3648,7 +3773,7 @@ end
 toggle.healthtint=function(ratio,above)return above and Color3.fromHex("#9ccfff")or Color3.fromHSV(clamp(ratio,0,1)/3,0.45,1)end
 toggle.playerprops=setmetatable({},{__mode="k"})
 toggle.playerprop=function(d,key,value)
-    if not d or toggle.removeddraw[d]then return end;local meta=toggle.textroles[d];if meta then if key=="Font"then value=meta.preview or toggle.fontvalue(meta.role)elseif key=="Size"and type(value)=="number"then meta.size=value end end;local props=toggle.playerprops[d];if not props then props={};toggle.playerprops[d]=props end;local old=props[key];local same=old==value
+    if not d or toggle.removeddraw[d]then return end;if key=="Visible"then toggle.setvisible(d,value);return end;local meta=toggle.textroles[d];if meta then if key=="Font"then value=meta.preview or toggle.fontvalue(meta.role)elseif key=="Size"and type(value)=="number"then meta.size=value end end;local props=toggle.playerprops[d];if not props then props={};toggle.playerprops[d]=props end;local old=props[key];local same=old==value
     if not same and old and value then if key=="Color"then same=math.abs(old.R-value.R)<0.00001 and math.abs(old.G-value.G)<0.00001 and math.abs(old.B-value.B)<0.00001 elseif key=="Position"or key=="Size"and typeof(value)=="Vector2"then same=typeof(old)=="Vector2"and old.X==value.X and old.Y==value.Y end end
     if not same then d[key]=value;props[key]=value end;if key=="Color"then toggle.drawcolors[d]=value end
 end
@@ -3827,10 +3952,10 @@ toggle.paintplayer=function(entry)
     for i=1,#rec.frames do local entry=rec.frames[i];local d,inset,detail,kind=entry[1],entry[2],entry[3],entry[4];local pane=kind and rec[kind.."pane"];local framew=detail and rec.detailw or kind=="health"and rec.healthw or kind=="distance"and rec.distancepanelw or kind=="scrap"and(rec.scrapw or 0)or rec.namew;local groupx=x+(w-rec.headerw)/2;local framex=detail and(rec.rake and statuscx-framew/2 or x+(w-framew)/2)or groupx+(kind=="health"and rec.healthx or kind=="distance"and 0 or kind=="scrap"and(rec.scrapx or 0)or rec.namex);local framey=y+(detail and rec.detaily or(rec.headertop or 0));local frameh=detail and rec.detailh or rec.headerh;local framealpha=panelalpha*(detail and rec.detailanim or kind=="health"and rec.healthanim or kind=="distance"and rec.distanceanim or kind=="scrap"and(rec.scrapanim or 0)or rec.nameanim);local unified=rec.style=="compact"and not detail;if unified and not kind then framew=rec.headerw;framex=groupx;framealpha=panelalpha*rec.headeranim end
         local isbg=d==rec.bg or d==rec.detailbg or pane and d==pane.bg;local istop=d==rec.top or d==rec.detailtop or pane and d==pane.top;local isborder=d==rec.middle or d==rec.detailmiddle or pane and d==pane.middle;local bg=kind and palette.bg or detail and statusbg or panelcolor;local top=kind and palette.top or detail and statustop or topcolor;local border=kind and palette.outline or detail and statusborder or bordertint
         if kind=="scrap"then local cfg=espcfg.Scrap5;local tint=cfg.rgb and rgb(0)or cfg.labelcolor;bg=toggle.colormix(palette.bg,tint,0.06)end
-        if kind=="health"and healthbased then bg=toggle.colormix(palette.bg,rec.healthcolor,0.06)end
+        if kind=="health"and healthbased and not unified then bg=toggle.colormix(palette.bg,rec.healthcolor,0.06)end
         if isbg then toggle.registerespsheen(d)end
-        if (kind=="health"and healthbased or kind=="scrap")and unified then toggle.playerprop(d,"ZIndex",(rec.bg.ZIndex or 0)+1)end
-        if(isbg or isborder)and not(unified and kind and not(kind=="health"and healthbased or kind=="scrap"))then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
+        if kind=="scrap"and unified then toggle.playerprop(d,"ZIndex",(rec.bg.ZIndex or 0)+1)end
+        if(isbg or isborder)and not(unified and kind and kind~="scrap")then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
     end
     local hx=x+(w-rec.headerw)/2+rec.namex+(rec.textpad or 10);local hy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);local username=(rec.nameanim or 0)>0.01;local namealpha=alpha*(rec.nameanim or 0);local healthalpha=alpha*(rec.healthanim or 0)
     local iconon=rec.icons and username and namealpha>0.01
@@ -4205,7 +4330,7 @@ toggle.setclient=function(id,value,quiet)
     elseif id=="noFall"then toggle.applynofall(toggle.client[id],true)
     elseif id=="towerBarriers"then toggle.applytowerbarriers(toggle.client[id],true)
     elseif id=="antiCollide"then if toggle.client[id]then toggle.collisions.nextroster=0;toggle.collisions.nextapply=0;toggle.applycollisions(true)else toggle.restorecollisions()end
-    elseif toggle.client[id]and(id=="noJumpCooldown"or id=="infiniteStamina")then toggle.clientgc.nextapply=0;if not toggle.uibatch then toggle.applyclient(not toggle.clientgc.valid)end
+    elseif toggle.client[id]and(id=="noJumpCooldown"or id=="infiniteStamina")then toggle.clientgc.nextapply=0;if not toggle.uibatch then toggle.armclientgc()end
     elseif not toggle.clientneedsgc()then toggle.releaseclientgc()end
     menuupdate();if not quiet then bindlog((toggle.client[id]and"enabled "or"disabled ")..(toggle.clientlabels[id]or id))end
 end
@@ -4460,8 +4585,15 @@ toggle.safetywrite=function(root,character,position,target,hazards,escape)
     if not toggle.running or toggle.replacing or lp.Character~=character or root.Parent~=character or not toggle.safetyfinite(target)then return false end
      
     local current=root.Position
-    if not toggle.safetyfinite(current)or not toggle.safetysegment(current,target,hazards,escape)then return false end
-    if not escape and(target-current).Magnitude>toggle.safetystate.safestepmeters/stud2m+0.001 then return false end
+    if not toggle.safetyfinite(current)then return false end
+    if not escape then
+        local state=toggle.safetystate;local dx,dz=target.X-current.X,target.Z-current.Z;local length=math.sqrt(dx*dx+dz*dz);local step=state.safestepmeters/stud2m
+        if length>step then dx=dx*step/length;dz=dz*step/length end
+        local x,z=current.X+dx,current.Z+dz;local tx,tz=x-state.target.X,z-state.target.Z
+        local y=tx*tx+tz*tz<=(1/stud2m)^2 and state.target.Y or current.Y
+        target=Vector3.new(x,y,z)
+    end
+    if not toggle.safetysegment(current,target,hazards,escape)then return false end
     for _,h in ipairs(hazards)do if h.kind=="trap"and(target.X-h.x)^2+(target.Z-h.z)^2<h.r*h.r-0.0001 then return false end end
     root.Position=target
      
@@ -4498,18 +4630,29 @@ toggle.applysafety=function()
         toggle.safetynotice("safety movement blocked by overlapping danger radii");return false
     end
     if not state.active then return false end
+    local hx,hz=position.X-state.target.X,position.Z-state.target.Z
+    if hx*hx+hz*hz<=(1/stud2m)^2 and math.abs(position.Y-state.target.Y)>0.02 then
+        local fresh=toggle.safetyhazards(tick(),velocity)
+        if not toggle.safetywrite(root,character,position,Vector3.new(position.X,state.target.Y,position.Z),fresh,false)then return false end
+        position=root.Position
+    end
     if(position-state.target).Magnitude*stud2m<0.4 then
         state.arrivalsince=state.arrivalsince or now
-        if now-state.arrivalsince>=0.3 then toggle.cancelsafespot("arrived at safe spot");return true end
+        local settled=now-state.arrivalsince>=0.3
+        if settled or now>=(state.nextsafe or 0)then
+            local fresh=toggle.safetyhazards(tick(),velocity)
+            if not toggle.safetywrite(root,character,position,state.target,fresh,false)then state.arrivalsince=nil;return false end
+            state.nextsafe=toggle.safetynext(state.nextsafe,state.safeinterval)
+            if settled then if(state.lastwrite-state.target).Magnitude<=0.02 then toggle.cancelsafespot("arrived at safe spot")else state.arrivalsince=nil end end
+            return true
+        end
         return false
     end
     state.arrivalsince=nil
     if now<(state.nextsafe or 0)then return false end
     local waypoint=state.target
-    local horizontal=math.sqrt((state.target.X-position.X)^2+(state.target.Z-position.Z)^2)
-    local travelto=horizontal>5/stud2m and Vector3.new(waypoint.X,position.Y,waypoint.Z)or waypoint
+    local travelto=Vector3.new(waypoint.X,position.Y,waypoint.Z)
     local delta=travelto-position;local length=delta.Magnitude
-    if length<=0.08 then return false end
     local target=length<=step and travelto or position+delta*(step/length)
     local fresh=toggle.safetyhazards(tick(),velocity)
     if not toggle.safetywrite(root,character,position,target,fresh,false)then return false end
@@ -5314,7 +5457,7 @@ local function clickmenu(mx,my)
             local layout=dropdownlayouts[i]
             if inside(mx,my,layout.x,layout.y,layout.w,layout.h)then
                 local kind=dropdownkind;if kind~="oofelements"and kind~="oof"and kind~="safespotelements"and kind~="espicons"and kind~="watermarkelements"and kind~="crateelements"and kind~="flareelements"and kind~="trapelements"and kind~="locationelements"and kind~="scrapstyle"and kind~="tracers"and kind~="hudelements"and kind~="playerelements"and kind~="rakeelements"and kind~="autocollect"and kind~="playeritems"and kind~="autobuyitems"and kind~="autosellitems"and kind~="notificationtypes"and kind~="worldstats"and kind~="locations"and kind~="scraptiers"and kind~="prompts"and kind~="resets"then dropdownkind=nil end
-                if kind=="rosterview"then local p=toggle.playerbrowser;p.view=layout.value;p.pitch=p.view=="List"and 60 or nil;menustate.scroll[4]=0;menustate.scrolltarget[4]=0;menustate.itemsdirty=true;menustate.positionanimating=true;menuupdate()
+                if kind=="rosterview"then local p=toggle.playerbrowser;p.view=layout.value;p.pitch=p.view=="List"and 60 or nil;local roster=toggle.browserscrollstate("list");roster.value=0;roster.target=0;menustate.itemsdirty=true;menustate.positionanimating=true;menuupdate()
                 elseif kind=="playerbackpack"then toggle.playerbackpackstyle=layout.value;menuupdate()elseif kind=="crateinventorystyle"then toggle.crateinventorystyle=layout.value;menuupdate()elseif kind=="fonttarget"then toggle.fontedit=toggle.fonttargetroles[layout.value]or layout.value;menuupdate()
                 elseif kind=="fontfamily"then toggle.setfontrole(toggle.fontedit,layout.index)
                 elseif kind=="oofelements"then toggle.extra.elements[layout.value]=not toggle.extra.elements[layout.value];dropdownkind=kind;menuupdate()elseif kind=="oof"then toggle.extra.selected[layout.value]=not toggle.extra.selected[layout.value];dropdownkind=kind;menuupdate()elseif kind=="safespotelements"then toggle.safespotelements[layout.value]=not toggle.safespotelements[layout.value];dropdownkind=kind;menuupdate()elseif kind=="espicons"then
@@ -5398,14 +5541,14 @@ local function clickmenu(mx,my)
 end
 local function mouseinput()
     if not toggle.gameactive()then
-        inputstate.mouseheld=ismouse1pressed();inputstate.rightheld=ismouse2pressed();inputstate.dragging=nil;inputstate.scrolling=nil;inputstate.sliding=nil;inputstate.resizing=nil;inputstate.widgetpending=nil;inputstate.wheel=0;menustate.pointerdown=false;return
+        inputstate.mouseheld=ismouse1pressed();inputstate.rightheld=ismouse2pressed();inputstate.dragging=nil;inputstate.scrolling=nil;inputstate.sliding=nil;inputstate.resizing=nil;inputstate.widgetpending=nil;inputstate.wheel=0;toggle.playerbrowser.scrollgrab=nil;menustate.pointerdown=false;return
     end
     if toggle.bootpanel and not toggle.bootpanel.closed then return end
     local down=ismouse1pressed();local rightdown=ismouse2pressed();local pressed=down and not inputstate.mouseheld;local rightpressed=rightdown and not inputstate.rightheld;local mx,my=mouse.X,mouse.Y;menustate.pointerdown=down
     toggle.scrollgrabbing=down and inputstate.scrolling~=nil and inputstate.scrolling~=false
     if toggle.menu then
         local widgethit=nil;if not menustate.minimized and not pickerentry and not dropdownkind then for i=1,#itemlayouts do local layout=itemlayouts[i];if layout.textvisible and layout.item.kind=="section"and layout.collapsex and inside(mx,my,layout.collapsex,layout.collapsey,layout.collapsew,layout.collapseh or 24)then widgethit=layout;break end end end
-        if inputstate.wheel~=0 then if dropdownkind and dropdown.layout and inside(mx,my,dropdown.layout.x,dropdown.layout.y,dropdown.layout.w,dropdown.layout.h)and dropdown.scrollmax>0 then dropdown.offset=clamp(dropdown.offset+inputstate.wheel,0,dropdown.scrollmax);menuupdate(true)elseif not menustate.minimized and inside(mx,my,menustate.x+12,menustate.y+(menustate.bodytop or 100),menustate.w-24,menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-8)then menustate.scrolltarget[menustate.tab]=clamp((menustate.scrolltarget[menustate.tab]or 0)+inputstate.wheel*58,0,menustate.scrollmax[menustate.tab]or 0);dropdownkind=nil end;inputstate.wheel=0 end
+        if inputstate.wheel~=0 then if dropdownkind and dropdown.layout and inside(mx,my,dropdown.layout.x,dropdown.layout.y,dropdown.layout.w,dropdown.layout.h)and dropdown.scrollmax>0 then dropdown.offset=clamp(dropdown.offset+inputstate.wheel,0,dropdown.scrollmax);menuupdate(true)elseif not pickerentry and toggle.browserwheel(mx,my,inputstate.wheel)then dropdownkind=nil elseif not menustate.minimized and inside(mx,my,menustate.x+12,menustate.y+(menustate.bodytop or 100),menustate.w-24,menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-8)then menustate.scrolltarget[menustate.tab]=clamp((menustate.scrolltarget[menustate.tab]or 0)+inputstate.wheel*58,0,menustate.scrollmax[menustate.tab]or 0);dropdownkind=nil end;inputstate.wheel=0 end
         if pressed then
             local displayw=displaysize()
             if not menustate.minimized and menustate.resizehit and not pickerentry and not dropdownkind and inside(mx,my,menustate.resizehit.x,menustate.resizehit.y,menustate.resizehit.w,menustate.resizehit.h)then inputstate.resizing=true;inputstate.resizey=my;inputstate.resizeh=menustate.h;menustate.resizeheighttarget=menustate.h
@@ -5415,6 +5558,7 @@ local function mouseinput()
             elseif toggle.playerbrowserhit(mx,my)then
             elseif toggle.headerdraghit(mx,my)then if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end;inputstate.dragging=true;inputstate.dragx=mx-menustate.x;inputstate.dragy=my-menustate.y
             elseif widgethit then inputstate.widgetpending={id=widgethit.item.widgetid,tab=menustate.tab,x=widgethit.collapsex,y=widgethit.collapsey,w=widgethit.collapsew,h=widgethit.collapseh or 24}
+            elseif toggle.browserbegindrag(mx,my)then
             elseif not menustate.minimized and(menustate.scrollmax[menustate.tab]or 0)>0 and menustate.scrollthumb and inside(mx,my,menustate.scrollthumb.x,menustate.scrollthumb.y,menustate.scrollthumb.w,menustate.scrollthumb.h)then inputstate.scrolling="thumb";inputstate.scrolly=my;inputstate.scrollstart=menustate.scrolltarget[menustate.tab]or 0
             elseif not menustate.minimized and(menustate.scrollmax[menustate.tab]or 0)>0 and menustate.scrollthumb and inside(mx,my,menustate.scrollthumb.x,menustate.scrollthumb.tracky,menustate.scrollthumb.w,menustate.scrollthumb.trackh)then local travel=menustate.scrollthumb.trackh-menustate.scrollthumb.thumbh;menustate.scrolltarget[menustate.tab]=clamp((my-menustate.scrollthumb.tracky-menustate.scrollthumb.thumbh/2)/math.max(1,travel)*(menustate.scrollmax[menustate.tab]or 0),0,menustate.scrollmax[menustate.tab]or 0);inputstate.scrolling="thumb";inputstate.scrolly=my;inputstate.scrollstart=menustate.scrolltarget[menustate.tab]
             else local occupied=false;if not menustate.minimized then for i=1,#itemlayouts do local l=itemlayouts[i];if toggle.controlhit(l,mx,my)then occupied=true;break end end end;if not occupied and not menustate.minimized and inside(mx,my,menustate.x+12,menustate.y+(menustate.bodytop or 100),menustate.w-24,menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-8)and(menustate.scrollmax[menustate.tab]or 0)>0 then inputstate.scrolling="content";inputstate.scrolly=my;inputstate.scrollstart=menustate.scrolltarget[menustate.tab]or 0 else clickmenu(mx,my)end end
@@ -5422,6 +5566,7 @@ local function mouseinput()
         if down and inputstate.dropdownscrolling and dropdownkind and dropdown.layout then local bar=dropdown.layout;dropdown.offset=clamp(inputstate.dropdownscrollstart+(my-inputstate.dropdownscrolly)/math.max(1,bar.travel)*dropdown.scrollmax,0,dropdown.scrollmax);menuupdate(true)end
         if down and inputstate.resizing then menustate.resizeheighttarget=clamp(inputstate.resizeh+my-inputstate.resizey,math.min(toggle.visualstyle=="compact"and 260 or 340,cam.ViewportSize.Y-36),math.max(340,cam.ViewportSize.Y-menustate.y-18));dropdownkind=nil end
         if down and inputstate.dragging then menustate.x=mx-inputstate.dragx;menustate.y=my-inputstate.dragy end
+        toggle.browserdrag(my,down)
         if down and inputstate.scrolling then if inputstate.scrolling=="content"then menustate.scrolltarget[menustate.tab]=clamp(inputstate.scrollstart-(my-inputstate.scrolly)*menustate.dragsensitivity,0,menustate.scrollmax[menustate.tab]or 0)else local thumb=menustate.scrollthumb;local travel=thumb and thumb.trackh-thumb.thumbh or 0;menustate.scrolltarget[menustate.tab]=clamp(inputstate.scrollstart+(my-inputstate.scrolly)*menustate.dragsensitivity/math.max(1,travel)*(menustate.scrollmax[menustate.tab]or 0),0,menustate.scrollmax[menustate.tab]or 0)end end
         if down and inputstate.sliding then sliderapply(mx,my,true)else menuupdate(true)end
     end
@@ -5529,9 +5674,9 @@ toggle.worlddepthsort=function(a,b)
 end
 toggle.depthprop=function(d,z)if d then toggle.setprop(d,"ZIndex",z)end end
 toggle.depthworld=function(rec,z)
-    for _,key in ipairs({"labelbg","distancebg"})do toggle.depthprop(rec[key],z)end
-    for _,key in ipairs({"labelborder","distanceborder"})do toggle.depthprop(rec[key],z+1)end
-    for _,key in ipairs({"name","distance","labelicon","distanceicon"})do toggle.depthprop(rec[key],z+2)end
+    for _,key in ipairs({"labelbg","distancebg","pointsbg"})do toggle.depthprop(rec[key],z)end
+    for _,key in ipairs({"labelborder","distanceborder","pointsborder"})do toggle.depthprop(rec[key],z+1)end
+    for _,key in ipairs({"name","distance","labelicon","distanceicon","pointstext","pointsicon"})do toggle.depthprop(rec[key],z+2)end
 end
 toggle.depthcrate=function(rec,z)
     for _,key in ipairs({"bg","crateheadbg"})do toggle.depthprop(rec[key],z)end
@@ -5834,7 +5979,7 @@ toggle.worker(function()
     local jobs={toggle.runpromptqueue,toggle.applyidle,toggle.applydoors,toggle.applycollisions,toggle.applyclient,toggle.applykillaura,toggle.applyautoheal,toggle.applyautopower,toggle.applyautoradio,toggle.applyautoclaimnightvision,toggle.applyautorecover,toggle.applyautobuyitems,toggle.applyautosellscrap,toggle.applyautosellitems,toggle.applyzoom,toggle.applyvisuals,toggle.applyshiftlock}
     while toggle.running do
         local started=tick();local budgetstart=started;local work=0
-        for i=1,#jobs do if not toggle.running then break end;if toggle.viewportvalid~=false or jobs[i]==toggle.applyidle then toggle.health.jobstage=toggle.jobnames[i];toggle.runjob(jobs[i],false);toggle.health.jobstage="waiting"end;work=work+1;if work>=4 or tick()-budgetstart>=0.002 then toggle.wait();budgetstart=tick();work=0 end end
+        for i=1,#jobs do if not toggle.running then break end;if toggle.viewportvalid~=false or jobs[i]==toggle.applyidle or jobs[i]==toggle.applyclient then toggle.health.jobstage=toggle.jobnames[i];toggle.runjob(jobs[i],false);toggle.health.jobstage="waiting"end;work=work+1;if work>=4 or tick()-budgetstart>=0.002 then toggle.wait();budgetstart=tick();work=0 end end
         toggle.wait(math.max(0.001,0.05-(tick()-started)))
     end
 end)
