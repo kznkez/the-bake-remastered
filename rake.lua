@@ -12,7 +12,7 @@ if not cam or not lp or not mouse then return end
 if type(_G)=="table"then
     local previous=_G.__therakeDrawingSession
     if type(previous)=="table"then
-        previous.replacing=true;previous.running=false
+        if previous.restoreidle then pcall(previous.restoreidle)end;previous.replacing=true;previous.running=false
         if previous.promptstate then previous.promptstate.queue={};previous.promptstate.holding=false;previous.promptstate.holdid=nil end
         if previous.instacratestate then local state=previous.instacratestate;state.collectid=(state.collectid or 0)+1;state.request=nil;state.worker=false;state.collecting=false end
         toggle.previoussession=previous
@@ -78,10 +78,7 @@ if not pcall(toggle.bootbegin)then toggle.bootcleanup()else
 end
 if toggle.previoussession then
     local previous=toggle.previoussession;toggle.previoussession=nil
-    if previous.health and type(writefile)=="function"then pcall(function()
-        local h=previous.health;local report={"The Rake Previous Session", "Render Stage: "..tostring(h.renderstage),"Render Error: "..tostring(h.rendererror or"none"),"Feature Job: "..tostring(h.jobstage),"Scan Stage: "..tostring(h.scanstage),"Native Call: "..tostring(h.nativecall),"Frames: "..tostring(h.frames),"Seconds Since Frame: "..tostring(math.max(0,tick()-(h.renderat or tick()))),"Native Created: "..tostring(h.nativecreated),"Native Removed: "..tostring(h.nativeremoved),"Image Loads: "..tostring(h.texturechanges),"Drawing Owners: "..tostring(#(previous.drawingowners or{})),"Effect Lines: "..tostring(previous.effectlinecount),"Idle Lines: "..tostring(#(previous.linepool or{})),"Queued Drawing Releases: "..tostring(previous.nativereleases and previous.nativereleases.count or 0)}
-        if type(makefolder)=="function"then pcall(makefolder,"therakesaint")end;writefile("therakesaint/stability-last.txt",table.concat(report,"\n"))
-    end)end
+
     if type(previous.bootcleanup)=="function"then pcall(previous.bootcleanup)end
     if type(previous.cleanup)=="function"then if not previous.retireaware then previous.running=true end;pcall(previous.cleanup)end;previous.running=false
 end
@@ -92,9 +89,10 @@ local font=fontvalues[fontindex]
 local stud2m=1/3.5714285714
 local scanrate,hudrate,statusrate=0.25,0.033,0.05
 local ringfade,ringseg,cratedist,maxtrack=40,64,30,256
-for key,value in pairs({esp=true,hud=true,distance=false,distancefade=false,menu=false,watermark=true,hybridmode=true,unsafeluau=true,barrgb=false,roof=true,distanceunit="meters",distanceposition="below",poweractivity=false,poweractivitymode="activity",autopower=false,autopowerrequiretoolbox=true,autopowernext=0,hudstyle="modern",containerstyle="modern",containerorientation="horizontal",containergrouping="stacked",containerpositions={},scrapstyle="default",scrapteleport="value",highlightscrap=false,supplylabel=true,supplyitems=true,crateinventorydistance=10,ringenabled=true,ringshape="circle",ringsize=1,ringspin=false,ringspinspeed=1,rgbdirection="right",powerformat="percent",powerdecimal=true,timerformat="clock",hudfontindex=1,teleportcooldown=false,cooldownseconds=10,cooldownuntil=0,cooldownremaining=0,rakename=true,rakehealth=false,rakedistance=false,rakenamevalue="rake",rakenamey=0,rakenamecapture=false,killaura=false,killaurarange=16,killauradelay=0.05,killauranext=0,killpartnames={"Head","Torso","UpperTorso","LowerTorso","HumanoidRootPart"},sellenabled=true,scrapteleportenabled=true,flareteleportenabled=true,hudelements={timer=true,target=false,scrap=false,power=false}})do toggle[key]=value end
+for key,value in pairs({esp=true,hud=true,distance=false,distancefade=false,menu=false,watermark=true,hybridmode=true,unsafeluau=true,barrgb=false,roof=true,distanceunit="meters",distanceposition="below",poweractivity=false,poweractivitymode="activity",autopower=false,autopowerrequiretoolbox=true,autopowernext=0,hudstyle="modern",containerstyle="modern",containerorientation="horizontal",containergrouping="stacked",containerpositions={},scrapstyle="default",scrapteleport="value",highlightscrap=true,supplylabel=true,supplyitems=true,crateinventorydistance=10,ringenabled=true,ringshape="circle",ringsize=1,ringspin=false,ringspinspeed=1,rgbdirection="right",powerformat="percent",powerdecimal=true,timerformat="clock",hudfontindex=1,teleportcooldown=false,cooldownseconds=10,cooldownuntil=0,cooldownremaining=0,rakename=true,rakehealth=true,rakedistance=true,rakenamevalue="rake",rakenamey=0,rakenamecapture=false,killaura=false,killaurarange=16,killauradelay=0.05,killauranext=0,killpartnames={"Head","Torso","UpperTorso","LowerTorso","HumanoidRootPart"},sellenabled=true,scrapteleportenabled=true,flareteleportenabled=true,hudelements={timer=true,target=true,scrap=true,power=true}})do toggle[key]=value end
 toggle.rakehealthcoloring=false;toggle.ringopacity=0.6;toggle.autoheal=false;toggle.autohealth=50;toggle.autohealnext=0
-toggle.safespotelements={Label=true,Distance=true};toggle.safespothud=true;toggle.safespotstyle={labelcolor=Color3.fromRGB(175,255,67),defaultcolor=Color3.fromRGB(175,255,67),rgb=false,defaultrgb=false};toggle.autoevadetrap=false;toggle.safetystate={active=false,target=Vector3.new(-283.3,33.5,-220.0),safestepmeters=3,safeinterval=0.35,shieldstepmeters=3/7,shieldinterval=0.05,trapstepmeters=1,interval=0.01,nextsafe=0,nextshield=0,next=0,nexttraps=0,traps={},routeindex=1,planat=0}
+toggle.safespotelements={Label=true,Distance=true};toggle.safespothud=true;toggle.safespotstyle={labelcolor=Color3.fromRGB(175,255,67),defaultcolor=Color3.fromRGB(175,255,67),rgb=false,defaultrgb=false};toggle.extra={order={"flare","rake","crates","scraps","traps","players"},selected={},size=18,radius=330,arrowopacity=0.9,distancefade=true,elements={Icon=true,Name=true,Distance=true},arrows={}}
+toggle.autoevadetrap=false;toggle.safetystate={active=false,target=Vector3.new(-283.3,33.5,-220.0),safestepmeters=2,safeinterval=0.35,shieldstepmeters=15/42,shieldinterval=0.01,trapstepmeters=1,interval=0.01,nextsafe=0,nextshield=0,next=0,nexttraps=0,traps={}}
 toggle.rakeshield=false;toggle.rakeshieldrange=30;toggle.shieldstate={nextapply=0,nextresolve=0,retreating=false}
 toggle.workererrors=0;toggle.worker=function(callback)toggle.spawn(function()local failures=0;while toggle.running and not toggle.replacing do local ok=pcall(callback);if not toggle.running or toggle.replacing then return end;if ok then return end;failures=math.min(4,failures+1);toggle.workererrors=toggle.workererrors+1;toggle.wait(math.min(2,0.25*2^(failures-1)))end end)end
 toggle.eventstates=setmetatable({},{__mode="k"})
@@ -139,7 +137,7 @@ toggle.shop={
     lookup={},
     selected="RakeTrap",lastscan=0,part=nil
 }
-toggle.playeresp={stacking=true,stackanim=0,enabled=true,distance=200,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=0,showusername=false,showhealth=false,showdistance=false,background=true,style="modern",selected={},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
+toggle.playeresp={stacking=false,stackanim=0,enabled=true,distance=200,detaildistance=25,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=0,showusername=false,showhealth=false,showdistance=false,showscrap=false,background=true,style="modern",selected={},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
 toggle.autorecover=false;toggle.autorecovernext=0;toggle.autorecoverfolder=nil;toggle.recovervalue=0;toggle.recovervaluenext=0;toggle.autosellscrap=false;toggle.autosellnext=0;toggle.autobuyitems={selected={},next=0};toggle.autosellitems={selected={},next=0}
 toggle.borderradius=10
 toggle.offseturl="https://offsets.femboythighs.org/offsets.cs"
@@ -173,7 +171,7 @@ local espgroups={locations=true,scraps=true,traps=true,flares=true,crates=true,r
 espgroups.items={BaseCampMSG=true,SafehouseMSG=true,StationMSG=true,ShopMSG=true,ObservationTowerMSG=true,RakeSpawnPart=true,Scrap1=true,Scrap2=true,Scrap3=true,Scrap4=true,Scrap5=true}
 local espfontsize=13
 toggle.shinesettings={enabled=true,brightness=0.07,width=0.6,speed=1.1,direction="right"}
-toggle.hudbackgroundalpha=0.9;toggle.espbackgroundalpha=0.6;toggle.executedat=tick();toggle.panelsize=13;toggle.menufontindex=1;toggle.fontedit="menu";toggle.visualstyle="modern";toggle.espvisualstyle="modern";toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,distance=true,health=true,locations={},locationgroup=false}
+toggle.hudbackgroundalpha=0.9;toggle.espbackgroundalpha=0.6;toggle.executedat=tick();toggle.panelsize=13;toggle.menufontindex=1;toggle.fontedit="menu";toggle.visualstyle="modern";toggle.espvisualstyle="modern";toggle.watermarkelements={title=true,avatar=true,displayname=true,uptime=true};toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,distance=true,health=true,locations={},locationgroup=false}
 local menuopacity=0.9
 local espcfg={}
 local roofstyle={labelcolor=Color3.fromHex("#f5d3ff"),defaultcolor=Color3.fromHex("#f5d3ff"),rgb=false,defaultrgb=false}
@@ -183,10 +181,10 @@ local colorentries={
     {name="flare",cfgs={"FlareGunPickUp"}},{name="scrap 1",cfgs={"Scrap1"}},{name="scrap 2",cfgs={"Scrap2"}},{name="scrap 3",cfgs={"Scrap3"}},{name="scrap 4",cfgs={"Scrap4"}},{name="scrap 5",cfgs={"Scrap5"}},{name="trap",cfgs={"RakeTrapModel"}},{name="supply",cfgs={"Box","SupplyCrate"}},
     {name="base",cfgs={"BaseCampMSG"}},{name="house",cfgs={"SafehouseMSG"}},{name="station",cfgs={"StationMSG"}},{name="shop",cfgs={"ShopMSG"}},{name="tower",cfgs={"ObservationTowerMSG"}},{name="cave",cfgs={"RakeSpawnPart"}}
 }
-local defaultbinds={menu=0x43,esp=0,hud=0,scrap=0,flare=0,aura=0,sell=0,thirdperson=0,crate=0x46,prompt=0x46,collide=0,door=0,safespot=0,evadetrap=0}
-local keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,aura=defaultbinds.aura,sell=defaultbinds.sell,thirdperson=defaultbinds.thirdperson,crate=defaultbinds.crate,prompt=defaultbinds.prompt,collide=defaultbinds.collide,door=defaultbinds.door,safespot=defaultbinds.safespot,evadetrap=defaultbinds.evadetrap}
-local bindorder={"menu","esp","hud","scrap","flare","aura","sell","thirdperson","collide","door","crate","prompt","safespot","evadetrap"}
-local bindlabels={menu="menu toggle",esp="esp switch",hud="hud switch",scrap="tp scrap",flare="tp flare",aura="stun aura",sell="tp sell scrap",thirdperson="third person",crate="instant crate",prompt="prompt toggle",collide="player no-collide",door="door no-collide",safespot="tp safe spot",evadetrap="auto-evade trap"}
+local defaultbinds={menu=0x43,esp=0,hud=0,scrap=0,flare=0,aura=0,sell=0,thirdperson=0,crate=0x46,prompt=0x46,collide=0,door=0,safespot=0,evadetrap=0,quickbuy=0,quicksell=0}
+local keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,aura=defaultbinds.aura,sell=defaultbinds.sell,thirdperson=defaultbinds.thirdperson,crate=defaultbinds.crate,prompt=defaultbinds.prompt,collide=defaultbinds.collide,door=defaultbinds.door,safespot=defaultbinds.safespot,evadetrap=defaultbinds.evadetrap,quickbuy=defaultbinds.quickbuy,quicksell=defaultbinds.quicksell}
+local bindorder={"menu","esp","hud","scrap","flare","aura","sell","thirdperson","collide","door","crate","prompt","safespot","evadetrap","quickbuy","quicksell"}
+local bindlabels={menu="menu toggle",esp="esp switch",hud="hud switch",scrap="tp scrap",flare="tp flare",aura="stun aura",sell="tp sell scrap",thirdperson="third person",crate="instant crate",prompt="prompt toggle",collide="player no-collide",door="door no-collide",safespot="warp to safe spot",evadetrap="auto-evade trap",quickbuy="quick tp buy",quicksell="quick tp sell"}
 local keyoptions,keynames,keywas={},{},{}
 local function addkey(code,name)keyoptions[#keyoptions+1]={code=code,name=name};keynames[code]=name;keywas[code]=false end
 addkey(0x08,"backspace");addkey(0x09,"tab");addkey(0x0D,"enter");addkey(0x10,"shift");addkey(0x11,"ctrl");addkey(0x12,"alt");addkey(0x1B,"escape");addkey(0x20,"space")
@@ -512,22 +510,27 @@ toggle.seteffect=function(class,on)
     local state=toggle.visuals;if not state.effectdefs[class]then return end;state.effects[class]=on==true;toggle.visualchanged()
     if not on then for _,rec in pairs(state.records)do if rec.class==class then toggle.restoreeffect(rec)end end end
 end
-toggle.readfootername=function()
-    local offset=toggle.displaynameoffset;local address=toggle.instanceaddress(lp)
+toggle.readplayerdisplayname=function(player)
+    local offset=toggle.displaynameoffset;local address=toggle.instanceaddress(player)
     local function read(slot)
         if not toggle.visualpointer(slot)then return nil end
         local length=toggle.memoryread("int",slot+16);local capacity=toggle.memoryread("int",slot+24)
-        if not toggle.visualfinite(length,1,128)or not toggle.visualfinite(capacity,length,4096)then return nil end
+        if not toggle.visualfinite(length,1,128)or length%1~=0 or not toggle.visualfinite(capacity,length,4096)or capacity%1~=0 then return nil end
         local data=capacity>=16 and toggle.memoryread("uintptr_t",slot)or slot
         if not toggle.visualfinite(data,10000,281474976710655)then return nil end
-        local value=toggle.memoryread("string",data);if type(value)=="string"then value=value:sub(1,length);if #value==length and not value:find("%z")then return value end end
+        local bytes={};for i=0,length-1 do local byte=toggle.memoryread("byte",data+i);if type(byte)~="number"or byte%1~=0 or byte<32 or byte>255 or byte==127 then return nil end;bytes[#bytes+1]=string.char(byte)end
+        if toggle.memoryread("int",slot+16)~=length or toggle.memoryread("int",slot+24)~=capacity then return nil end
+        if capacity>=16 and toggle.memoryread("uintptr_t",slot)~=data then return nil end
+        return table.concat(bytes)
     end
     if type(offset)=="number"and offset>0 and offset<0x10000 and offset%8==0 and toggle.visualpointer(address)then
         local slot=address+offset;local name=read(slot);if not name then name=read(toggle.memoryread("uintptr_t",slot))end
-        if name then toggle.resolveddisplayname=name;return name end
+        if name then return name end
     end
-    local ok,name=pcall(function()return lp.DisplayName end);if ok and type(name)=="string"and #name>0 and name~=lp.Name then return name end
-    return toggle.resolveddisplayname or"User"
+    local ok,name=pcall(function()return player and player.DisplayName end);if ok and type(name)=="string"and #name>0 and #name<=128 then return name end
+end
+toggle.readfootername=function()
+    local name=toggle.readplayerdisplayname(lp);if name then toggle.resolveddisplayname=name end;return name or toggle.resolveddisplayname or"User"
 end
 toggle.applyvisuals=function(force)
     if not toggle.running or toggle.replacing then return end;local state=toggle.visuals;local now=tick();if not force and now<state.nextapply then return end;state.nextapply=now+0.1
@@ -843,12 +846,38 @@ toggle.drawingequal=function(key,a,b)
     if(key=="Position"or key=="Size"or key=="From"or key=="To"or key=="PointA"or key=="PointB"or key=="PointC")and typeof(a)=="Vector2"and typeof(b)=="Vector2"then return a.X==b.X and a.Y==b.Y end
     return false
 end
+ 
+toggle.playernativequeue={head=1,count=0};toggle.avataruploads={head=1,count=0};toggle.avatarpending=setmetatable({},{__mode="k"})
+toggle.playerdrawcall=function(callback,...)
+    local before=toggle.deferplayerdrawings;toggle.deferplayerdrawings=true
+    local ok,result=pcall(callback,...);toggle.deferplayerdrawings=before;if not ok then error(result)end;return result
+end
+toggle.queueplayernative=function(state)
+    local queue=toggle.playernativequeue;if state.queuednative or queue.count>=2048 then return end
+    local slot=(queue.head+queue.count-1)%2048+1;queue[slot]=state;queue.count=queue.count+1;state.queuednative=true
+end
+toggle.flushplayernative=function()
+    local queue=toggle.playernativequeue;local started=tick();local done,visited=0,0
+    while queue.count>0 and done<2 and visited<32 do
+        local state=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%2048+1;queue.count=queue.count-1;visited=visited+1
+        if state then state.queuednative=false
+            if not state.removed and state.owner[1]and not state.native and tick()>=(state.primenext or 0)and state.properties.Visible then
+                state.backgroundprime=true;local ok,err=pcall(state.prime);state.backgroundprime=nil;done=done+1
+                if not ok then toggle.health.profileerror=tostring(err)end
+            end
+        end
+        if done>0 and tick()-started>=0.001 then break end
+    end
+end
+
 toggle.newdrawing=function(kind)
     assert(toggle.running and not toggle.replacing,"drawing session stopped")
-    local props={Visible=false};local state={kind=kind,properties=props};local d={};state.owner=setmetatable({d},{__mode="v"})
+    local props={Visible=false};local state={kind=kind,properties=props,deferred=toggle.deferplayerdrawings==true};local d={};state.owner=setmetatable({d},{__mode="v"})
     local function prime()
         if state.removed or not toggle.running or toggle.replacing then return nil end;if state.native then return state.native end
         if tick()<(state.primenext or 0)then return nil end
+        if state.deferred and not state.backgroundprime then toggle.queueplayernative(state);return nil end
+        if toggle.preparing then toggle.wait(0.005);if state.native then return state.native end;if state.removed then return nil end end
         toggle.health.nativecall="drawing allocation";local created,native=pcall(Drawing.new,kind);toggle.health.nativecall="waiting";if not created or not native then state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));return nil end
         toggle.health.nativecreated=toggle.health.nativecreated+1;state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
             assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=false
@@ -907,7 +936,7 @@ toggle.esptext=function(...)return toggle.settextrole(newtext(...),"esp")end
 toggle.uiwidth=function(text,size)return toggle.measuretext(text,toggle.fontvalue("menu"),size or 13)end
 toggle.uititles={};toggle.uititleorder={};toggle.uititlecursor=0;toggle.uititle=function(value)
     local text=tostring(value or "");local cached=toggle.uititles[text];if cached then return cached end
-    local acronyms={tp="TP",esp="ESP",hud="HUD",gui="GUI",uv="UV",hp="HP",rgb="RGB",fps="FPS",ppms="PPMS",luau="Luau",uv_lamp="UV Lamp",displayname="Display Name",uptime="Script Uptime"}
+    local acronyms={oof="OOF",tp="TP",esp="ESP",hud="HUD",gui="GUI",uv="UV",hp="HP",rgb="RGB",fps="FPS",ppms="PPMS",luau="Luau",uv_lamp="UV Lamp",displayname="Display Name",uptime="Script Uptime"}
     local result=text:gsub("[%a_]+",function(word)local key=string.lower(word);return acronyms[key]or(string.upper(string.sub(word,1,1))..string.lower(string.sub(word,2)))end)
     result=result:gsub("(%d)P%f[%W]","%1p"):gsub("(%d)M%f[%W]","%1m");local slot=toggle.uititlecursor%512+1;toggle.uititlecursor=slot;local expired=toggle.uititleorder[slot];if expired then toggle.uititles[expired]=nil end;toggle.uititleorder[slot]=text;toggle.uititles[text]=result;return result
 end
@@ -1039,9 +1068,9 @@ end
 toggle.newicon=function(z)local d=toggle.newdrawing("Image");d.Visible=false;toggle.setpos(d,0,0);d.Size=Vector2.new(1,1);d.Transparency=1;setz(d,z);return d end
 toggle.iconqueue={head=1,count=0}
 toggle.flushicons=function()
-    local now=toggle.frametime or tick();local budget=toggle.iconbudget;if not budget then budget={tokens=8,at=now};toggle.iconbudget=budget end;budget.tokens=math.min(8,budget.tokens+math.max(0,now-budget.at)*120);budget.at=now
+    local now=toggle.frametime or tick();local budget=toggle.iconbudget;if not budget then budget={tokens=4,at=now};toggle.iconbudget=budget end;budget.tokens=math.min(4,budget.tokens+math.max(0,now-budget.at)*16);budget.at=now
     local queue=toggle.iconqueue;local visited,uploaded=0,0;local started=tick()
-    while queue.count>0 and budget.tokens>=1 and visited<32 and uploaded<2 do
+    while queue.count>0 and budget.tokens>=1 and visited<32 and uploaded<1 do
         local d=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%1024+1;queue.count=queue.count-1;visited=visited+1
         local state=d and toggle.iconstates[d];if state then state.queued=false
             if not toggle.removeddraw[d]and d.Visible and state.wantedkey and state.wantedkey~=state.key then
@@ -1071,7 +1100,7 @@ local function remove(d)
     if not d or toggle.removeddraw[d]then return end
     local sheen=toggle.espsheens and toggle.espsheens[d];if sheen then toggle.espsheens[d]=nil;toggle.espsheencount=math.max(0,toggle.espsheencount-1);if sheen.image then remove(sheen.image)end end
     if toggle.effectlines and toggle.effectlines[d]then toggle.effectlines[d]=nil;toggle.effectlinecount=math.max(0,toggle.effectlinecount-1)end
-    toggle.removeddraw[d]=true;toggle.drawregistry[d]=nil;toggle.iconstates[d]=nil;toggle.drawcolors[d]=nil;toggle.textroles[d]=nil;if toggle.playerprops then toggle.playerprops[d]=nil end;pcall(function()d.Visible=false end);pcall(function()d:Remove()end)
+    toggle.removeddraw[d]=true;toggle.drawregistry[d]=nil;toggle.iconstates[d]=nil;if toggle.avatarimages then toggle.avatarimages[d]=nil end;if toggle.avatarpending then toggle.avatarpending[d]=nil end;toggle.drawcolors[d]=nil;toggle.textroles[d]=nil;if toggle.playerprops then toggle.playerprops[d]=nil end;pcall(function()d.Visible=false end);pcall(function()d:Remove()end)
 end
 toggle.linepool={};toggle.linepooled=setmetatable({},{__mode="k"});toggle.linepoolmax=512
 toggle.effectlines=setmetatable({},{__mode="k"});toggle.effectlinecount=0;toggle.effectlinemax=4096;toggle.effectlinenext=0
@@ -1143,7 +1172,7 @@ end
 local rgbline={_count=barseg,_z=13}
 local themes={
     {name="signal bruise",bg="#151426",top="#090812",side="#102b27",card="#25213c",hover="#393158",select="#574b7b",text="#f8efff",muted="#9a8db4",accent="#ff4fd8"},
-    {name="default",bg="#191919",top="#151515",side="#151515",card="#242424",hover="#303030",select="#434343",text="#EEEEEE",muted="#969696",accent="#fc5454"},
+    {name="default",bg="#101010",top="#0C0C0C",side="#0C0C0C",card="#1C1C1C",hover="#272727",select="#383838",text="#EEEEEE",muted="#969696",accent="#fc5454"},
     {name="acid arcade",bg="#100b1b",top="#07040d",side="#160629",card="#23103a",hover="#3b1260",select="#641d8c",text="#f4ffbd",muted="#9a72b8",accent="#b7ff00"},
     {name="mango circuit",bg="#201407",top="#120a03",side="#291006",card="#38220b",hover="#56330c",select="#7f4b0d",text="#fff4cf",muted="#c29352",accent="#ff9d00"},
     {name="ice pop",bg="#071c2e",top="#03101d",side="#07152a",card="#0d304a",hover="#124765",select="#176983",text="#e8fbff",muted="#69a7bd",accent="#00eaff"},
@@ -1210,9 +1239,9 @@ local menustate={w=math.min(600,math.max(340,cam.ViewportSize.X-36)),h=math.min(
 menustate.widgetclosed={}
 toggle.bindvisible=function(id)return id~="menu"and id~="crate"and id~="prompt"and(keybinds[id]or 0)~=0 end
 toggle.bindactive=function(id)return id=="menu"and toggle.menu and not menustate.minimized or id=="esp"and toggle.esp or id=="hud"and toggle.hud or id=="safespot"and toggle.safetystate.active or id=="evadetrap"and toggle.autoevadetrap or id=="aura"and toggle.killaura or id=="thirdperson"and toggle.zoom.thirdperson or id=="collide"and toggle.client.antiCollide or id=="door"and toggle.client.doorNoCollide or false end
-local tabnames={"main","visuals","interface","settings"}
-toggle.tabiconnames={"house","eye","sun","gear"};toggle.tablabelanim={};toggle.tabselectanim={};toggle.tabicons={};toggle.heartcolor=Color3.fromHex("#FF8398")
-for i=1,4 do toggle.tabicons[i]=toggle.newicon(121)end
+local tabnames={"main","visuals","interface","players","settings"}
+toggle.tabiconnames={"house","eye","sun","two-people","gear"};toggle.tablabelanim={};toggle.tabselectanim={};toggle.tabicons={};toggle.heartcolor=Color3.fromHex("#FF8398")
+for i=1,#tabnames do toggle.tabicons[i]=toggle.newicon(121)end
 local menubg=newsquare(Color3.fromHex("#16161e"),0.98)
 local menutop=newsquare(Color3.fromHex("#1a1b26"),1)
 local menuside=newsquare(Color3.fromHex("#13131a"),1)
@@ -1336,6 +1365,10 @@ end
 toggle.search.ui.gradient=toggle.makegradient(128,153)
 toggle.layoutgradient=function(lines,x,y,w)
     local count=math.max(1,math.min(lines._count or 144,math.floor(w)));if lines._x==x and lines._y==y and lines._w==w and lines._layoutcount==count and lines._allocated==#lines then return end
+    local dx=lines._x and x-lines._x
+    if dx and lines._w==w and lines._layoutcount==count and lines._allocated==#lines and lines._edges and math.abs(dx-math.floor(dx+0.5))<0.000001 then
+        for i=1,math.min(#lines,count)do local d=lines[i];local p=d.Position;if p then toggle.setprop(d,"Position",Vector2.new(p.X+dx,y))end end;lines._x=x;lines._y=y;return
+    end
     lines._x=x;lines._y=y;lines._w=w;lines._layoutcount=count;lines._allocated=#lines;lines._paintframe=nil;lines._edges=lines._edges or{};local fade=math.min(0.16,14/math.max(1,w));local edgepixels=math.min(14,math.floor(count/4),math.floor(w/4))
     local function boundary(n)if n<=edgepixels then return n elseif n>=count-edgepixels then return w-(count-n)else return edgepixels+(n-edgepixels)*(w-edgepixels*2)/math.max(1,count-edgepixels*2)end end
     for i=1,#lines do local d=lines[i];if i<=count then
@@ -1554,10 +1587,10 @@ toggle.shopindex=function()
 end
 toggle.autosellitemslabel=function()return toggle.multilabel(toggle.shop.items,toggle.autosellitems.selected,"name")end
 toggle.autobuyitemslabel=function()return toggle.multilabel(toggle.shop.items,toggle.autobuyitems.selected,"name")end
-toggle.espelementorder={rake={"name","health","distance","status"},players={"name","health","distance"}}
+toggle.espelementorder={rake={"name","health","distance","status"},players={"name","health","distance","scrap"}}
 toggle.espelementslabel=function(rake)
     if rake then return toggle.selectionlabel(toggle.espelementorder.rake,{name=toggle.rakename,health=toggle.rakehealth,distance=toggle.rakedistance,status=toggle.rakestatus})end
-    local state=toggle.playeresp;return toggle.selectionlabel(toggle.espelementorder.players,{name=state.showusername,health=state.showhealth,distance=state.showdistance})
+    local state=toggle.playeresp;return toggle.selectionlabel(toggle.espelementorder.players,{name=state.showusername,health=state.showhealth,distance=state.showdistance,scrap=state.showscrap})
 end
 toggle.playeritemslabel=function()return toggle.multilabel(toggle.playeresp.order,toggle.playeresp.selected,"name")end
 toggle.recoverfolder=function()
@@ -1587,7 +1620,7 @@ toggle.itemshown=function(item,available)
     if #shown>18 then shown=string.sub(shown,1,16)..".."end;return shown
 end
 toggle.dropdownkindof=function(id)
-    return id=="containergroupingselect"and"containergrouping"or id=="containerorientationselect"and"containerorientation"or id=="safespotelementsselect"and"safespotelements"or id=="espiconsselect"and"espicons"or id=="fonttargetselect"and"fonttarget"or id=="fontfamilyselect"and"fontfamily"or id=="watermarkelementsselect"and"watermarkelements"or id=="crateelementsselect"and"crateelements"or id=="flareelementsselect"and"flareelements"or id=="trapelementsselect"and"trapelements"or id=="locationelementsselect"and"locationelements"or id=="panelstyleselect"and"panelstyle"or id=="hudstyleselect"and"hudstyle"or id=="espstyleselect"and"espstyle"or id=="terrainelementselect"and"terraineditor"or id=="posteffectselect"and"posteditor"or id=="scrapeditsselect"and"scrapedit"or id=="locationeditselect"and"locationedit"or id=="tracersselect"and"tracers"or id=="hudelementsselect"and"hudelements"or id=="playerelementsselect"and"playerelements"or id=="playerstyleselect"and"playerstyle"or id=="rakestyleselect"and"rakestyle"or id=="rakeelementsselect"and"rakeelements"or id=="espfontselect"and"espfont"or id=="hudfontselect"and"hudfont"or id=="presetselect"and"preset"or id=="distanceunitselect"and"unit"or id=="distancepositionselect"and"distanceposition"or id=="scrapstyleselect"and"scrapstyle"or id=="scrapteleportselect"and"scrapteleport"or id=="ringshapeselect"and"ringshape"or id=="rgbdirectionselect"and"rgbdirection"or id=="containerstyleselect"and"containerstyle"or id=="poweractivitymodeselect"and"poweractivitymode"or id=="notificationstyleselect"and"notificationstyle"or id=="notificationpositionselect"and"notificationposition"or id=="notificationtypeselect"and"notificationtypes"or id=="worldstatsselect"and"worldstats"or id=="autocollectselect"and"autocollect"or id=="playeritemsselect"and"playeritems"or id=="promptsselect"and"prompts"or id=="accentbarsselect"and"accentbars"or id=="resetselect"and"resets"or id=="shopitemselect"and"shopitem"or id=="autobuyitemsselect"and"autobuyitems"or id=="autosellitemsselect"and"autosellitems"or id=="configselect"and"config"or nil
+    return id=="playerbackpackselect"and"playerbackpack"or id=="crateinventorystyleselect"and"crateinventorystyle"or id=="oofelements"and"oofelements"or id=="oofselect"and"oof"or id=="containergroupingselect"and"containergrouping"or id=="containerorientationselect"and"containerorientation"or id=="safespotelementsselect"and"safespotelements"or id=="espiconsselect"and"espicons"or id=="fonttargetselect"and"fonttarget"or id=="fontfamilyselect"and"fontfamily"or id=="watermarkelementsselect"and"watermarkelements"or id=="crateelementsselect"and"crateelements"or id=="flareelementsselect"and"flareelements"or id=="trapelementsselect"and"trapelements"or id=="locationelementsselect"and"locationelements"or id=="panelstyleselect"and"panelstyle"or id=="hudstyleselect"and"hudstyle"or id=="espstyleselect"and"espstyle"or id=="terrainelementselect"and"terraineditor"or id=="posteffectselect"and"posteditor"or id=="scrapeditsselect"and"scrapedit"or id=="locationeditselect"and"locationedit"or id=="tracersselect"and"tracers"or id=="hudelementsselect"and"hudelements"or id=="playerelementsselect"and"playerelements"or id=="playerstyleselect"and"playerstyle"or id=="rakestyleselect"and"rakestyle"or id=="rakeelementsselect"and"rakeelements"or id=="espfontselect"and"espfont"or id=="hudfontselect"and"hudfont"or id=="presetselect"and"preset"or id=="distanceunitselect"and"unit"or id=="distancepositionselect"and"distanceposition"or id=="scrapstyleselect"and"scrapstyle"or id=="scrapteleportselect"and"scrapteleport"or id=="ringshapeselect"and"ringshape"or id=="rgbdirectionselect"and"rgbdirection"or id=="containerstyleselect"and"containerstyle"or id=="poweractivitymodeselect"and"poweractivitymode"or id=="notificationstyleselect"and"notificationstyle"or id=="notificationpositionselect"and"notificationposition"or id=="notificationtypeselect"and"notificationtypes"or id=="worldstatsselect"and"worldstats"or id=="autocollectselect"and"autocollect"or id=="playeritemsselect"and"playeritems"or id=="promptsselect"and"prompts"or id=="accentbarsselect"and"accentbars"or id=="resetselect"and"resets"or id=="shopitemselect"and"shopitem"or id=="autobuyitemsselect"and"autobuyitems"or id=="autosellitemsselect"and"autosellitems"or id=="configselect"and"config"or nil
 end
 toggle.itemvaluecolor=function(item)
     if item.inlinebind and item.bind then if capture==item.bind then return toggle.colormix(toggle.accentvisual(),color("bg"),0.55)elseif(keybinds[item.bind]or 0)==0 then return color("muted")else return toggle.accentvisual()end end
@@ -1603,16 +1636,16 @@ toggle.featurecatalog=function(tab)
         toggle.refreshshop(false)
         local items={
             section("master",1),{id="hybridfeatures",kind="toggle",label="hybrid features",on=toggle.hybridfeatures,info="shows Hybrid Mode sections and options",col=1},{id="bindmenu",kind="bind",bind="menu",inlinebind=true,label="menu toggle",col=1},{id="watermark",kind="toggle",label="watermark state",on=toggle.watermark,col=1},{id="esp",kind="toggle",label="esp switch",on=toggle.esp,bind="esp",inlinebind=true,col=1},{id="hud",kind="toggle",label="hud switch",on=toggle.hud,bind="hud",inlinebind=true,col=1},{id="keybindpanel",kind="toggle",label="keybind panel",on=toggle.keybindpanel,col=1},{id="worldpanel",kind="toggle",label="world stats panel",on=toggle.worldpanel,col=1},{id="worldstatsselect",kind="dropdown",label="world stats",value=toggle.worldlabel(),col=1},
-            section("shop",1,"teleport to trade or claim nightvision; nearby automation buys, sells, recovers, and claims items","hybrid"),{id="autorecover",kind="toggle",label="auto-recover items",on=toggle.autorecover,info="claims stored items while you are near the shop",col=1},{id="autobuyitemsselect",kind="dropdown",label="items to auto-buy",value=toggle.autobuyitemslabel(),col=1},{id="autosellitemsselect",kind="dropdown",label="items to auto-sell",value=toggle.autosellitemslabel(),col=1},{id="autosellscrap",kind="toggle",label="auto-sell scrap",on=toggle.autosellscrap,info="sells your scraps while you are near the shop until none remain",col=1},{id="tpclaimnightvision",kind="action",label="TP Claim Nightvision",col=1},{id="autoclaimnightvision",kind="toggle",label="auto-claim nightvision",on=toggle.autoclaimnightvision,info="instantly claims nightvision when you are near the shop",col=1},{id="tpsellscrap",kind="action",label="TP Sell Scrap",col=1},{id="sell",kind="bind",label="tp sell scrap bind",bind="sell",inlinebind=true,col=1},{id="shopitemselect",kind="dropdown",label="items for quick tp",value=toggle.shoplabel(),col=1},{id="quickbuy",kind="action",label="quick tp buy",col=1},{id="quicksell",kind="action",label="quick tp sell",col=1},
+            section("shop",1,"teleport to trade or claim nightvision; nearby automation buys, sells, recovers, and claims items","hybrid"),{id="autorecover",kind="toggle",label="auto-recover items",on=toggle.autorecover,info="claims stored items while you are near the shop",col=1},{id="autobuyitemsselect",kind="dropdown",label="items to auto-buy",value=toggle.autobuyitemslabel(),col=1},{id="autosellitemsselect",kind="dropdown",label="items to auto-sell",value=toggle.autosellitemslabel(),col=1},{id="autosellscrap",kind="toggle",label="auto-sell scrap",on=toggle.autosellscrap,info="sells your scraps while you are near the shop until none remain",col=1},{id="tpclaimnightvision",kind="action",label="TP Claim Nightvision",col=1},{id="autoclaimnightvision",kind="toggle",label="auto-claim nightvision",on=toggle.autoclaimnightvision,info="instantly claims nightvision when you are near the shop",col=1},{id="tpsellscrap",kind="action",label="TP Sell Scrap",col=1},{id="sell",kind="bind",label="tp sell scrap bind",bind="sell",inlinebind=true,col=1},{id="shopitemselect",kind="dropdown",label="items for quick tp",value=toggle.shoplabel(),col=1},{id="quickbuy",kind="action",label="quick tp buy",col=1},{id="quicksell",kind="action",label="quick tp sell",col=1},{id="bindquickbuy",kind="bind",label="quick tp buy bind",bind="quickbuy",inlinebind=true,col=1},{id="bindquicksell",kind="bind",label="quick tp sell bind",bind="quicksell",inlinebind=true,col=1},
             section("teleports",2,"teleports can be inconsistent; move around during the teleport if the object is not collected"),{id="scrap",kind="toggle",label="tp scrap",on=toggle.scrapteleportenabled,bind="scrap",inlinebind=true,col=2},{id="flare",kind="toggle",label="tp flare",on=toggle.flareteleportenabled,bind="flare",inlinebind=true,col=2},{id="scrapteleportselect",kind="dropdown",label="sort scrap teleport by",value=toggle.scrapteleport,col=2},{id="highlightscrap",kind="toggle",label="Highlight Target Scrap",on=toggle.highlightscrap,info="marks the scrap chosen by your teleport sorting mode with a target icon and a tinted ESP background",col=2},{id="teleportcooldown",kind="toggle",label="tp safe cooldown",on=toggle.teleportcooldown,info=teleportinfo,col=2},{id="cooldownseconds",kind="slider",label="cooldown time",value=toggle.cooldownseconds,min=10,max=30,display=tostring(toggle.cooldownseconds).."s",col=2},
             section("prompts",1,"shows interactive controls over supported house and tower mechanisms","hybrid"),{id="promptmaster",kind="toggle",label="bypass prompts",on=toggle.prompts,info="use the prompt bind near a mechanism; left or right click switches actions",col=1},{id="promptsselect",kind="dropdown",label="prompt panels",value=toggle.promptlabel(),col=1},{id="bindprompt",kind="bind",bind="prompt",inlinebind=true,label="prompt toggle bind",col=1},
             section("combat",1,"combat actions and healing","hybrid"),{id="killaura",kind="toggle",label="stun aura",on=toggle.killaura,bind="aura",inlinebind=true,info="uses an equipped stun stick without consuming stamina",col=1},{id="killaurarange",kind="slider",label="stun range",value=toggle.killaurarange,min=6,max=30,display=tostring(toggle.killaurarange).." studs",col=1},{id="killauradelay",kind="slider",label="stun delay",value=toggle.killauradelay,min=0.05,max=0.6,display=string.format("%.2fs",toggle.killauradelay),col=1},{id="autoheal",kind="toggle",label="auto-heal",on=toggle.autoheal,info="uses an equipped first aid kit when your health drops below the selected amount",col=1},{id="autohealth",kind="slider",label="heal below",value=toggle.autohealth,min=20,max=70,display=tostring(toggle.autohealth).." hp",col=1},
             section("camera",2,"equip an item after enabling third person; change shift lock in Roblox movement settings",nil),{id="thirdperson",kind="toggle",label="third person",on=toggle.zoom.thirdperson,bind="thirdperson",inlinebind=true,col=2},{id="zoomamount",kind="slider",label="zoom amount",value=toggle.zoom.amount,min=0.5,max=100,display=string.format("%.1f studs",toggle.zoom.amount),col=2},{id="shiftlock",kind="toggle",label="shift lock",on=toggle.shiftlockstate.active,info="allows Shift Lock in Roblox movement settings",col=2},
             section("supply",2),{id="supplylabel",kind="toggle",label="crate esp",on=toggle.supplylabel,colorindex=8,col=2},{id="flares",kind="toggle",label="flare esp",on=espgroups.flares,colorindex=1,col=2},{id="supplyitems",kind="toggle",label="crate inventory",on=toggle.supplyitems,disabled=toggle.instacrate,infowhendisabled=true,info="shows crate contents and taken items; locked on while instant crate is enabled",col=2},{id="instacrate",kind="toggle",label="instant crate",on=toggle.instacrate,info="left click selects the next item; right click selects the previous item",permission="hybrid",col=2},{id="bindcrate",kind="bind",label="take item bind",bind="crate",bindinfo="takes the selected crate item; click to change this required bind",inlinebind=true,col=2},{id="autocollect",kind="toggle",label="auto-collect",on=toggle.autocollect.enabled,disabled=not toggle.instacrate,col=2},{id="autocollectselect",kind="dropdown",label="auto-collect items",value=toggle.autocollectlabel(),disabled=not toggle.instacrate,col=2},
             section("client",2),{id="antiCollide",kind="toggle",label="player no-collide",on=toggle.client.antiCollide,bind="collide",inlinebind=true,info="disables collisions with other players; restores them when switched off",col=2},{id="doorNoCollide",kind="toggle",label="Door No-Collide",on=toggle.client.doorNoCollide,bind="door",inlinebind=true,info="walk through the house and tower doors; restores collisions to match their open state when disabled",col=2},{id="preventIdle",kind="toggle",label="Prevent Idle Timeout",on=toggle.client.preventIdle,info="prevents idle kicks; has not been tested",warning=true,unstable=true,col=2},{id="noFall",kind="toggle",label="no fall damage",on=toggle.client.noFall,col=2},{id="towerBarriers",kind="toggle",label="no tower push",on=toggle.client.towerBarriers,info="disables conveyors that push you off the tower fences",col=2},{id="autoradio",kind="toggle",label="auto-take radio",on=toggle.autoradio,info="instantly takes the radio when you are close to its prompt range",permission="hybrid",col=2},{id="noJumpCooldown",kind="toggle",label="no jump cooldown",on=toggle.client.noJumpCooldown,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},{id="infiniteStamina",kind="toggle",label="infinite stamina",on=toggle.client.infiniteStamina,info="may freeze over time; re-enable if needed",warning=true,unstable=true,col=2},
-            section("safety",1,"protective movement and safe spot teleport"),{id="autoevadetrap",kind="toggle",label="Auto-Evade Trap",on=toggle.autoevadetrap,bind="evadetrap",inlinebind=true,col=1},{id="rakeshield",kind="toggle",label="rake shield",on=toggle.rakeshield,info="retreats in approximately 0.429m steps every 0.05s; checks the configured radius and active trap protection",col=1},{id="rakeshieldrange",kind="slider",label="shield range",value=toggle.rakeshieldrange,min=20,max=50,display=tostring(toggle.rakeshieldrange).."m",col=1},{id="tpsafespot",kind="action",label="TP Safe Spot",col=1},{id="bindsafespot",kind="bind",label="TP Safe Spot Bind",bind="safespot",inlinebind=true,col=1},
+            section("safety",1,"protective movement and safe spot teleport"),{id="autoevadetrap",kind="toggle",label="Auto-Evade Trap",on=toggle.autoevadetrap,bind="evadetrap",inlinebind=true,col=1},{id="rakeshield",kind="toggle",label="rake shield",on=toggle.rakeshield,info="pushes you away from the rake",col=1},{id="rakeshieldrange",kind="slider",label="shield range",value=toggle.rakeshieldrange,min=20,max=50,display=tostring(toggle.rakeshieldrange).."m",col=1},{id="tpsafespot",kind="action",label="Warp to Safe Spot",col=1},{id="bindsafespot",kind="bind",label="Warp to Safe Spot Bind",bind="safespot",inlinebind=true,col=1},
             section("power usage",2),{id="hudpower",kind="toggle",label="power left",on=toggle.hudelements.power,info="reads station power, with a voltmeter fallback",col=2},{id="autopower",kind="toggle",label="auto-power station",on=toggle.autopower,info="automatically starts the station while you remain within 4 meters of it",permission="hybrid",col=2},{id="autopowertoolbox",kind="toggle",label="require toolbox",on=toggle.autopowerrequiretoolbox,info="only lets auto-power run while a toolbox is equipped",col=2},{id="poweractivity",kind="toggle",label="activity panel",on=toggle.poweractivity,col=2},{id="poweractivitymodeselect",kind="dropdown",label="show panel when",value=toggle.poweractivitymode,col=2},
-            section("players",2),{id="playerelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(false),col=2},{id="playeritemsselect",kind="dropdown",label="show player items",value=toggle.playeritemslabel(),col=2},{id="playerstyleselect",kind="dropdown",label="esp style",value=toggle.playeresp.style,col=2},{id="playerstacking",kind="toggle",label="Stacking Elements",on=toggle.playeresp.stacking,info="stacks nearby player panels to reduce overlap",col=2},{id="playerdistance",kind="slider",label="render distance",value=toggle.playeresp.distance,min=10,max=200,display=tostring(toggle.playeresp.distance).."m",col=2},
+            section("players",2),{id="playerelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(false),col=2},{id="playeritemsselect",kind="dropdown",label="show player items",value=toggle.playeritemslabel(),col=2},{id="playerstyleselect",kind="dropdown",label="esp style",value=toggle.playeresp.style,col=2},{id="playerstacking",kind="toggle",label="Stacking Elements",on=toggle.playeresp.stacking,info="stacks nearby player panels to reduce overlap",col=2},{id="playerdistance",kind="slider",label="Detailed Render Distance",value=toggle.playeresp.detaildistance,min=15,max=150,display=tostring(toggle.playeresp.detaildistance).."m",col=2},
             section("tracers",2),{id="tracersselect",kind="dropdown",label="Show Tracers",value=toggle.multilabel(toggle.tracers.order,toggle.tracers.selected),col=2},{id="traceropacity",kind="slider",label="Tracer Opacity",value=toggle.tracers.opacity,min=0.1,max=1,display=tostring(math.floor(toggle.tracers.opacity*100+0.5)).."%",col=2},{id="tracerspeed",kind="slider",label="Tracer Speed",value=toggle.tracers.speed,min=0.5,max=2,display=string.format("%.2f",toggle.tracers.speed),col=2},section("distance esp",2),{id="distance",kind="toggle",label="distance",on=toggle.distance,colorindex="distance",col=2},{id="distancepositionselect",kind="dropdown",label="label position",value=toggle.distanceposition,col=2},{id="distancemin",kind="slider",label="show distance after",value=toggle.distancemin,min=0,max=100,display=tostring(toggle.distancemin).."m",col=2},
             section("rake",1),{id="hudtarget",kind="toggle",label="show target hud",on=toggle.hudelements.target,col=1},{id="rakenotifydistance",kind="slider",label="warn distance",value=toggle.notifysettings.rakedistance,min=5,max=100,display=tostring(toggle.notifysettings.rakedistance).."m",col=1},{id="rakestyleselect",kind="dropdown",label="esp style",value=toggle.rakeespstyle,col=1},{id="rakeelementsselect",kind="dropdown",label="display elements",value=toggle.espelementslabel(true),col=1},{id="rakerenderdistance",kind="slider",label="render distance",value=toggle.rakerenderdistance,min=10,max=200,display=tostring(toggle.rakerenderdistance).."m",col=1},{id="traps",kind="toggle",label="trap esp",on=espgroups.traps,colorindex=7,col=1},
             section("scraps",1),{id="hudscrap",kind="toggle",label="scrap amount hud",on=toggle.hudelements.scrap,col=1},{id="scrapeditsselect",kind="dropdown",label="Choose Tier To Edit",value=scrap.label,col=1},{id="scrapedittoggle",kind="toggle",label=scrap.label.." ESP",on=espgroups.items[scrap.id],itemkey=scrap.id,colorindex=scrap.color,col=1},{id="scrapstyleselect",kind="dropdown",label="Display Scrap Elements",value=toggle.multilabel({"tiers","points"},elements),col=1},
@@ -1648,13 +1681,228 @@ toggle.featurecatalog=function(tab)
     end
     return {}
 end
+toggle.itemart={
+["Vest"]="iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAIMklEQVR42u2Ysa5kSVKGv4jIzHNO1a3uaWZ6EBistBrAYCUEBh5YOFg8BUJ48ATg8gIrDIS0Bg+AhYGFhzMrYeBgwcyswy7T20PfqjonMyIwTk2r1XSr7/TOGkibUkl1S3luRMb/R/x/HvjF+tmWfIN9r+/N2+chS98Sy3/eB7R3HFJue37eFXz0S9O0PokoByBaa3p//+xz4Ke3DeVWjXylYgoMgNZOvy5Vv1MgylyYbNLex/2zZ//1L98Ahbcmb9ZOn9rywWbtkFqW1HpMtfaZavnT1ypkr/39oYj9tdp0b9Mh63LK6fhBPnn6K/nBh08/ux3sm1DtjdxB2/Gfy/JBlvk0dDqltlOqLallzjItn07Loz8DPvr6ocePH3+3zIe/FK2fa5lS65JSF7fp6FrvtrY88tLmf3w1xttWeUCCke7/Gu6/r7VmUc2IFCcyU4LkdxW+r6X9lWD/sNzd3bnwx2Q/WFsgwzNDSVTVyIwYvWum//urMd43wb3+wmdESvSNejxJscJ2SbFSzbc1Rh+JlI/Vyp+IGJ5JeI62VANs9E56x3sngdIaPvKL9P4wCN/ZqqI/USskQkTg2woI07JQWlNIE8ixraP31d1HikgBkfl4ZF5mMkGLoaaUUjguhx8/JPaDKkitKJCubOsVEwGSy/0LailkOFqq1PlQRiTH40xXpY/B5fyCcb2SEUCh1EppjalW+5/nX347FRT0o1onIFEtlGnGSiUj2NYNqxNiBpIIMIYzRkdNWeYDqYX5cCTc6b1DwnVbnz64S9+10rdfdncUQVVxHyQgCO6DNi+IKmNbyQiu5xf4tlJKofcNwhEz1AwTYVsv9Mvl6bcBcQKM7fqd0TdKLTvZ3SEcRCGDfoXwAZlE+u1Qne1ciLGRMRjdyBggKf1yJdN/89UY71tBB4qq/LbgjO2qZFBrRXRPDmD0jfBBRpC+dywI/foCEWjzgdguSDp4iFpBbfreJzDdYsj7JLjrbK3f09I+UWup1lS1oVYxq6gVRG9yLIaoIWIvv6tV1BqZQngQkSCqVmog/NqPltPv3JLT9zUCiMjf1DanldbNamqpqVZTtaTVOdXK7mpEE5EU0VTdf1ObspQlEU0rLUU1gbQyjdtvf/9qrG9iFvTGjU/U6r+VOpXRryzHR+IRrJfzPv5j3HYXhACEzERIQBHVvcIZRAaqBiTpTmREqQvV5t87n3/y6S1Jf2OV3lK9ENG/RepvJYSWpqp6awzZ4bVCplCnA/PxDtQID8QqIoKUnQYphohibSJTmZYjpU7hkWZT+Y1+Pf/gFjMfkuDXJ/kLLfOfa6lei1m409eVcCcFJB0tlcxASyEyMStYrUQm+OD05COGO2NdUbO9y8dGApGhatV9xHcFnTL6P70pSXuTObB2+KNSph+olZiPR/3w6ceyrisiQpnmlx0sZkRCa5VSG33tQBJj11wRezlJrFTqNLEcDgTJuF4RNVUzz8w/sNY+j7798PUk9TU+JnAS0b+TOomWKtfzRbZ1ZV4OlGmm1kZ67NKVcuMitLIrzXq5gBgqSvgg3IlIRI0YnePpxOF4IiP29hUEMjPl+8uy/OoNPX3bmElgZMQWfcudc/Dsv3/M+XyPitK3lSSx2rBasVLx4ZzP94gotTUyHB8DHwEZHI93ZAYixt3hwDRNLKdHJImCqKmIirn78SFKsiV5JVy26yUzkx3RTo/E+wYk03LCE8bYWA53XM9nMhMVQW6K4mPfSwRtnnny0VM+/8//YPRBkIgII2Qf8BmpMgds70xQVEwzHTUlM1/CAU5bFtbLlcv9V6CFjGD0sY+SsRFitHlGh+LDSRF635BSeP7ll2zbBhF7I6khGpCJiMia68OUJNPJCFQVySTD9ztm7AZBTfExEAQh2a73hI999IjsHM3YCZaBmjD6xouvfkq4gxqqhqmRkbgPapt5ND16mFkQURCnXy97O2XsSKWyXu4REcwKKsrwcbtZlb0imYx+JTOwOqHFdpeTcRMc2UeTGSKyjy0fbNcLznhYgnWa8C6E95u+NkbfdiOwlxiRJCIQ0X2uhSMJmQkiqBjhjtUFoZN5s1wqt2fiJUpYxcfGeMMV4I0Q9/WKu6Ol0eaFOu0jBBHUKqVNiNW9KUqjLXc7V3cC30ifaKl7hTIpbUKtIrI7cN/GDnWpNyNsD/eDmYkIIErf9lNJmTCz24Vn4NfLnthuKLC23zvSAwTUDLXC6BuoEii1TUQGfnVEC+EC0fcRpCbTNMm6ru+u4NcmQICMXb9bqyjO6CveV9LXvYlIlKQUI8dKpoNARMfHSvqGiCIJ6/krsq9YbUAgucMsAlbKuq7r5WGOOnZLHyQRTqHSL1fG2Chtt/ciuyGNCDo7X5Hc5S0hM0gfu/TFDjM785CSpF9Rm/Z9BGO9XID71132Wyy/ZKktwz3MqgzviBhaJjLBtJBWiAisFMjcJTQRUcNKIcbA3UkCFUHNKHXe3ffYEGtorTsFpBKjv9G4vnnMWG0eIogW0UJrM977PmDdGWOQCNYOlFpR2XnY+5bRh0QKIYrV/d9HBlYqiNKWQ4iQ1/NFIkFtyoguApEPbZJi5UeR2YAR4QsuR7WC+/UlvKBkONfzRpvmLLVO83I0b862bYjD/kwgkWi5QR+pqUpdZvrlus9OhJQ8kf/XQJfXb3DA+Pjpkz/84osvFMjHjx9Pz58/v4MlWWAhueBw+ZrPs6zjWaztdDws093xeIx1vQoehCbiY3ctatBHnLfrY9N6LHMJSd2F20NSpANfPeSm9//iFbC856vin/WlqfOL9S2v/wWOAbquBxVHsQAAAABJRU5ErkJggg==",
+["Compass"]="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",
+["Map"]="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",
+["StunStick"]="iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAEAElEQVR42tVXTWhcVRg9976/mZd5M5m8TObnZdpp0tgSlKgxICJEkFJsQXAxUYuShRVE0G6yEFEHdKMEfyIuW7oQRGmR4qLFbhIJgosaFxYp/pVpsxBF2iSTmffue/d9LvKCFbQmzkxePNvHfPfc833n3G8UxIhqtarkcjmlUqnzeh0h/o9QYjqX1QD+QzY7VcxlX9EhSw0vuLRbROFExAAUPph7ly5euEDHnzpG/SnzGQCoxifaBohIAYBzn557VkoZElFj+fp1OvTQ5CkAqNVq6l9us5OtJyI2NTWF6enp3vsmxl/nnBMAY3V15af+oj0bKbsls2jdVO/LxcW3aAOe7wd0+vRHR2/9Hk+kAAoRsXw2+/jMiRe8a/W6R0S0tHT5CwDK/Py8+ne/U3eK4BmAGGNULhROnD1zVl9a+sY/dPhwi2v6cQByYWGBx+pcAKxs26Xh8uBKLpv1k4ZOGsP5f/ECdoT15MY5xFT1sUDKtOe5qqaqXw0fOPh0tVpVAFCs6tUAblmW/fCDD1wbzOdCU9eumqZZ3EmRbvveAsDEPWPv3T9+L/XoBlmmfmSnPXDb2du/pzA6cfeYa2d6Sde0z7dDjndZPQaA+lKZ2cbNG4bbWhears9sxmK8rY1eo5G9zpG7hvdR3uqhdMKYi3lJ+XNbAcBHAX1k755vi/22tAz9F8uy7KhrW+6c2sXZk8Jxnvf94M71ZgsS7LXm2trvkXoybmPwoXx+oOI4v9m9vaGZMC5FxJRI3W0V60Z7Q6aqtSDw+z3hQRJmblEtVnNsGMNxxvY7JWFnLDIN/eN2jME77NwNCRnNtoSnCSHWJNhLkarxxspkZLjRcunREadI2VQPpRL6q+3GSqcU5AMADabTfYzzWU94YSj9HxuueDs6I/a/lAoAlAdyp4acEtkpk3oS2hO7JZQBQB0ayJ2sFPOyL5ORKTN5ZRBIRrPH2ircgUhBDkgEMjgWhJyBQqYp7OQy0IrqB+2Gajuu5QCoODLyXDqT0ZuNtYAoXA+JX+2Uc1m7lyuX7YJOie8CX6Rvrq4xX4ZHm0Kc75Q51DYvJ5VAf0OQzKw2mvCJPovItd3ajrh2uFgcrzilwO7NyJ5E0tV1/Y7NTaaTD/t/RsjYO34QKEIEPKRwTgjx/W7IPRUA9jlOteKUKGulQ9NILCOLzOaK3+nVaNtzZ9u2pTC8KTxBfhCwkOFl3MBKVI/iJkgFK/kJRzjkei5CBIuu634YzWXHjcG3kXkKgPDgYPFJQ1UeableK5CScSjvR6qxrs3TVvBrREASDjRbLjzfT4ZEPzda7sXNFb9rcbEV1COVcrrx9arn9jV9wfwQL0opr+yWjaUbr1HXCCmdDuR/wh8uMoZ/1Z/B4wAAAABJRU5ErkJggg==",
+["Watch"]="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",
+["Vitamins"]="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",
+["Monitor"]="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",
+["FirstAidKit"]="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",
+["Tracker"]="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",
+["RakeTrap"]="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",
+["UV_Lamp"]="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",
+["Voltmeter"]="iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAFFklEQVR42s2YT48kRxHFfy+yqrpndtjZFRobGcxi2TcOgCyExQEjDj5y44Nw4Btw5JvgI2dLIy4WJ5DRYgthWLCNQIvXnpmdnq7KjOCQVTPdI3vdPdsLLqmqq0uRmS/+vYhM+JJfuoG8gLjh+OnyL4MyO5lrq0UPDw/vDF03/4qZAyy8vd0k60BxJdUB/We8A4SGXIbThx/+eZcADfD5nW/d29tvjpu2uxealtPlFFd+1/gea8EgwBAXw6KUoX/j8b/+/haQgPKkxZtNAc46fyOSfZN59wtzjwAhd1yBGeDIAbMaYA6YYz7OgJFk2Urzy2D4MfAWvC445mkBXl6l5JNP3vv9r54m+G5//ZWfh1Q2ld8KIOHGa6/tMZsNnJ2Jg4PYGuF7/0jbiG8MsDiEBQxD5u238zW62VzH5+8R+AjyeIcWtDH8Fwut8OH29GIWFD7duQXNzLAE9+9PvBE3ABhJ5jJf7BDg68Ax1jRnTTO7dfTSt48jsPCyRi+6zNyV/6NEAJJhilyCF9THo9W5d2LBNuzFpu2MZD9yDwhVrluzD6Dpuy5BShVwMqFSWHj5Cbz6JjznT0vUBvjdF15+kdS+O9vb20+WckTIIygRjITIqjljpVQbYKqPNiU8ZzsflroYzn+w+OCvv/sism42y49mH0t7UWdKEqqLj9aKqI4cS0ysqC80Igxy8VqAUDRuzc6SRBo8aIqwplpIXDw+YXnycS1qI8BYc40mhKRuzq27zyOrY6XNKarZiiIAIgiJYXHK4uThZpnYztg/fA4XKESEdk/UV+Ag/CohQBDxxAiXJSIci0QQ9XP7DADGJZjxvgQWnzdg1KvKjvkjwj369GgTPrXNYlBBREhV+9pmbafaOg0RlkresIB98cznvZ+CzoMxUWPbOqI1QlNUfXfnYmnVn5V46+PJVDqVlElW1d3beGCrGNTKgtWSG5gyILwg2RgefH5SPQ3AkYqxGkPMDu7SpPYyAZiyc/VN9ZHaDjMhCfl2PUazDQnW9QxF0M1vofkBMXHOVQKsj1EFFlFWoyEkxY4tWBlCgEwjJp96FUhWK4p7teoUc9MGygwbXRvEeen9dGc0cx0miJgsYwlrWkypZqc7PvREqXGHTck0uX5iQ8XuK8lqCzXqLgnPmaFfkFKHzLC2RUprciGubUyfRRZfLnGlvEpmubyobVVrqOlo2gYkvBRKzsTmm7gbAoyQQFdROFqPoOQeA9q9fVJqSW1HN98DE8NyScnlM/ZXm2fyRjHYLH0ZsFzrcDW2TqkhzWY03RxLDd18zu07d5jt3Vpt+K+FiHYL8OioXRicI+FxdaqBQE2DNS1N1+HA0dER3/3ed5AXytDXBImJGWMqey5rfGcAh2FQ7eKCxnSJTuMEiqAMAwIen57yp3f+yOknH7NWGrHadFRvn5z9c3m2M4AA7n4Q4d5K2GTGsYgEQe6XhGcePvw3f3v/L+Sc8ZwrQRMETpsMRXGP0vGNol0ADMAePHjQl8hves72uF9GieJeSpRSohSPkj1KyTEMyyh5iIgSuV9Gzr17zsWzF89eLhZ9zsXNvbzPyx8MmwTjpuckujh99JvZ/uEh8EMPF+5yL8Jd4aXeJctLUcmDohRFuCLcItzwYh6e+mH5h9z3Px3uf7pRJdn6+OKrX3vp+27Wrk7cAsP1fbQUg+JQ2L7woBA5IffFb08/+ug/Nz3b+V8dA+tZLmjbjfvZ+Pvr1QP0nVvu/3b9FxCFsGHUn3HkAAAAAElFTkSuQmCC",
+["Toolbox"]="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",
+["FlareGun"]="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",
+}
+toggle.playerbackpackstyle="Image";toggle.crateinventorystyle="Image"
+toggle.itempools={};toggle.itemimagekeys=setmetatable({},{__mode="k"});toggle.itemimagefree=setmetatable({},{__mode="k"});toggle.itemdemand={};toggle.itempoolcount=0;toggle.itemidle=setmetatable({},{__mode="k"})
+toggle.itemkey=function(name)return({FlareGunPickUp="FlareGun",FlareGunTool="FlareGun",VestModel="Vest",RakeTrapModel="RakeTrap",UVLamp="UV_Lamp",Stun="StunStick"})[name]or name end
+toggle.makeitemimage=function(key)
+    local pool=toggle.itempools[key];if not pool then pool={free={},count=0};toggle.itempools[key]=pool end
+    if pool.count>=24 or toggle.itempoolcount>=128 then return end
+    local data=toggle.itemart[key];if not data then return end;if data:sub(1,8)~="\137PNG\r\n\26\n"then data=toggle.iconbase64(data);toggle.itemart[key]=data end
+    local d=toggle.newicon(0);d.Data=data;d.Size=Vector2.new(28,28);local state=toggle.drawingstates[d];state.backgroundprime=true;local ok,native=pcall(state.prime);state.backgroundprime=nil
+    if not ok or not native then remove(d);return end
+    toggle.itemimagekeys[d]=key;toggle.itemimagefree[d]=true;toggle.itemidle[d]=tick();pool.free[#pool.free+1]=d;pool.count=pool.count+1;toggle.itempoolcount=toggle.itempoolcount+1;return d
+end
+toggle.acquireitemimage=function(name)
+    local key=toggle.itemkey(name);if not toggle.itemart[key]then return end;local pool=toggle.itempools[key]
+    if pool then while #pool.free>0 do local d=table.remove(pool.free);toggle.itemimagefree[d]=nil;toggle.itemidle[d]=nil;if not toggle.removeddraw[d]then return d end end end
+    toggle.itemdemand[key]=true
+end
+toggle.releaseitemimage=function(d)
+    if not d or toggle.removeddraw[d]or toggle.itemimagefree[d]then return end;toggle.setvisible(d,false);local key=toggle.itemimagekeys[d];local pool=key and toggle.itempools[key];if pool then toggle.itemimagefree[d]=true;toggle.itemidle[d]=tick();pool.free[#pool.free+1]=d end
+end
+toggle.itempaintstate=setmetatable({},{__mode="k"})
+toggle.paintitemimage=function(d,x,y,size,a,z,on,height)
+    if not d or toggle.removeddraw[d]then return end
+    local state=toggle.itempaintstate[d];if not state then state={};toggle.itempaintstate[d]=state end
+    if state.x~=x or state.y~=y then d.Position=Vector2.new(x,y);state.x=x;state.y=y end
+    height=height or size;if state.size~=size or state.height~=height then d.Size=Vector2.new(size,height);state.size=size;state.height=height end
+    if state.alpha~=a then d.Transparency=a;state.alpha=a end
+    if state.z~=z then d.ZIndex=z;state.z=z end
+    toggle.setvisible(d,on and a>0.01)
+end
+toggle.backpackraster={
+["Vest"]="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",
+["Compass"]="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",
+["Map"]="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",
+["StunStick"]="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",
+["Watch"]="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAEAAAAAgAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVDAAAAAMAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAECAw8BgwQfAcNFKQIDxTbCBAXtw8PDxEAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAACAAAAAQUMEb8IEhj/ChIY/woSGv8NGSH/CxYftAAAAAoAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAABw0UrgoTGfsJEhn4CRQc/Q0aIvoPHCj/CxYdrAAAAAgAAAACAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAEHDBSyChMa/wkSGvsKFBz/Dhoj/w4bJfgPGyX/DBYeoQAAAAEAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAULE6wNFh3/DRYe+woVHP8NGSL/Dx0m/w0bIv4NGST/ChQamAAAAAYAAAACAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAvLz8QGx4hxhwiJP8cISX8HSQo/x0nLfENGiGJCxYf7AwYIf0JExruChQUGQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAKCgoJhUWF84LDAz/AwMD/QMCAv8KCgr+HR8g/UJGR5kVHSTXCxUc/wkSF+ANDRoTAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAS8vLxARFBTMAwMD/wAAAPwAAAD/AAAA/wAAAP8AAAD/HB4e/z9ESP8SGyP/CBIY5QwMGRQAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAFxkZbQUGBv8AAAD6AAAA/wAAAP8AAAD/AAAA/wEBAf8AAAD8MjM1/Tg/RP8GERjlGRkZFAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf///wENDw/DAAAA/QAAAP0KCgr/CQoJ/xISEv8ICAn/AQEB/wAAAP8RERL+SUxQ/xQeJeUADAwUAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAPDw8EQsLDOQAAAD/AQEB/i8vMP8vMDD/QkND/yAgIf8AAAD/AAAA/wMDA/5CRUf/ICow5QAAABQAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAoKCgZCQkL5gAAAP8AAAD+FxcX/yUmJ/8kJST/Dg4O/wAAAP8AAAD/AQIC/js9Pv8jKzLlAAAAFAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAD9fXwgLDA3cAAAA/wAAAP0EBAT/BgYG/wYFBf8CAgL/AAAA/wAAAP8DAwP+ODs9/xwkKuUAAAAUAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAEBABEUEqUCAgL/AAAA/AAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wsMDf41ODz/EBkf5QAMDBQAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAHh4eQgkJCf8AAAD6AAAB/gEBAf8BAQH/AAAA/wEBAf8AAAD/IiMk/iQqMP8HERjkDBkZFAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL///8BFBYakwcICP8AAAD/AAAA/wAAAP8AAAD/AAAA/xQVFv8rMzn+Eh0m/gsUHOcLFxcWAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAIqVVUGGRsblhAQEfcGBgb9BQUF/wgICf8bHR7/KDE7/xwsO/wWJTT/DRYf1AAAAAoAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAAAFxwfoRsiJf8cIiX7HyQo/x0mMP8YKDj+Fyc2/RAbJ+8IFRk7AAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAIDDBGUChQb/wwVHPsKFBz/Dhol/xUkM/sQHSj/CxQZWQAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAYLEpcLEhn7ChIZ+AoUHP4PGiT7EBwo/wkVHYEAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAABAsQnwkRGP8JEhn/CxMa/w0YIf8JFh2nAAAAAAAAAAQAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAEFCwsuBgoQeQYNE6YGDhTjBxAWxQAPHxAAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADxAAAAAJAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAQAAAACAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+["Vitamins"]="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",
+["Monitor"]="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAA////wL///8C////Av///wL///8BAAAAAQAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL///8CVapVAwAAAAYAAAAGAAAABgAAAAkAAAALAAAACwAAAAsAAAAPHw8fEBcXFwsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABAAAAEjw5O5t2dXaqfXt7qXl3d6hqaGqvSEZJtBYWGLIBAAG0BAECvAkGCb0QDRC8FhIWwhgVF8cYFRfGFRMVxwcGBtAODA7SDgsMxwAAACIAAAAAAAAAAQAAAAAAAAAAAAAAAwAAAAAPDw+GGhgZ/zc1Nv8+PD7/Q0FD/0ZERf8uLC7/HBoc/yUjJf81MzX/QD0//0ZDRv9KR0r/SkhK/0hFSP86Nzr/IB0f/wkHCf8FBQb/AQEDpgAAAAEAAAADAAAAAAAAAAMAAAABGBISKgkICfEDAwP6BQQF+R4cHftubG77mJeX/KKgovyop6j8srGy/MTDwvzKycn8ysrK/MrKyvzJycn9x8bH/ZiYmP0+Oj79FBIU/AoJCvoEBAT6AAAATQAAAAAAAAADAAAABAAAAAAQDhCKBgUF/wkJCfsXFBf/UE5Q/9/e3v//////////////////////////////////////////////////////1tbW/0dERv8TEBP/Dw0O/AcHB/8BAQGsAAAAAAAAAAIAAAABAAAABQUGBsUCAwL+CgkK/RkVGP9YVlj/5OPj//7+/v/7+/v//f39//z8/P/9/f3//f39//39/f/9/f3//Pz8//7+/v/a2tr/TEpM/xMQEv8TDxL+Dw4P/wYHB+UAAAASAAAAAAAAAAAAAAAVAAAA7QMDA/8LCwv+GBUX/1lXWf/l5eX///////39/f/////////////////////////////////9/f3//////93e3v9TUVL/FRIU/xIQEv8WEhT/Dw4Q/wUFBSwAAAAAAAAAAAAAABgAAADvBQUF/w0MDf4XExb/WFZY/+Xl5f///////f39//////////////////////////////////39/f//////4uHh/1VTVf8UERT/Eg8S/xsXGf8VExX9BQsLLAAAAAAAAAAAAAAAEQAAAOoHBwj/Dw0O/hYSFf9YVlf/5OTl///////9/f3//////////////////////////////////f39///////i4eH/U1FS/xMQE/8WEhT/HRkb/xcUFv8FCwssAAAAAAAAAAAAAAAJAQAB0gcHB/8ODQ39FhIU/1hWWP/j4+P///////7+/v/////////////////////////////////9/f3//////+Hh4f9XVVf/FRMV/xQSE/4ZFRf/FhIV6wwMDBUAAAAAAAAAAwAAAAABAQGdBgcG/w0NDvsUERP/VlNV/+Li4v/+/v7//Pz8//39/f/8/Pz//Pz8//z8/P/8/Pz//Pz8//v7/P/9/f3/39/f/1RSVP8VERT/Eg8R/RwYG/8XFBW8AAAAAgAAAAEAAAAEAAAAAAAAAGkHBgf/Dg0O+xIQEv9QTlD/4ODg///////////////////////////////////////////////////////b29v/QT9B/wwLDP8WEhX7Hhse/xYUFIkAAAAAAAAABAAAAAIAAAAAAAAAKwcGBvEPDQ79EQ4Q/Dk2Of6sqqz+29va/tzb2/7U1NT+xsXG/cDAwP3Av7/9v7+//cC/v/2/vr/9vLy8/YqJiv0jISP9DgwN/RgTFvseGx36EREVSAAAAAAAAAAEAAAAAAAAAAMAAAABBAMEogwLDP8RDhD+Ghga/zg2OP9PTE7/UU9Q/0lGSP85Nzn/NTI1/zg1N/88Ojz/QT5A/z88P/82Mzb/KCQn/yMeIf8ZFRj/GhUY/xsXGcUAADMFAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAAtBQUF4AkICeYKCgvlDAwN5Q0MDeUODQ3lEA4Q5RMSE90YFhncHhse3SMgIt0mISTdJCAi3SEfIN0iHiDdIR4g3RYSE9sSDxHdEBATTQAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAAAAGQAAABgKCgoYCgoKGAoKChgKFQoYGAwYFRkZGRQYGBgVGBgYFRgYGBUYGBgVGBgYFRgYGBUMDAwVDAwMFQAAABUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+["FirstAidKit"]="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",
+["Tracker"]="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",
+["RakeTrap"]="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQAAAABVVVUDAAAAAFVVVQMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAB/AgAAAAAAAAAAAAAAAAAAAAB/f38CAAAAAAEBAQD///8BAQEBAH9/fwL///8BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAADQAAABEAAAADLjI2QgAAAAA2OkI9AAAABgAAAAAAAAAGAAAAAAAAAAB/f38Cf39/Av///wF/f38CAAAAAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAGR4eMhogI048QURZMjg8uklQXWVOVl3vWmBkf2xxd/Juc3ljh4yQont/g0hVVVwkUlpaIgAAAAAAAAAAAAAAAAAAAAAAAAAAAQECAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAABodIFc9QUeMPkRJ9D1BRdc1OT7/OT9G/ENJT/9VW2H/bnV7/4yUmvu1vML/usLGzr7DyNymrLGhRElPLXB2eVZjZ2w2PENDJjM7Ox4AAAAJAAAAAAAAAAAAAAAAAAAAAX9/fwIRESIPPUJGykhNU/s5PkP9LzM5/ysuMvwuMjb/MDY6/zpBRf9PVVr4cXqA9IqSmvSvtr3/zNPZ/7nBxv2ttLnrwMbK+sDGx7Ozt73IqK2ymXqBhJYxMTEff39/AgAAAAE/Pz8EAAAAACguMVJJT1T7Q0lP/jg+QvwtMzf/Jyww/zQ4POBKT1TURU1QpGdtdLOIj5a0lp2jr4uSmpCQmJ6hoqqx/rvCyP/L0df/1dvg/9TZ3v/S193/qrK4/1pka0wAAAAAf39/BFVVVQMAAAAANzs/QEdNUvlCSE7+Mjc8/yEmKa0RFRlHY2pvlJKZoPKYoKjps7nB8s7V2vbh5uv05+ru49fc4NmYnqW7Zm52YX+GjbKdpq30oamv/bK6wP6Tm6DrNTU7KwAAAAB/f38CAH9/AgAAAAArMTcpU1hf6zxDR/kcHyJhAQAAAAAAAABeZ2xZiZGY/5ujqv+0vML/09nd/+jr7v/t8PL/5Onu/4GIjrUAAAAAAAAAAFxjaG5QV139hoyT/11iZ88AAAAI////AQAAAAEAAAABAAAAARwcHAlSV17jRUtNiwAAAAAAAAAAHiMmazA0OTWRmaDDsbi//qWttP2/xsv/09ne/77FzP+ZoKj9Vl1k/zM5PrtgZmtaPkRJvzE3PP1WXGH/QkdLrAAAAAA/Pz8EAAAAAAAAAABVVaoDAAAAAFpfZbVsdHrKW2Jrb1JcX1BUW2L+XmVssqKpsbWttbz/eIGI/HuFjf9/h4/Aa3F4vFZeZv89Q0n9PkRK/1phaP8/RUr/LzU5/ERLUP85QER3AAAAAFVVVQMAAAAAAAAAAKqqqgMAAAAAeX+DeISMk/96g4n/hI2V/3qEjf2Bi5X/kpuj/3+IkP9qdHv9Y2tz/0xTW7VPVlyzSlFZ/zxBSP42O0D9Mzk++zA1Ovw0OT79NDk+/xUVFTAAAAAAAAAAAgAAAAAAAAAAVVVVAwAAAABaX2SQfIKJ/253fvZ3f4j/eIGK/36Gkfp/h5L8eoKL/213fv9ianL/XmVt/1NaYf9FTFP/PUNJ/zQ5Pv8vNDr8LDE3+i8zOP8fJSfAAAAABwAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAD9FRSxfZWneV11j/09XXuBdZWv4cXqD/3mCjP93gIj8anR7+2Jrc/taYmj5T1dd+UZNU/s7QUf8NTtA/iwxNv8hJCj/GyAh2xQaGjEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAABAAAAACYsMS4lKi9nJycnGjI7PzhITlKmVl1k8F1lbf9bY2v/WmFo/1FYX/9JT1b/OkFG/y0zN/8jKCz4GR0exw8SElMLCwAXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAlJSsvNDY8XTI2PXUxNjqVLTQ5rikuMaQdISWBFRocYQsTE0EAAAAEAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACVVVVAwAAAAJVVVUDVVVVAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAj8/PwQzMzMFPz8/BP///wFVVVUDMzMzBQAAAAQAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+["UV_Lamp"]="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",
+["Voltmeter"]="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",
+["Toolbox"]="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",
+["FlareGun"]="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",
+}
+toggle.backpackcrc={[0]=0,1996959894,3993919788,2567524794,124634137,1886057615,3915621685,2657392035,249268274,2044508324,3772115230,2547177864,162941995,2125561021,3887607047,2428444049,498536548,1789927666,4089016648,2227061214,450548861,1843258603,4107580753,2211677639,325883990,1684777152,4251122042,2321926636,335633487,1661365465,4195302755,2366115317,997073096,1281953886,3579855332,2724688242,1006888145,1258607687,3524101629,2768942443,901097722,1119000684,3686517206,2898065728,853044451,1172266101,3705015759,2882616665,651767980,1373503546,3369554304,3218104598,565507253,1454621731,3485111705,3099436303,671266974,1594198024,3322730930,2970347812,795835527,1483230225,3244367275,3060149565,1994146192,31158534,2563907772,4023717930,1907459465,112637215,2680153253,3904427059,2013776290,251722036,2517215374,3775830040,2137656763,141376813,2439277719,3865271297,1802195444,476864866,2238001368,4066508878,1812370925,453092731,2181625025,4111451223,1706088902,314042704,2344532202,4240017532,1658658271,366619977,2362670323,4224994405,1303535960,984961486,2747007092,3569037538,1256170817,1037604311,2765210733,3554079995,1131014506,879679996,2909243462,3663771856,1141124467,855842277,2852801631,3708648649,1342533948,654459306,3188396048,3373015174,1466479909,544179635,3110523913,3462522015,1591671054,702138776,2966460450,3352799412,1504918807,783551873,3082640443,3233442989,3988292384,2596254646,62317068,1957810842,3939845945,2647816111,81470997,1943803523,3814918930,2489596804,225274430,2053790376,3826175755,2466906013,167816743,2097651377,4027552580,2265490386,503444072,1762050814,4150417245,2154129355,426522225,1852507879,4275313526,2312317920,282753626,1742555852,4189708143,2394877945,397917763,1622183637,3604390888,2714866558,953729732,1340076626,3518719985,2797360999,1068828381,1219638859,3624741850,2936675148,906185462,1090812512,3747672003,2825379669,829329135,1181335161,3412177804,3160834842,628085408,1382605366,3423369109,3138078467,570562233,1426400815,3317316542,2998733608,733239954,1555261956,3268935591,3050360625,752459403,1541320221,2607071920,3965973030,1969922972,40735498,2617837225,3943577151,1913087877,83908371,2512341634,3803740692,2075208622,213261112,2463272603,3855990285,2094854071,198958881,2262029012,4057260610,1759359992,534414190,2176718541,4139329115,1873836001,414664567,2282248934,4279200368,1711684554,285281116,2405801727,4167216745,1634467795,376229701,2685067896,3608007406,1308918612,956543938,2808555105,3495958263,1231636301,1047427035,2932959818,3654703836,1088359270,936918000,2847714899,3736837829,1202900863,817233897,3183342108,3401237130,1404277552,615818150,3134207493,3453421203,1423857449,601450431,3009837614,3294710456,1567103746,711928724,3020668471,3272380065,1510334235,755167117}
+toggle.backpackbatch={cache={},order={},cursor=0,bytes=0,queue={head=1,count=0},pending={},owners=setmetatable({},{__mode="k"}),sprites={}}
+toggle.backpackbe32=function(n)return string.char(math.floor(n/16777216)%256,math.floor(n/65536)%256,math.floor(n/256)%256,n%256)end
+toggle.backpackchunk=function(tag,data)
+    local input=tag..data;local crc=0xFFFFFFFF;local tablecrc=toggle.backpackcrc
+    for i=1,#input do crc=bit32.bxor(bit32.rshift(crc,8),tablecrc[bit32.band(bit32.bxor(crc,input:byte(i)),255)])end
+    return toggle.backpackbe32(#data)..input..toggle.backpackbe32(bit32.bxor(crc,0xFFFFFFFF))
+end
+toggle.preparebackpacksprites=function()
+    local state=toggle.backpackbatch
+    for key,encoded in pairs(toggle.backpackraster)do
+        local pixels=toggle.iconbase64(encoded);local rows={};if #pixels==2704 then for y=0,25 do rows[y+1]=pixels:sub(y*104+1,(y+1)*104)end;state.sprites[key]=rows end
+        toggle.backpackraster[key]=nil;toggle.wait()
+    end
+end
+toggle.requestbackpackbatch=function(rec)
+    local layout=rec.itemlayout;if not layout or not layout.image or rec.far or rec.health~=nil and rec.health<=0 then return end
+    local state=toggle.backpackbatch
+    if not layout.batchnames then
+        local names={}
+        for _,node in ipairs(rec.itemnodes or{})do if node.active and toggle.playeresp.selected[node.item.name]then local key=toggle.itemkey(node.item.name);if not state.sprites[key]then return end;names[#names+1]=key end end
+        layout.batchnames=names;layout.batchkey=#names>=2 and table.concat(names,",")or false
+    end
+    local key=layout.batchkey;if not key then return end
+    if rec.backpackbatchkey==key and rec.backpackimage and not toggle.removeddraw[rec.backpackimage]then return key end
+    local entry=state.cache[key]
+    if rec.backpackbatchkey~=key or not rec.backpackimage or toggle.removeddraw[rec.backpackimage]then state.owners[rec]=key end
+    if not entry and not state.pending[key]and state.queue.count<32 then
+        local queue=state.queue;local slot=(queue.head+queue.count-1)%32+1;queue[slot]={key=key,names=layout.batchnames};queue.count=queue.count+1;state.pending[key]=true
+    end
+    return key
+end
+toggle.advancebackpackbatch=function(job)
+    if not job.phase then
+        job.count=#job.names;job.width=math.min(6,job.count)*34-8;job.height=math.ceil(job.count/6)*30-4;job.rows={};job.row=0;job.a=1;job.b=0;job.phase="rows"
+    end
+    if job.phase=="rows"then
+        local y=job.row;local row=math.floor(y/30);local localy=y%30;local count=math.min(6,job.count-row*6);local zero=string.char(0);local pieces={zero}
+        if localy<26 then
+            local margin=(job.width-(count*34-8))/2;pieces[#pieces+1]=string.rep(zero,margin*4)
+            for i=1,count do pieces[#pieces+1]=toggle.backpackbatch.sprites[job.names[row*6+i]][localy+1];if i<count then pieces[#pieces+1]=string.rep(zero,32)end end
+            pieces[#pieces+1]=string.rep(zero,margin*4)
+        else pieces[#pieces+1]=string.rep(zero,job.width*4)end
+        local data=table.concat(pieces);for i=1,#data do job.a=(job.a+data:byte(i))%65521;job.b=(job.b+job.a)%65521 end
+        job.rows[#job.rows+1]=data;job.row=y+1
+        if job.row>=job.height then
+            local pixels=table.concat(job.rows);job.rows=nil;local blocks={string.char(120,1)};local at=1
+            while at<=#pixels do local n=math.min(65535,#pixels-at+1);local inverse=65535-n;blocks[#blocks+1]=string.char(at+n>#pixels and 1 or 0,n%256,math.floor(n/256),inverse%256,math.floor(inverse/256))..pixels:sub(at,at+n-1);at=at+n end
+            blocks[#blocks+1]=toggle.backpackbe32(job.b*65536+job.a);job.packed=table.concat(blocks);job.input="IDAT"..job.packed;job.crc=0xFFFFFFFF;job.at=1;job.phase="crc"
+        end
+    elseif job.phase=="crc"then
+        local finish=math.min(#job.input,job.at+1023);local crc=job.crc;local tablecrc=toggle.backpackcrc
+        for i=job.at,finish do crc=bit32.bxor(bit32.rshift(crc,8),tablecrc[bit32.band(bit32.bxor(crc,job.input:byte(i)),255)])end
+        job.crc=crc;job.at=finish+1
+        if job.at>#job.input then
+            local ihdr=toggle.backpackbe32(job.width)..toggle.backpackbe32(job.height)..string.char(8,6,0,0,0)
+            job.data=string.char(137,80,78,71,13,10,26,10)..toggle.backpackchunk("IHDR",ihdr)..toggle.backpackbe32(#job.packed)..job.input..toggle.backpackbe32(bit32.bxor(crc,0xFFFFFFFF))..toggle.backpackchunk("IEND","");job.phase="done";job.input=nil;job.packed=nil
+        end
+    end
+    return job.phase=="done"
+end
+toggle.servicebackpackbatches=function()
+    local state=toggle.backpackbatch;local started=tick()
+    if not state.active and state.queue.count>0 then local q=state.queue;state.active=q[q.head];q[q.head]=nil;q.head=q.head%32+1;q.count=q.count-1 end
+    local job=state.active
+    if job then
+        for step=1,8 do
+            if toggle.advancebackpackbatch(job)then
+                local slot=state.cursor%16+1;state.cursor=slot;local previous=state.order[slot];if previous and state.cache[previous]then state.bytes=state.bytes-#state.cache[previous].data;state.cache[previous]=nil end
+                state.order[slot]=job.key;state.cache[job.key]={data=job.data,width=job.width,height=job.height};state.bytes=state.bytes+#job.data;state.pending[job.key]=nil;state.active=nil;break
+            end
+            if tick()-started>=0.001 then break end
+        end
+    end
+    if tick()-started>=0.002 then return end
+    for rec,key in pairs(state.owners)do
+        local layout=rec.itemlayout
+        if rec.departed or not layout or layout.batchkey~=key then state.owners[rec]=nil
+        else local entry=state.cache[key]
+            if entry and tick()>=(rec.nextbatchupload or 0)then
+                if not rec.draws then state.owners[rec]=nil;return end
+                local d=rec.backpackimage;if not d or toggle.removeddraw[d]then d=toggle.newicon(0);rec.backpackimage=d;rec.draws[#rec.draws+1]=d end
+                local ok,err=pcall(function()
+                    if d.Data~=entry.data then d.Data=entry.data end;d.Size=Vector2.new(entry.width,entry.height)
+                    local draw=toggle.drawingstates[d];if draw and not draw.native then draw.backgroundprime=true;local loaded,native=pcall(draw.prime);draw.backgroundprime=nil;assert(loaded and native,"backpack image not ready")end
+                end)
+                if ok then rec.backpackbatchkey=key;rec.backpackwidth=entry.width;rec.backpackheight=entry.height;state.owners[rec]=nil;rec.nextbatchupload=nil else rec.nextbatchupload=tick()+1;toggle.health.profileerror=tostring(err)end
+                return
+            end
+        end
+    end
+end
+toggle.paintbackpackbatch=function(rec,x,y,w,alpha)
+    local key=toggle.requestbackpackbatch(rec);local image=rec.backpackimage;local layout=rec.itemlayout
+    local on=key and image and not toggle.removeddraw[image]and rec.backpackbatchkey==key and layout and not layout.animating and alpha>0.01
+    if not on then if image then toggle.setvisible(image,false)end;return false end
+    local nodes=rec.itemnodes or{};local layer=nodes[1]and nodes[1].text.ZIndex or 1024
+    toggle.paintitemimage(image,x+w/2-rec.backpackwidth/2,y+rec.itemy,rec.backpackwidth,alpha,layer,true,rec.backpackheight)
+    for _,node in ipairs(nodes)do
+        if node.image then toggle.releaseitemimage(node.image);node.image=nil end
+        local text=node.text
+        if node.slot and node.item.name=="FlareGun"and(rec.flarecount or 0)>1 then
+            local style=toggle.playeritemstyle(node.item.name);local itemcolor=toggle.hudtextcolor(style.rgb and rgb(0)or style.labelcolor)
+            toggle.playerprop(text,"Text","x"..tostring(rec.flarecount));toggle.playerprop(text,"Font",font);toggle.playerprop(text,"Size",11);toggle.playerprop(text,"Color",toggle.white);toggle.playerprop(text,"Transparency",alpha);toggle.nametagoutline(text,alpha,itemcolor,rec);toggle.centertext(text,x+w/2+node.x+8,y+rec.itemy+node.y+24);toggle.playerprop(text,"Visible",true)
+        else toggle.playerprop(text,"Visible",false)end
+    end
+    return true
+end
+
+toggle.preloaditemimages=function()
+    toggle.preparebackpacksprites()
+    local copies={};for key in pairs(toggle.itemart)do copies[key]=2 end
+    for _,rec in pairs(toggle.playeresp.records)do
+        local seen={};local player=rec.player;local ok=pcall(function()
+            for _,parent in pairs({backpack=player:FindFirstChild("Backpack"),character=player.Character})do
+                local children=parent:GetChildren();for _,child in ipairs(children)do local key=toggle.itemkey(child.Name);if copies[key]and not seen[key]then copies[key]=copies[key]+1;seen[key]=true end end
+            end
+        end);toggle.wait()
+    end
+    for key,count in pairs(copies)do for i=1,math.min(24,count)do toggle.makeitemimage(key);toggle.wait()end end
+    toggle.icondata("skull",toggle.white)
+end
+toggle.serviceitemimages=function()
+    if tick()<(toggle.nextitemwarm or 0)then return end;toggle.nextitemwarm=tick()+0.05
+    for key in pairs(toggle.itemdemand)do toggle.itemdemand[key]=nil;toggle.makeitemimage(key);return end
+end
+toggle.prepareprofileimages=function(rec,preload)
+    if rec.departed or not rec.avatarbytes then return end;rec.profileimages=rec.profileimages or{}
+    for _,key in ipairs({"nametag","oof","browsergrid","browserdetail"})do local d=rec.profileimages[key]
+        if not d or toggle.removeddraw[d]then d=toggle.newicon(0);rec.profileimages[key]=d end
+        if preload then if toggle.avatarimages[d]~=rec.avatarbytes then d.Data=rec.avatarbytes end;local state=toggle.drawingstates[d];state.backgroundprime=true;local ok,native=pcall(state.prime);state.backgroundprime=nil;if ok and native then toggle.avatarimages[d]=rec.avatarbytes end
+        else toggle.setplayeravatar(d,rec,0,0,16,0,true)end
+    end
+    for _,key in ipairs({"skull","oofskull"})do local d=key=="skull"and rec.skull or rec.profileimages.oofskull
+        if not d or toggle.removeddraw[d]then d=toggle.newicon(0);d.Data=toggle.icondata("skull",toggle.white);toggle.primedrawing(d);if key=="skull"then rec.skull=d else rec.profileimages.oofskull=d end end
+    end
+end
+toggle.preloadserverprofiles=function()
+    toggle.refreshplayers(tick(),nil,false)
+     
+    toggle.arrowavatarstep(true)
+    for _,player in ipairs(toggle.playeresp.scanlist)do local rec=toggle.playeresp.records[toggle.playerkey(player)];if rec then
+        toggle.refreshplayeridentity(rec,tick());toggle.arrowavatarstep(true,rec);toggle.prepareprofileimages(rec,true)
+        if not rec.skull then rec.skull=toggle.newicon(3);rec.skull.Data=toggle.icondata("skull",toggle.white);toggle.primedrawing(rec.skull)end
+        toggle.wait()
+    end end
+end
+toggle.paintdeadplayer=function(rec,imagekey,x,y,size,c,a,z,on)
+    local dead=on and not rec.rake and rec.health~=nil and rec.health<=0
+    local d=rec[imagekey]
+    if dead and not d then d=toggle.playerdrawcall(toggle.newicon,0);rec[imagekey]=d;if rec.draws then rec.draws[#rec.draws+1]=d end end
+    if d then toggle.setprop(d,"ZIndex",z);toggle.seticon(d,"skull",x,y,size,toggle.white,a,dead)end
+end
+
 toggle.tabgroups={
-    {{"rake",1,{"rakestyleselect","rakeelementsselect","rakehealthcoloring","rakerenderdistance","traps"}},{"players",1,{"playerstyleselect","playerelementsselect","playerhealthcoloring","playeritemsselect","playerstacking","playerdistance"}},{"locations",1,{"locationeditselect","locationedittoggle","roof"}},
+    {{"rake",1,{"rakestyleselect","rakeelementsselect","rakehealthcoloring","rakerenderdistance","traps"}},{"players",1,{"playerstyleselect","playerelementsselect","playerhealthcoloring","playeritemsselect","playerbackpackselect","playerstacking","playerdistance"}},{"locations",1,{"locationeditselect","locationedittoggle","roof"}},
      {"display",2,{"esp"}},{"supply",2,{"supplylabel","flares","supplyitems"}},{"scraps",2,{"scrapstyleselect","scrapeditsselect","scrapedittoggle"}},{"distance esp",2,{"distance","distancepositionselect","distancemin"}},{"tracers",2,{"tracersselect","traceropacity","tracerspeed","tracercurve"}}},
     {{"display",1,{"hud","containerstyleselect"}},{"container",1,{"hudelementsselect"}},{"rake",1,{"rakenotifydistance"}},
      {"world",2,{"worldpanel","worldstatsselect"}},{"activity",2,{"poweractivity","poweractivitymodeselect"}},{"keybinds",2,{"keybindpanel"}}},
     {{"master",1,{"bindmenu","watermark"}},{"client",1,{"noFall","antiCollide","doorNoCollide","towerBarriers","autoradio","preventIdle","noJumpCooldown","infiniteStamina"}},{"safety",1,{"autoevadetrap","rakeshield","rakeshieldrange","tpsafespot","bindsafespot"}},{"combat",1,{"killaura","killaurarange","killauradelay","autoheal","autohealth"}},{"camera",1,{"thirdperson","zoomamount","shiftlock"}},{"world esp rings",1,{"ringenabled","ringshapeselect","ringfade","ringopacity","ringsize","ringspin","ringspinspeed"}},
-     {"shop",2,{"autorecover","autobuyitemsselect","autosellitemsselect","autosellscrap","tpclaimnightvision","autoclaimnightvision","tpsellscrap","sell","shopitemselect","quickbuy","quicksell"}},{"teleports",2,{"scrap","flare","scrapteleportselect","highlightscrap","teleportcooldown","cooldownseconds"}},{"prompts",2,{"promptmaster","promptsselect","bindprompt"}},{"supply",2,{"instacrate","bindcrate","autocollect","autocollectselect"}},{"power station",1,{"autopower","autopowertoolbox"}}},
+     {"shop",2,{"autorecover","autobuyitemsselect","autosellitemsselect","autosellscrap","tpclaimnightvision","autoclaimnightvision","tpsellscrap","sell","shopitemselect","quickbuy","quicksell","bindquickbuy","bindquicksell"}},{"teleports",2,{"scrap","flare","scrapteleportselect","highlightscrap","teleportcooldown","cooldownseconds"}},{"prompts",2,{"promptmaster","promptsselect","bindprompt"}},{"supply",2,{"instacrate","bindcrate","autocollect","autocollectselect"}},{"power station",1,{"autopower","autopowertoolbox"}}},
     {{"preferences",1,{"opacity","borderradius","fontsize"}},{"theme preset",1,{"presetselect","presetespcolors","accentcolor","themebgcolor","themebordercolor","themeoutlinecolor","themetextcolor","presetname","savepreset","deletepreset"}},{"fonts",1,{"hudfontselect","espfontselect"}},{"notifications",1,{"notificationtypeselect","notificationpositionselect","notificationduration"}},
      {"configuration",2,{"configname","configselect","save","load","deleteconfig"}},{"accent bars",2,{"accentbarsselect","rgbdirectionselect","rgbspeed"}},{"chroma",2,{"barrgb","chromasaturation","chromaspeed"}},{"reset",2,{"resetselect","startreset"}}}
 }
@@ -1678,12 +1926,14 @@ for tab=1,4 do for _,group in ipairs(toggle.tabgroups[tab])do
     if group[1]=="fonts"then group[3]={"fonttargetselect","fontfamilyselect","fonteditsize"}
     elseif group[1]=="locations"then group[3]={"locationeditselect","locationedittoggle","roof"}
     elseif group[1]=="scraps"and tab==2 then group[3]={"scrapeditsselect","scrapedittoggle","scrapstyleselect"}
-    elseif group[1]=="supply"and tab==2 then group[3]={"supplylabel","flares","supplyitems"}end
+    elseif group[1]=="supply"and tab==2 then group[3]={"supplylabel","flares","supplyitems","crateinventorystyleselect"}end
 end end
 table.insert(toggle.tabgroups[2],1,{"esp overlay",1,{"espstyleselect","espbackgroundalpha","backgroundshine","espiconsselect"}})
 table.insert(toggle.tabgroups[3],1,{"display",1,{"hudstyleselect","hudbackgroundalpha"}})
+toggle.tabgroups[3][#toggle.tabgroups[3]+1]={"OOF Arrows",2,{"oofselect","oofelements","oofsize","oofradius","oofopacity","ooffade"}}
 for i=#toggle.tabgroups[3],1,-1 do if toggle.tabgroups[3][i][1]=="container"then table.remove(toggle.tabgroups[3],i)end end
-table.insert(toggle.tabgroups[3],1,{"container",2,{"hudelementsselect","containerorientationselect","containergroupingselect"}})
+table.insert(toggle.tabgroups[3],2,{"container",1,{"hudelementsselect","containerorientationselect","containergroupingselect"}})
+for i,group in ipairs(toggle.tabgroups[3])do if group[1]=="OOF Arrows"then table.remove(toggle.tabgroups[3],i);table.insert(toggle.tabgroups[3],1,group);break end end
 toggle.tabgroups[2][#toggle.tabgroups[2]+1]={"safe spot",2,{"safespothud","safespotelementsselect"}}
 toggle.espiconorder={"rake","players","locations","scraps","crates","flare","traps","distance","health"}
 toggle.watermarkorder={"title","avatar","displayname","uptime"}
@@ -1703,6 +1953,7 @@ toggle.compactitems=function(items)
     for _,item in ipairs(items)do if item.kind=="section"then group={};local column=columns[item.col or 1];column[#column+1]=group end;if group then group[#group+1]=item end end
     local result={};for row=1,math.max(#columns[1],#columns[2])do for col=1,2 do local section=columns[col][row];if section then for _,item in ipairs(section)do result[#result+1]=item end end end end;return result
 end
+toggle.tabgroups[5]=toggle.tabgroups[4];toggle.tabgroups[4]={}
 local function currentitems(tab,allpost)
     tab=tab or menustate.tab
     local lookup,sections,colors={},{},{};for tab=1,2 do local source=toggle.featurecatalog(tab);for i=1,#source do local item=source[i];if item.kind=="section"then sections[item.label]=item elseif item.id then lookup[item.id]=item;if item.kind=="color"then colors[#colors+1]=item end end end end
@@ -1719,6 +1970,14 @@ local function currentitems(tab,allpost)
     lookup.notificationopacity={id="notificationopacity",kind="slider",label="Background Opacity",min=0,max=1,value=toggle.notifysettings.opacity,display=tostring(math.floor(toggle.notifysettings.opacity*100+0.5)).."%"}
     lookup.espiconsselect={id="espiconsselect",kind="dropdown",label="Show Icons For Elements",value=toggle.selectionlabel(toggle.espiconorder,icons)}
     lookup.panelstyleselect={id="panelstyleselect",kind="dropdown",label="Menu Visual Style",value=toggle.visualstyle}
+    lookup.playerbackpackselect={id="playerbackpackselect",kind="dropdown",label="Player Backpack Style",value=toggle.playerbackpackstyle}
+    lookup.crateinventorystyleselect={id="crateinventorystyleselect",kind="dropdown",label="Crate Inventory Style",value=toggle.crateinventorystyle}
+    lookup.oofselect={id="oofselect",kind="dropdown",label="Show OOF Arrows",value=toggle.selectionlabel(toggle.extra.order,toggle.extra.selected)}
+    lookup.oofelements={id="oofelements",kind="dropdown",label="Display Elements",value=toggle.selectionlabel({"Icon","Name","Distance"},toggle.extra.elements)}
+    lookup.oofradius={id="oofradius",kind="slider",label="Circle Range",min=60,max=450,value=toggle.extra.radius,display=tostring(toggle.extra.radius).."px"}
+    lookup.oofopacity={id="oofopacity",kind="slider",label="OOF Opacity",min=0.1,max=1,value=toggle.extra.arrowopacity,display=tostring(math.floor(toggle.extra.arrowopacity*100)).."%"}
+    lookup.ooffade={id="ooffade",kind="toggle",label="Opacity Based on Distance",on=toggle.extra.distancefade}
+    lookup.oofsize={id="oofsize",kind="slider",label="Arrow Size",min=6,max=28,value=toggle.extra.size,display=tostring(toggle.extra.size).."px"}
     lookup.containergroupingselect={id="containergroupingselect",kind="dropdown",label="Container Grouping",value=toggle.containergrouping}
     lookup.containerorientationselect={id="containerorientationselect",kind="dropdown",label="Container Layout",value=toggle.containerorientation}
     lookup.safespotelementsselect={id="safespotelementsselect",kind="dropdown",label="Display Elements",value=toggle.selectionlabel({"Label","Distance"},toggle.safespotelements)}
@@ -1897,9 +2156,9 @@ local function menupos()
         advances[i]=toggle.rowheight(item)*(item.widgetphase or 1)+(last and sectiongap+sectionpadding*(item.kind=="section"and(item.openphase or 1)or(item.widgetphase or 1))or 0);natural[col]=natural[col]+advances[i]
     end
     for col=1,2 do local total=0;for i=#menuitems,1,-1 do if(compact and 1 or menuitems[i].col or 1)==col then total=total+advances[i];if menuitems[i].kind=="section"then groups[i]=total;total=0 end end end end
-    local viewport=math.max(0,clipbottom-cliptop);local content=math.max(natural[1],natural[2]);local maxscroll=math.max(0,content-viewport)
+    local viewport=math.max(0,clipbottom-cliptop);local content=menustate.tab==4 and toggle.browsercontentheight()or math.max(natural[1],natural[2]);local maxscroll=math.max(0,content-viewport)
     menustate.scrollmax[menustate.tab]=maxscroll;menustate.scrolltarget[menustate.tab]=clamp(menustate.scrolltarget[menustate.tab]or 0,0,maxscroll)
-    local targetscroll=menustate.scrolltarget[menustate.tab];local scroll=toggle.ease(menustate.scroll[menustate.tab]or targetscroll,targetscroll,0.40);menustate.scroll[menustate.tab]=scroll
+    local targetscroll=menustate.scrolltarget[menustate.tab];local scroll=toggle.scrollgrabbing and targetscroll or toggle.ease(menustate.scroll[menustate.tab]or targetscroll,targetscroll,0.40);menustate.scroll[menustate.tab]=scroll
     if math.abs(scroll-targetscroll)>0.001 then menustate.positionanimating=true end
     local renderscroll=math.floor(scroll*2+0.5)/2;local ys={ystart-renderscroll,ystart-renderscroll};local groupbottom={clipbottom,clipbottom}
     for i=1,#menuitems do
@@ -1961,7 +2220,7 @@ local function menupos()
     toggle.layoutgradient(menurgb,menustate.x+toggle.gradientinset(),menustate.y+3,math.max(1,displayw-toggle.gradientinset()*2))
 end
 local function dropdownvalues()
-    if dropdownkind=="safespotelements"then return {"Label","Distance"}elseif dropdownkind=="espicons"then return toggle.espiconorder
+    if dropdownkind=="rosterview"then return {"List","Grid"}elseif dropdownkind=="playerbackpack"or dropdownkind=="crateinventorystyle"then return {"Image","Text"}elseif dropdownkind=="oofelements"then return {"Icon","Name","Distance"}elseif dropdownkind=="oof"then return toggle.extra.order elseif dropdownkind=="safespotelements"then return {"Label","Distance"}elseif dropdownkind=="espicons"then return toggle.espiconorder
     elseif dropdownkind=="fonttarget"then return toggle.fonttargetnames
     elseif dropdownkind=="fontfamily"then return fontnames
     elseif dropdownkind=="watermarkelements"then return toggle.watermarkorder
@@ -2017,21 +2276,31 @@ toggle.paintpresetpreview=function(slot,index,x,y,w,h,alpha,on)
     if entry.index~=index then local data=toggle.presetpreviewdata(index);if not data then toggle.setvisible(entry.image,false);entry.index=nil;return end;toggle.setprop(entry.image,"Data",data);entry.index=index end
     toggle.setpos(entry.image,x,y);toggle.setprop(entry.image,"Size",Vector2.new(w,h));toggle.setprop(entry.image,"Transparency",alpha);toggle.setvisible(entry.image,true)
 end
+toggle.menufieldcolor=function(surface)
+    surface=surface or toggle.colormix(color("bg"),color("text"),toggle.visualstyle=="compact"and 0.035 or toggle.textbrightness(color("bg"))>0.58 and 0.025 or 0.035)
+    return toggle.colormix(surface,toggle.white,0.02)
+end
+toggle.dropdownitemcolor=function(hover,selected)
+    local panel=toggle.menufieldcolor();local base=toggle.colormix(panel,toggle.white,0.012+hover*0.018)
+    local tint=toggle.colormix(base,color("accent"),selected*0.10)
+    return Color3.new(math.max(base.R,tint.R),math.max(base.G,tint.G),math.max(base.B,tint.B))
+end
 local function dropdownupdate(visible)
-    local values=dropdownvalues();dropdownlayouts={};local rowid=dropdownkind=="containergrouping"and"containergroupingselect"or dropdownkind=="containerorientation"and"containerorientationselect"or dropdownkind=="safespotelements"and"safespotelementsselect"or dropdownkind=="espicons"and"espiconsselect"or dropdownkind=="fonttarget"and"fonttargetselect"or dropdownkind=="fontfamily"and"fontfamilyselect"or dropdownkind=="watermarkelements"and"watermarkelementsselect"or dropdownkind=="crateelements"and"crateelementsselect"or dropdownkind=="flareelements"and"flareelementsselect"or dropdownkind=="trapelements"and"trapelementsselect"or dropdownkind=="locationelements"and"locationelementsselect"or dropdownkind=="panelstyle"and"panelstyleselect"or dropdownkind=="hudstyle"and"hudstyleselect"or dropdownkind=="espstyle"and"espstyleselect"or dropdownkind=="terraineditor"and"terrainelementselect"or dropdownkind=="posteditor"and"posteffectselect"or dropdownkind=="scrapedit"and"scrapeditsselect"or dropdownkind=="locationedit"and"locationeditselect"or dropdownkind=="tracers"and"tracersselect"or dropdownkind=="hudelements"and"hudelementsselect"or dropdownkind=="playerelements"and"playerelementsselect"or dropdownkind=="playerstyle"and"playerstyleselect"or dropdownkind=="rakestyle"and"rakestyleselect"or dropdownkind=="rakeelements"and"rakeelementsselect"or dropdownkind=="espfont"and"espfontselect"or dropdownkind=="hudfont"and"hudfontselect"or dropdownkind=="preset"and"presetselect"or dropdownkind=="unit"and"distanceunitselect"or dropdownkind=="distanceposition"and"distancepositionselect"or dropdownkind=="scrapstyle"and"scrapstyleselect"or  dropdownkind=="scrapteleport"and"scrapteleportselect"or dropdownkind=="ringshape"and"ringshapeselect"or dropdownkind=="rgbdirection"and"rgbdirectionselect"or dropdownkind=="containerstyle"and"containerstyleselect"or dropdownkind=="poweractivitymode"and"poweractivitymodeselect"or dropdownkind=="notificationstyle"and"notificationstyleselect"or dropdownkind=="notificationposition"and"notificationpositionselect"or dropdownkind=="notificationtypes"and"notificationtypeselect"or dropdownkind=="worldstats"and"worldstatsselect"or dropdownkind=="autocollect"and"autocollectselect"or dropdownkind=="playeritems"and"playeritemsselect"or dropdownkind=="prompts"and"promptsselect"or dropdownkind=="accentbars"and"accentbarsselect"or dropdownkind=="resets"and"resetselect"or dropdownkind=="shopitem"and"shopitemselect"or dropdownkind=="autobuyitems"and"autobuyitemsselect"or dropdownkind=="autosellitems"and"autosellitemsselect"or"configselect";local source=nil
+    local values=dropdownvalues();dropdownlayouts={};local rowid=dropdownkind=="playerbackpack"and"playerbackpackselect"or dropdownkind=="crateinventorystyle"and"crateinventorystyleselect"or dropdownkind=="oofelements"and"oofelements"or dropdownkind=="oof"and"oofselect"or dropdownkind=="containergrouping"and"containergroupingselect"or dropdownkind=="containerorientation"and"containerorientationselect"or dropdownkind=="safespotelements"and"safespotelementsselect"or dropdownkind=="espicons"and"espiconsselect"or dropdownkind=="fonttarget"and"fonttargetselect"or dropdownkind=="fontfamily"and"fontfamilyselect"or dropdownkind=="watermarkelements"and"watermarkelementsselect"or dropdownkind=="crateelements"and"crateelementsselect"or dropdownkind=="flareelements"and"flareelementsselect"or dropdownkind=="trapelements"and"trapelementsselect"or dropdownkind=="locationelements"and"locationelementsselect"or dropdownkind=="panelstyle"and"panelstyleselect"or dropdownkind=="hudstyle"and"hudstyleselect"or dropdownkind=="espstyle"and"espstyleselect"or dropdownkind=="terraineditor"and"terrainelementselect"or dropdownkind=="posteditor"and"posteffectselect"or dropdownkind=="scrapedit"and"scrapeditsselect"or dropdownkind=="locationedit"and"locationeditselect"or dropdownkind=="tracers"and"tracersselect"or dropdownkind=="hudelements"and"hudelementsselect"or dropdownkind=="playerelements"and"playerelementsselect"or dropdownkind=="playerstyle"and"playerstyleselect"or dropdownkind=="rakestyle"and"rakestyleselect"or dropdownkind=="rakeelements"and"rakeelementsselect"or dropdownkind=="espfont"and"espfontselect"or dropdownkind=="hudfont"and"hudfontselect"or dropdownkind=="preset"and"presetselect"or dropdownkind=="unit"and"distanceunitselect"or dropdownkind=="distanceposition"and"distancepositionselect"or dropdownkind=="scrapstyle"and"scrapstyleselect"or  dropdownkind=="scrapteleport"and"scrapteleportselect"or dropdownkind=="ringshape"and"ringshapeselect"or dropdownkind=="rgbdirection"and"rgbdirectionselect"or dropdownkind=="containerstyle"and"containerstyleselect"or dropdownkind=="poweractivitymode"and"poweractivitymodeselect"or dropdownkind=="notificationstyle"and"notificationstyleselect"or dropdownkind=="notificationposition"and"notificationpositionselect"or dropdownkind=="notificationtypes"and"notificationtypeselect"or dropdownkind=="worldstats"and"worldstatsselect"or dropdownkind=="autocollect"and"autocollectselect"or dropdownkind=="playeritems"and"playeritemsselect"or dropdownkind=="prompts"and"promptsselect"or dropdownkind=="accentbars"and"accentbarsselect"or dropdownkind=="resets"and"resetselect"or dropdownkind=="shopitem"and"shopitemselect"or dropdownkind=="autobuyitems"and"autobuyitemsselect"or dropdownkind=="autosellitems"and"autosellitemsselect"or"configselect";local source=nil
     for i=1,#itemlayouts do if itemlayouts[i].item.id==rowid and itemlayouts[i].visible then source=itemlayouts[i];break end end
+    if dropdownkind=="rosterview"then source=menustate.tab==4 and toggle.playerbrowser.viewsource or nil end
     if not visible or not source then toggle.hidepresetpreviews();if not dropdown.opened then return end;dropdown.opened=false;dropdown.anim=0;dropdown.layout=nil;dropdown.scrollmax=0;toggle.setvisible(dropdown.panel,false);toggle.setvisible(dropdown.border,false);toggle.setvisible(dropdown.accent,false);toggle.setvisible(dropdown.scrolltrack,false);toggle.setvisible(dropdown.scrollborder,false);toggle.setvisible(dropdown.scrollthumb,false);for i=1,dropdown.max do toggle.setvisible(dropdown.bg[i],false);toggle.setvisible(dropdown.text[i],false)end;return end
-    local count=math.min(#values,dropdown.visiblemax,math.max(1,math.floor((menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-20)/(toggle.visualstyle=="compact"and 24 or 30))));dropdown.scrollmax=math.max(0,#values-count)
+    local count=math.min(#values,dropdown.visiblemax,math.max(1,math.floor((menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-20)/(toggle.visualstyle=="compact"and 30 or 38))));dropdown.scrollmax=math.max(0,#values-count)
     if not dropdown.opened then local selectedindex=dropdownkind=="fontfamily"and(toggle.fontedit=="esp"and fontindex or toggle.fontedit=="menu"and toggle.menufontindex or toggle.hudfontindex)or dropdownkind=="scrapedit"and toggle.scrapedit or dropdownkind=="locationedit"and toggle.locationedit or dropdownkind=="espfont"and fontindex or dropdownkind=="hudfont"and toggle.hudfontindex or dropdownkind=="preset"and(toggle.presetpositions[themes[themeindex].name]or 1)or dropdownkind=="shopitem"and toggle.shopindex()or dropdownkind=="config"and math.max(1,configslot)or 1;dropdown.offset=clamp(selectedindex-math.ceil(count/2),0,dropdown.scrollmax);dropdown.scroll=dropdown.offset;dropdown.anim=0;dropdown.opened=true end
     dropdown.offset=clamp(dropdown.offset or 0,0,dropdown.scrollmax);dropdown.scroll=toggle.ease(dropdown.scroll,dropdown.offset,0.3);if math.abs(dropdown.scroll-dropdown.offset)<0.001 then dropdown.scroll=dropdown.offset end;dropdown.anim=toggle.ease(dropdown.anim,1,0.28)
-    local w,rowh=source.w-28,toggle.visualstyle=="compact"and 24 or 30;local x=source.x+14;local y=source.y+source.h-3;local panelh=count*rowh+7
-    y=clamp(y,menustate.y+(menustate.bodytop or 100),math.max(menustate.y+(menustate.bodytop or 100),menustate.y+menustate.h-(menustate.footerheight or 52)-8-panelh))+math.floor((1-dropdown.anim)*6+0.5);toggle.setpos(dropdown.panel,x-2,y-3);dropdown.panel.Size=Vector2.new(w+4,panelh-2);dropdown.panel.Color=color("bg");dropdown.panel.Transparency=(0.80+menuopacity*0.20)*dropdown.anim;toggle.setvisible(dropdown.panel,true);toggle.setpos(dropdown.border,x-3,y-4);dropdown.border.Size=Vector2.new(w+6,panelh);dropdown.border.Color=color("select");dropdown.border.Transparency=0.30*dropdown.anim;toggle.setvisible(dropdown.border,true);toggle.setpos(dropdown.accent,x-2,y-3);dropdown.accent.Size=Vector2.new(w+4,2);dropdown.accent.Color=toggle.accentvisual();dropdown.accent.Transparency=dropdown.anim;toggle.setvisible(dropdown.accent,false)
-    local scrollable=dropdown.scrollmax>0;local trackx=x+w-12;local tracky=y+2;local trackw=4;local trackh=math.max(1,count*rowh-4);local thumbh=scrollable and math.max(24,math.floor(trackh*count/#values+0.5))or trackh;local travel=math.max(1,trackh-thumbh);local thumby=tracky+(scrollable and travel*dropdown.scroll/dropdown.scrollmax or 0);local roww=scrollable and w-12 or w
-    toggle.setpos(dropdown.scrollborder,trackx,tracky);dropdown.scrollborder.Size=Vector2.new(trackw,trackh);dropdown.scrollborder.Color=color("select");dropdown.scrollborder.Transparency=dropdown.anim;toggle.setpos(dropdown.scrolltrack,trackx,tracky);dropdown.scrolltrack.Size=Vector2.new(trackw,trackh);dropdown.scrolltrack.Color=color("bg");dropdown.scrolltrack.Transparency=dropdown.anim;toggle.setpos(dropdown.scrollthumb,trackx,thumby+1);dropdown.scrollthumb.Size=Vector2.new(trackw,math.max(3,thumbh-2));dropdown.scrollthumb.Color=toggle.accentvisual();dropdown.scrollthumb.Transparency=dropdown.anim;toggle.setvisible(dropdown.scrollborder,false);toggle.setvisible(dropdown.scrolltrack,scrollable);toggle.setvisible(dropdown.scrollthumb,scrollable);dropdown.layout={x=x-3,y=y-4,w=w+6,h=panelh,trackx=trackx,tracky=tracky,trackw=trackw,trackh=trackh,thumbx=trackx,thumby=thumby,thumbw=trackw,thumbh=thumbh,travel=travel,scrollable=scrollable}
+    local w,rowh=source.w-28,toggle.visualstyle=="compact"and 30 or 38;local x=source.x+14;local y=source.y+source.h-3;local panelh=count*rowh+7
+    y=clamp(y,menustate.y+(menustate.bodytop or 100),math.max(menustate.y+(menustate.bodytop or 100),menustate.y+menustate.h-(menustate.footerheight or 52)-8-panelh))+math.floor((1-dropdown.anim)*6+0.5);toggle.setpos(dropdown.panel,x-2,y-3);dropdown.panel.Size=Vector2.new(w+4,panelh-2);dropdown.panel.Color=toggle.menufieldcolor();dropdown.panel.Transparency=(0.80+menuopacity*0.20)*dropdown.anim;toggle.setvisible(dropdown.panel,true);toggle.setpos(dropdown.border,x-3,y-4);dropdown.border.Size=Vector2.new(w+6,panelh);dropdown.border.Color=color("select");dropdown.border.Transparency=0.30*dropdown.anim;toggle.setvisible(dropdown.border,true);toggle.setpos(dropdown.accent,x-2,y-3);dropdown.accent.Size=Vector2.new(w+4,2);dropdown.accent.Color=toggle.accentvisual();dropdown.accent.Transparency=dropdown.anim;toggle.setvisible(dropdown.accent,false)
+    local scrollable=dropdown.scrollmax>0;local trackx=x+w-12;local tracky=y+2;local trackw=3;local trackh=math.max(1,count*rowh-4);local thumbh=scrollable and math.max(24,math.floor(trackh*count/#values+0.5))or trackh;local travel=math.max(1,trackh-thumbh);local thumby=tracky+(scrollable and travel*dropdown.scroll/dropdown.scrollmax or 0);local roww=scrollable and w-12 or w
+    toggle.setpos(dropdown.scrollborder,trackx,tracky);dropdown.scrollborder.Size=Vector2.new(trackw,trackh);dropdown.scrollborder.Color=color("select");dropdown.scrollborder.Transparency=dropdown.anim;toggle.setpos(dropdown.scrolltrack,trackx,tracky);dropdown.scrolltrack.Size=Vector2.new(trackw,trackh);dropdown.scrolltrack.Color=color("muted");dropdown.scrolltrack.Transparency=0.12*menuopacity*dropdown.anim;toggle.setpos(dropdown.scrollthumb,trackx,thumby+1);dropdown.scrollthumb.Size=Vector2.new(trackw,math.max(3,thumbh-2));dropdown.scrollthumb.Color=color("muted");dropdown.scrollthumb.Transparency=0.6*menuopacity*dropdown.anim;toggle.setprop(dropdown.scrollthumb,"Corner",1.5);toggle.setvisible(dropdown.scrollborder,false);toggle.setvisible(dropdown.scrolltrack,scrollable);toggle.setvisible(dropdown.scrollthumb,scrollable);dropdown.layout={x=x-3,y=y-4,w=w+6,h=panelh,trackx=trackx,tracky=tracky,trackw=trackw,hitx=trackx-8,hitw=19,trackh=trackh,thumbx=trackx-8,thumby=thumby,thumbw=19,thumbh=thumbh,travel=travel,scrollable=scrollable}
     local first=math.floor(dropdown.scroll);local shift=(dropdown.scroll-first)*rowh;local listbottom=y+count*rowh
     for slot=1,dropdown.max do
         local index=first+slot;local iy=y+(slot-1)*rowh-shift;local rowtop=math.max(y,iy);local rowbottom=math.min(listbottom,iy+rowh);local on=slot<=count+1 and index<=#values and rowbottom>rowtop;local swatchon=on and dropdownkind=="preset"and iy+rowh/2-7>=y and iy+rowh/2+7<=listbottom;local swatchindex=swatchon and toggle.presetindices[values[index]]or nil;toggle.paintpresetpreview(slot,swatchindex,x+roww-58,iy+rowh/2-7,48,14,dropdown.anim,swatchon and swatchindex~=nil);toggle.setvisible(dropdown.bg[slot],on);toggle.setvisible(dropdown.text[slot],on and iy+7>=y and iy+23<=listbottom)
-        if on then local value=values[index];local world=toggle.multientry(toggle.worldorder,value);local prompt=toggle.multientry(toggle.promptoptionorder,value);local accentbar=toggle.multientry(toggle.accentbarorder,value);local reset=toggle.multientry(toggle.resetorder,value);local shop=toggle.shop.lookup[value];local playeritem=toggle.multientry(toggle.playeresp.order,value);local hudentry=toggle.multientry(toggle.hudselectionorder,value);local selected=(dropdownkind=="safespotelements"and toggle.safespotelements[value]==true)or(dropdownkind=="espicons"and(value=="locations"and toggle.espicons.locationgroup or toggle.espicons[value]==true))or(dropdownkind=="fonttarget"and toggle.fonttargetroles[value]==toggle.fontedit)or(dropdownkind=="fontfamily"and index==(toggle.fontedit=="esp"and fontindex or toggle.fontedit=="menu"and toggle.menufontindex or toggle.hudfontindex))or(dropdownkind=="watermarkelements"and toggle.watermarkelements[value]==true)or(dropdownkind=="crateelements"and toggle.espicons.crates)or(dropdownkind=="flareelements"and toggle.espicons.flare)or(dropdownkind=="trapelements"and toggle.espicons.traps)or(dropdownkind=="locationelements"and toggle.espicons.locations[toggle.locationedit])or(dropdownkind=="terraineditor"and value==toggle.visuals.terrainselect)or(dropdownkind=="posteditor"and value==toggle.visuals.effectdefs[toggle.visuals.editclass].label)or(dropdownkind=="tracers"and toggle.tracers.selected[value]==true)or(dropdownkind=="hudelements"and hudentry and toggle.hudelements[hudentry.id]==true)or(dropdownkind=="playerelements"and(value=="name"and toggle.playeresp.showusername or value=="health"and toggle.playeresp.showhealth or value=="distance"and toggle.playeresp.showdistance or value=="icons"and toggle.espicons.players))or(dropdownkind=="playerstyle"and value==toggle.playeresp.style)or(dropdownkind=="rakestyle"and value==toggle.rakeespstyle)or(dropdownkind=="rakeelements"and(value=="name"and toggle.rakename or value=="health"and toggle.rakehealth or value=="distance"and toggle.rakedistance or value=="status"and toggle.rakestatus or value=="icons"and toggle.espicons.rake))or(dropdownkind=="autocollect"and toggle.autocollect.selected[toggle.autocollectname(value)]==true)or(dropdownkind=="playeritems"and playeritem and toggle.playeresp.selected[playeritem.name]==true)or(dropdownkind=="autobuyitems"and shop and toggle.autobuyitems.selected[shop.name]==true)or(dropdownkind=="autosellitems"and shop and toggle.autosellitems.selected[shop.name]==true)or(dropdownkind=="notificationtypes"and toggle.notifysettings.types[value]==true)or(dropdownkind=="worldstats"and world and toggle.worldpanelitems[world.id]==true)or(dropdownkind=="prompts"and prompt and toggle.promptsettings[prompt.id]==true)or(dropdownkind=="accentbars"and accentbar and toggle.accentbars[accentbar.id]==true)or(dropdownkind=="resets"and reset and toggle.resetselected[reset.id]==true)or(dropdownkind=="shopitem"and toggle.shopitem().label==value)or(dropdownkind=="espfont"and index==fontindex)or(dropdownkind=="hudfont"and index==toggle.hudfontindex)or(dropdownkind=="preset"and value==themes[themeindex].name)or(dropdownkind=="unit"and value==toggle.distanceunit)or(dropdownkind=="distanceposition"and value==toggle.distanceposition)or(dropdownkind=="scrapstyle"and(value=="icons"and toggle.espicons.scraps or toggle.scrapelements.Scrap1[value]==true))or(dropdownkind=="scrapedit"and index==toggle.scrapedit)or(dropdownkind=="locationedit"and index==toggle.locationedit)or(dropdownkind=="scrapteleport"and value==toggle.scrapteleport)or(dropdownkind=="ringshape"and value==toggle.ringshape)or(dropdownkind=="rgbdirection"and value==toggle.rgbdirection)or(dropdownkind=="panelstyle"and value==toggle.visualstyle)or(dropdownkind=="hudstyle"and value==toggle.hudstyle)or(dropdownkind=="espstyle"and value==toggle.espvisualstyle)or(dropdownkind=="containergrouping"and value==toggle.containergrouping)or(dropdownkind=="containerorientation"and value==toggle.containerorientation)or(dropdownkind=="containerstyle"and value==toggle.containerstyle)or(dropdownkind=="poweractivitymode"and value==toggle.poweractivitymode)or(dropdownkind=="notificationstyle"and value==toggle.notifysettings.style)or(dropdownkind=="notificationposition"and value==toggle.notifysettings.position)or(dropdownkind=="config"and index==configslot);local hover=inside(mouse.X,mouse.Y,x,rowtop,roww,rowbottom-rowtop);local akey=tostring(dropdownkind)..":"..index;local sa=toggle.ease(dropdown.selectionanim[akey],selected and 1 or 0,0.22);local ha=toggle.ease(dropdown.hoveranim[akey],hover and 1 or 0,0.20);dropdown.selectionanim[akey]=sa;dropdown.hoveranim[akey]=ha;local textcolor=toggle.colormix(color("text"),color("accent"),sa);toggle.setprop(dropdown.bg[slot],"Corner",0);toggle.setpos(dropdown.bg[slot],x,rowtop);dropdown.bg[slot].Size=Vector2.new(roww,rowbottom-rowtop);toggle.setprop(dropdown.bg[slot],"Color",toggle.colormix(toggle.colormix(color("bg"),color("text"),ha*0.06),color("accent"),sa*0.14));dropdown.bg[slot].Transparency=dropdown.anim;local meta=toggle.textroles[dropdown.text[slot]];meta.preview=(dropdownkind=="fontfamily"or dropdownkind=="espfont"or dropdownkind=="hudfont")and fontvalues[index]or nil;dropdown.text[slot].Font=meta.preview or toggle.fontvalue("menu");dropdown.text[slot].Text=dropdownkind=="config"and(string.lower(value)=="default"and"Default"or value)or(dropdownkind=="preset"and themes[toggle.presetindices[value]].custom or dropdownkind=="fontfamily"or dropdownkind=="espfont"or dropdownkind=="hudfont")and value or toggle.uititle(value);local shown=dropdown.text[slot].Text;local available=math.max(12,roww-20-(dropdownkind=="preset"and 60 or 0));local textwidth=toggle.measuretext(shown,meta.preview or toggle.fontvalue("menu"),13)
+        if on then local value=values[index];local world=toggle.multientry(toggle.worldorder,value);local prompt=toggle.multientry(toggle.promptoptionorder,value);local accentbar=toggle.multientry(toggle.accentbarorder,value);local reset=toggle.multientry(toggle.resetorder,value);local shop=toggle.shop.lookup[value];local playeritem=toggle.multientry(toggle.playeresp.order,value);local hudentry=toggle.multientry(toggle.hudselectionorder,value);local selected=(dropdownkind=="rosterview"and value==toggle.playerbrowser.view)or(dropdownkind=="playerbackpack"and value==toggle.playerbackpackstyle)or(dropdownkind=="crateinventorystyle"and value==toggle.crateinventorystyle)or(dropdownkind=="oofelements"and toggle.extra.elements[value]==true)or(dropdownkind=="oof"and toggle.extra.selected[value]==true)or(dropdownkind=="safespotelements"and toggle.safespotelements[value]==true)or(dropdownkind=="espicons"and(value=="locations"and toggle.espicons.locationgroup or toggle.espicons[value]==true))or(dropdownkind=="fonttarget"and toggle.fonttargetroles[value]==toggle.fontedit)or(dropdownkind=="fontfamily"and index==(toggle.fontedit=="esp"and fontindex or toggle.fontedit=="menu"and toggle.menufontindex or toggle.hudfontindex))or(dropdownkind=="watermarkelements"and toggle.watermarkelements[value]==true)or(dropdownkind=="crateelements"and toggle.espicons.crates)or(dropdownkind=="flareelements"and toggle.espicons.flare)or(dropdownkind=="trapelements"and toggle.espicons.traps)or(dropdownkind=="locationelements"and toggle.espicons.locations[toggle.locationedit])or(dropdownkind=="terraineditor"and value==toggle.visuals.terrainselect)or(dropdownkind=="posteditor"and value==toggle.visuals.effectdefs[toggle.visuals.editclass].label)or(dropdownkind=="tracers"and toggle.tracers.selected[value]==true)or(dropdownkind=="hudelements"and hudentry and toggle.hudelements[hudentry.id]==true)or(dropdownkind=="playerelements"and(value=="name"and toggle.playeresp.showusername or value=="health"and toggle.playeresp.showhealth or value=="distance"and toggle.playeresp.showdistance or value=="scrap"and toggle.playeresp.showscrap or value=="icons"and toggle.espicons.players))or(dropdownkind=="playerstyle"and value==toggle.playeresp.style)or(dropdownkind=="rakestyle"and value==toggle.rakeespstyle)or(dropdownkind=="rakeelements"and(value=="name"and toggle.rakename or value=="health"and toggle.rakehealth or value=="distance"and toggle.rakedistance or value=="status"and toggle.rakestatus or value=="icons"and toggle.espicons.rake))or(dropdownkind=="autocollect"and toggle.autocollect.selected[toggle.autocollectname(value)]==true)or(dropdownkind=="playeritems"and playeritem and toggle.playeresp.selected[playeritem.name]==true)or(dropdownkind=="autobuyitems"and shop and toggle.autobuyitems.selected[shop.name]==true)or(dropdownkind=="autosellitems"and shop and toggle.autosellitems.selected[shop.name]==true)or(dropdownkind=="notificationtypes"and toggle.notifysettings.types[value]==true)or(dropdownkind=="worldstats"and world and toggle.worldpanelitems[world.id]==true)or(dropdownkind=="prompts"and prompt and toggle.promptsettings[prompt.id]==true)or(dropdownkind=="accentbars"and accentbar and toggle.accentbars[accentbar.id]==true)or(dropdownkind=="resets"and reset and toggle.resetselected[reset.id]==true)or(dropdownkind=="shopitem"and toggle.shopitem().label==value)or(dropdownkind=="espfont"and index==fontindex)or(dropdownkind=="hudfont"and index==toggle.hudfontindex)or(dropdownkind=="preset"and value==themes[themeindex].name)or(dropdownkind=="unit"and value==toggle.distanceunit)or(dropdownkind=="distanceposition"and value==toggle.distanceposition)or(dropdownkind=="scrapstyle"and(value=="icons"and toggle.espicons.scraps or toggle.scrapelements.Scrap1[value]==true))or(dropdownkind=="scrapedit"and index==toggle.scrapedit)or(dropdownkind=="locationedit"and index==toggle.locationedit)or(dropdownkind=="scrapteleport"and value==toggle.scrapteleport)or(dropdownkind=="ringshape"and value==toggle.ringshape)or(dropdownkind=="rgbdirection"and value==toggle.rgbdirection)or(dropdownkind=="panelstyle"and value==toggle.visualstyle)or(dropdownkind=="hudstyle"and value==toggle.hudstyle)or(dropdownkind=="espstyle"and value==toggle.espvisualstyle)or(dropdownkind=="containergrouping"and value==toggle.containergrouping)or(dropdownkind=="containerorientation"and value==toggle.containerorientation)or(dropdownkind=="containerstyle"and value==toggle.containerstyle)or(dropdownkind=="poweractivitymode"and value==toggle.poweractivitymode)or(dropdownkind=="notificationstyle"and value==toggle.notifysettings.style)or(dropdownkind=="notificationposition"and value==toggle.notifysettings.position)or(dropdownkind=="config"and index==configslot);local hover=inside(mouse.X,mouse.Y,x,rowtop,roww,rowbottom-rowtop);local akey=tostring(dropdownkind)..":"..index;local sa=toggle.ease(dropdown.selectionanim[akey],selected and 1 or 0,0.22);local ha=toggle.ease(dropdown.hoveranim[akey],hover and 1 or 0,0.20);dropdown.selectionanim[akey]=sa;dropdown.hoveranim[akey]=ha;local textcolor=toggle.colormix(color("text"),color("accent"),sa);toggle.setprop(dropdown.bg[slot],"Corner",math.min(8,toggle.borderradius));toggle.setpos(dropdown.bg[slot],x+5,rowtop+2);dropdown.bg[slot].Size=Vector2.new(math.max(1,roww-10),math.max(0,rowbottom-rowtop-4));toggle.setprop(dropdown.bg[slot],"Color",toggle.dropdownitemcolor(ha,sa));dropdown.bg[slot].Transparency=dropdown.anim;local meta=toggle.textroles[dropdown.text[slot]];meta.preview=(dropdownkind=="fontfamily"or dropdownkind=="espfont"or dropdownkind=="hudfont")and fontvalues[index]or nil;dropdown.text[slot].Font=meta.preview or toggle.fontvalue("menu");dropdown.text[slot].Text=dropdownkind=="config"and(string.lower(value)=="default"and"Default"or value)or(dropdownkind=="preset"and themes[toggle.presetindices[value]].custom or dropdownkind=="fontfamily"or dropdownkind=="espfont"or dropdownkind=="hudfont")and value or toggle.uititle(value);local shown=dropdown.text[slot].Text;local available=math.max(12,roww-20-(dropdownkind=="preset"and 60 or 0));local textwidth=toggle.measuretext(shown,meta.preview or toggle.fontvalue("menu"),13)
             if textwidth>available then local raw=shown;while #shown>1 and toggle.measuretext(shown.."..",meta.preview or toggle.fontvalue("menu"),13)>available do shown=shown:sub(1,-2)end;shown=shown.."..";dropdown.text[slot].Text=shown;textwidth=toggle.measuretext(shown,meta.preview or toggle.fontvalue("menu"),13)end
             toggle.lefttext(dropdown.text[slot],x+10,iy+rowh/2);dropdown.text[slot].Color=textcolor;dropdown.text[slot].Transparency=dropdown.anim;toggle.uioutline(dropdown.text[slot],dropdown.anim,textcolor);dropdownlayouts[#dropdownlayouts+1]={x=x,y=rowtop,w=roww,h=rowbottom-rowtop,index=index,value=value}end
     end
@@ -2129,8 +2398,245 @@ toggle.painttabs=function(nav,mx,my,shell,alpha)
         toggle.seticon(toggle.tabicons[i],toggle.tabiconnames[i],iconx,ty+(th-iconsize)/2,iconsize,tint,alpha,menustate.contentfade>0.01 and menustate.menuanim>0.001)
     end
 end
+ 
+toggle.playerbrowser={view="List",cards={},draws={},hits={},items={},inventory={},list={},avatarowners={},profiledraws=setmetatable({},{__mode="k"})}
+toggle.browserdrawing=function(kind)
+    local p=toggle.playerbrowser;local d=kind=="text"and newtext("",color("text"),true,false)or kind=="image"and toggle.newicon(122)or kind=="border"and newborder(color("outline"),1)or newsquare(color("bg"),1)
+    setz(d,kind=="text"and 123 or kind=="image"and 122 or kind=="border"and 121 or 120);if kind=="text"then toggle.settextrole(d,"menu")end;p.draws[#p.draws+1]=d;return d
+end
+toggle.browsercard=function()
+    return {bg=toggle.browserdrawing("square"),border=toggle.browserdrawing("border"),avatar=toggle.browserdrawing("image"),name=toggle.browserdrawing("text"),username=toggle.browserdrawing("text")}
+end
+toggle.browserreleaseitems=function()
+    for i,d in pairs(toggle.playerbrowser.items)do toggle.releaseitemimage(d);toggle.playerbrowser.items[i]=nil end
+end
+toggle.readplayerscrap=function(player)
+    local ok,value=pcall(function()local backpack=player and player:FindFirstChild("Backpack");local folder=backpack and backpack:FindFirstChild("ScrapFolder");local points=folder and folder:FindFirstChild("Points");return points and points.Value end)
+    return ok and type(value)=="number"and value==value and value>=0 and value<1e12 and math.floor(value)or 0
+end
+toggle.playerbackpackread=function(player,character)
+    local owned,flarecount={},0
+    local ok=pcall(function()
+        for _,parent in pairs({backpack=player:FindFirstChild("Backpack"),character=character})do
+            local children=parent:GetChildren();for i=1,#children do local child=children[i];local name=child.Name;owned[name]=child;if name=="FlareGun"or name=="FlareGunPickUp"or name=="FlareGunTool"then flarecount=flarecount+1 end end
+        end
+    end)
+    if ok then return owned,flarecount end
+end
+toggle.browsergridname=function(value)
+    local count=0;for at in value:gmatch("()[%z\1-\127\194-\244][\128-\191]*")do count=count+1;if count==16 then return value:sub(1,at-1)..".."end end;return value
+end
+toggle.browserwrap=function(value,width)
+    local lines,line={},""
+    for ch in tostring(value):gmatch("[%z\1-\127\194-\244][\128-\191]*")do
+        if line~=""and toggle.uiwidth(line..ch)>width then lines[#lines+1]=line;line=""end;line=line..ch
+    end
+    lines[#lines+1]=line;return lines
+end
+toggle.browsercontentheight=function()
+    if toggle.visualstyle=="compact"and toggle.playerbrowser.detailopen then return (toggle.playerbrowser.detailheight or 300)+32 end
+    local p=toggle.playerbrowser;return 68+(p.view=="List"and #p.list or math.ceil(#p.list/2))*(p.pitch or(p.view=="List"and 60 or 122))
+end
+toggle.playerbrowserhit=function(x,y)
+    if menustate.tab~=4 or menustate.minimized then return false end
+    local p=toggle.playerbrowser
+    if p.viewhit and inside(x,y,p.viewhit.x,p.viewhit.y,p.viewhit.w,p.viewhit.h)then
+        if dropdownkind=="rosterview"then dropdownkind=nil else dropdownkind="rosterview"end
+        dropdown.opened=false;return true
+    end
+    if toggle.playerbrowser.returnhit then local h=toggle.playerbrowser.returnhit;if inside(x,y,h.x,h.y,h.w,h.h)then toggle.playerbrowser.detailopen=false;menustate.scrolltarget[4]=toggle.playerbrowser.gridscroll or 0;return true end end
+    for _,hit in ipairs(toggle.playerbrowser.hits)do if inside(x,y,hit.x,hit.y,hit.w,hit.h)then toggle.playerbrowser.selected=hit.id;toggle.playerbrowser.next=0;toggle.playerbrowser.detailphase=0;toggle.playerbrowser.detailopen=true;menustate.positionanimating=true;menustate.itemsdirty=true;toggle.playerbrowser.gridscroll=menustate.scrolltarget[4]or 0;if toggle.visualstyle=="compact"then menustate.scrolltarget[4]=0 end;return true end end
+    return false
+end
+toggle.paintplayerbrowser=function(alpha)
+    local p=toggle.playerbrowser;p.hits={};p.returnhit=nil;p.viewhit=nil;p.viewsource=nil;local useddraws={}
+    local function finish()
+        for _,d in ipairs(p.draws)do if not useddraws[d]then toggle.setvisible(d,false)end end
+        for d in pairs(p.profiledraws)do if toggle.removeddraw[d]then p.profiledraws[d]=nil;p.avatarowners[d]=nil elseif not useddraws[d]then toggle.setvisible(d,false)end end
+    end
+    local on=menustate.tab==4 and alpha>0.001 and not menustate.minimized
+    if not on then if dropdownkind=="rosterview"then dropdownkind=nil end;if not p.hidden then finish();toggle.browserreleaseitems();p.hidden=true end;return end
+    p.hidden=false
+    local compact=toggle.visualstyle=="compact";local pad=compact and 10 or 14;local left=menustate.x+(compact and 8 or 18);local top=menustate.y+menustate.bodytop
+    local cliptop=top;local bottom
+    local _,displayh=displaysize();bottom=math.max(cliptop,math.min(menustate.y+menustate.h,menustate.y+displayh)-(menustate.footerheight or 26))
+    local gap=compact and 10 or 14;local width=compact and menustate.w-16 or(menustate.w-36-gap)/2;local right=compact and left or left+width+gap
+    local details=not compact or p.detailopen;local grid=not compact or not p.detailopen
+    p.detailphase=toggle.ease(p.detailphase or 0,1,0.18)
+    local ink=color("text");local muted=color("muted");local accent=toggle.accentvisual();local surface=toggle.colormix(color("bg"),ink,0.035);local radius=toggle.borderradius
+    local fadinggrid=false;local fadingdetails=false
+    local function smooth(t)t=clamp(t,0,1);return t*t*(3-2*t)end
+    local function elementfade(y,h)
+        if not fadinggrid and not fadingdetails then return 1 end
+        local scroll=menustate.scroll[4]or 0;local maxscroll=math.max(0,(fadinggrid and 16+(p.view=="List"and #p.list or math.ceil(#p.list/2))*(p.pitch or 122)or(p.detailheight or 300)+32)-(bottom-cliptop))
+        local band=40
+        local upper=1-(1-smooth((y-cliptop)/band))*smooth(scroll/band)
+        local lower=1-(1-smooth((bottom-y-h)/band))*smooth((maxscroll-scroll)/band)
+        return upper*lower
+    end
+    local function box(d,x,y,w,h,c,a,border,corners,sectionbackground)
+        if y+h<=cliptop or y>=bottom or w<=0 or h<=0 then return end
+        local rawy,rawh=y,h;y=math.max(y,cliptop);h=math.min(rawy+rawh,bottom)-y
+         
+        local fade=sectionbackground and 1 or elementfade(rawy,rawh)
+        toggle.setpos(d,x,y);toggle.setprop(d,"Size",Vector2.new(w,h));toggle.setprop(d,"Filled",not border);toggle.setprop(d,"Corner",math.max(0,corners or radius-1));toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",a*alpha*menuopacity*fade);toggle.setvisible(d,true);useddraws[d]=true
+    end
+    local function text(d,value,x,y,c,size)
+        if y-8<cliptop or y+8>bottom then return end
+        toggle.setprop(d,"Text",value);toggle.setprop(d,"Size",size or 13);toggle.setprop(d,"Color",c or ink);toggle.setprop(d,"Transparency",alpha*elementfade(y-8,16));toggle.centertext(d,x,y);toggle.uioutline(d,alpha,c or ink);toggle.setvisible(d,true);useddraws[d]=true
+    end
+    local function avatar(d,rec,x,y,w,h,gridavatar)
+        h=h or w;if y<cliptop or y+h>bottom then return end
+        local key=gridavatar and "browsergrid"or"browserdetail";local cached=rec.profileimages and rec.profileimages[key]
+        if cached and not toggle.removeddraw[cached]then d=cached;p.profiledraws[d]=true end
+        if not toggle.setplayeravatar(d,rec,x,y,w,alpha*elementfade(y,h),true,(gridavatar and p.view~="List"and math.min(radius,w/2,h/2)or w/2),h)then toggle.seticon(d,"person",x,y,w,muted,alpha*elementfade(y,h),true);toggle.setprop(d,"Size",Vector2.new(w,h));toggle.setprop(d,"Rounding",(gridavatar and p.view~="List"and math.min(radius,w/2,h/2)or w/2))end;toggle.setprop(d,"ZIndex",122*256)
+        p.avatarowners[d]=rec;useddraws[d]=true
+    end
+    local function leftlabel(d,value,x,y,c)
+        if y-8<cliptop or y+8>bottom then return end
+        toggle.setprop(d,"Text",value);toggle.setprop(d,"Size",13);toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",alpha*elementfade(y-8,16));toggle.lefttext(d,x,y);toggle.uioutline(d,alpha,c);toggle.setvisible(d,true);useddraws[d]=true
+    end
+    if not p.left then p.left=toggle.browserdrawing("square");p.right=toggle.browserdrawing("square");p.empty=toggle.browserdrawing("text");p.detail={avatar=toggle.browserdrawing("image"),avatarbg=toggle.browserdrawing("square"),name=toggle.browserdrawing("text")};p.username=toggle.browserdrawing("text");p.distance=toggle.browserdrawing("text");p.inventoryempty=toggle.browserdrawing("text")end
+    setz(p.left,119);setz(p.right,119)
+    if grid then box(p.left,left,top,width,bottom-top,surface,1)end;if details then box(p.right,right,top,width,bottom-top,surface,1)end
+    local originalclip=cliptop;local rostertop=top+52;local listmode=p.view=="List"
+    local scroll=math.floor((menustate.scroll[4]or 0)*2+0.5)/2;local cardw=listmode and width-pad*2 or(width-pad*2-8)/2
+    local thumbh=cardw-2;local textrows=2
+    for _,rec in ipairs(p.list)do
+        local signature=p.view..":"..tostring(cardw)..":"..(rec.displayname or rec.username)..":"..rec.username
+        if rec.browserwrapkey~=signature then rec.browserwrapkey=signature;rec.browsernames=toggle.browserwrap(listmode and(rec.displayname or rec.username)or toggle.browsergridname(rec.displayname or rec.username),cardw-(listmode and 64 or 14));rec.browserusers=toggle.browserwrap("@"..(listmode and rec.username or toggle.browsergridname(rec.username)),cardw-(listmode and 64 or 14))end
+        textrows=math.max(textrows,#rec.browsernames+#rec.browserusers)
+    end
+    local cardh=listmode and math.max(54,textrows*16+16)or thumbh+textrows*16+8;local pitch=cardh+(listmode and 6 or 8);if p.pitch~=pitch then menustate.positionanimating=true end;p.pitch=pitch
+    local basealpha=alpha;local gray=Color3.fromRGB(52,52,56)
+    cliptop=rostertop;fadinggrid=true;local slot=0;for i,rec in ipairs(p.list)do
+        local x=left+pad+(listmode and 0 or((i-1)%2)*(cardw+8));local y=rostertop+10+(listmode and(i-1)or math.floor((i-1)/2))*pitch-scroll
+        if grid and y+cardh>cliptop and y<bottom then
+            slot=slot+1;local card=p.cards[slot];if not card then card=toggle.browsercard();p.cards[slot]=card end
+            if card.owner~=rec.id then card.owner=rec.id;card.selection=0;card.hover=0 end
+            local selected=rec.id==p.selected;local hovered=inside(mouse.X,mouse.Y,x,y,cardw,cardh)
+            card.selection=toggle.ease(card.selection or 0,selected and 1 or 0,0.20);card.hover=toggle.ease(card.hover or 0,hovered and 1 or 0,0.16)
+            local by=math.max(cliptop,y);local bh=math.max(0,math.min(bottom,y+cardh)-by)
+            box(card.bg,x,y,cardw,cardh,toggle.colormix(surface,toggle.white,0.035+card.hover*0.02),1,false,nil,true)
+            if listmode then avatar(card.avatar,rec,x+9,y+(cardh-36)/2,36,36,true)else avatar(card.avatar,rec,x+1,y+1,cardw-2,thumbh,true)end
+            box(card.border,x,y,cardw,cardh,toggle.colormix(color("outline"),accent,card.selection),0.16+card.selection*0.65+card.hover*0.10,true,nil,true)
+            card.namelines=card.namelines or{card.name};card.userlines=card.userlines or{card.username}
+            if listmode then
+                local ty=y+(cardh-(#rec.browsernames+#rec.browserusers)*16)/2+8
+                for j,value in ipairs(rec.browsernames)do if not card.namelines[j]then card.namelines[j]=toggle.browserdrawing("text")end;leftlabel(card.namelines[j],value,x+55,ty,ink);ty=ty+16 end
+                for j,value in ipairs(rec.browserusers)do if not card.userlines[j]then card.userlines[j]=toggle.browserdrawing("text")end;leftlabel(card.userlines[j],value,x+55,ty,muted);ty=ty+16 end
+            else
+            local ty=y+thumbh+12
+            for j,value in ipairs(rec.browsernames)do if not card.namelines[j]then card.namelines[j]=toggle.browserdrawing("text")end;leftlabel(card.namelines[j],value,x+7,ty,ink);ty=ty+16 end
+            for j,value in ipairs(rec.browserusers)do if not card.userlines[j]then card.userlines[j]=toggle.browserdrawing("text")end;leftlabel(card.userlines[j],value,x+7,ty,muted);ty=ty+16 end
+            end
+            p.hits[#p.hits+1]={id=rec.id,x=x,y=by,w=cardw,h=bh}
+        end
+    end
+    fadinggrid=false;cliptop=originalclip;alpha=basealpha
+    if grid then
+        p.viewui=p.viewui or{bg=toggle.browserdrawing("square"),border=toggle.browserdrawing("border"),text=toggle.browserdrawing("text")}
+        local ui=p.viewui
+        if not ui.arrow then ui.arrow=toggle.newdrawing("Triangle");ui.arrow.Filled=true;ui.arrow.Thickness=1;setz(ui.arrow,122);p.draws[#p.draws+1]=ui.arrow end
+        local vx,vy,vw=left+pad,top+12,width-pad*2;local vh=compact and 30 or 34;local opened=dropdownkind=="rosterview";local hovered=inside(mouse.X,mouse.Y,vx,vy,vw,vh)
+        ui.hover=toggle.ease(ui.hover or 0,hovered and 1 or 0,0.20);ui.phase=toggle.ease(ui.phase or 0,opened and 1 or 0,0.24)
+        local bright=toggle.textbrightness(color("bg"))>0.58;local field=toggle.menufieldcolor(surface)
+        box(ui.bg,vx,vy,vw,vh,toggle.colormix(field,accent,ui.hover*0.09),compact and 0.94 or 0.96)
+        box(ui.border,vx,vy,vw,vh,opened and accent or color("select"),opened and 0.45 or 0.10+ui.hover*0.18,true)
+        leftlabel(ui.text,p.view,vx+12,vy+vh/2,ink)
+        local ax,ay,angle=vx+vw-14,vy+vh/2,ui.phase*math.pi/2
+        for key,point in pairs({PointA={-3.5,-2},PointB={3.5,-2},PointC={0,2.5}})do toggle.setprop(ui.arrow,key,Vector2.new(ax+point[1]*math.cos(angle)+point[2]*math.sin(angle),ay-point[1]*math.sin(angle)+point[2]*math.cos(angle)))end
+        toggle.setprop(ui.arrow,"Color",opened and accent or muted);toggle.setprop(ui.arrow,"Transparency",alpha);toggle.setvisible(ui.arrow,true);useddraws[ui.arrow]=true
+        p.viewhit={x=vx,y=vy,w=vw,h=vh};p.viewsource={x=vx-14,y=vy,w=vw+28,h=vh+6,visible=true}
+    elseif dropdownkind=="rosterview"then dropdownkind=nil end
+    fadingdetails=compact and details
+    if not details then toggle.browserreleaseitems();finish();return end
+    alpha=alpha*p.detailphase;local detailoffset=(1-p.detailphase)*8
+    local rec=p.owner
+    if not rec then text(p.empty,"No players",right+width/2,top+70,muted);toggle.browserreleaseitems();finish();return end
+    if compact then
+        p.backbg=p.backbg or toggle.browserdrawing("square");p.backicon=p.backicon or toggle.browserdrawing("image")
+        box(p.backbg,right+12,top+8,30,30,toggle.colormix(color("bg"),ink,0.06),0.85)
+        toggle.seticon(p.backicon,"chevron-large-left",right+19,top+15,16,ink,alpha,true);useddraws[p.backicon]=true;p.returnhit={x=right+8,y=top+4,w=38,h=38}
+    end
+    local cx=right+width/2;top=top+(compact and 32-scroll or 0)+detailoffset;if compact then cliptop=cliptop+42 end
+    local avatarx=right+12;local avatarsize=64
+    setz(p.detail.avatarbg,121);box(p.detail.avatarbg,avatarx,top+18,avatarsize,avatarsize,gray,0.95,false,avatarsize/2)
+    avatar(p.detail.avatar,rec,avatarx,top+18,avatarsize,avatarsize,false)
+    p.distanceicon=p.distanceicon or toggle.browserdrawing("image");p.healthicon=p.healthicon or toggle.browserdrawing("image");p.healthtext=p.healthtext or toggle.browserdrawing("text")
+    p.scrapicon=p.scrapicon or toggle.browserdrawing("image");p.scraptext=p.scraptext or toggle.browserdrawing("text")
+    local self=rec.player==lp or rec.id=="local";p.meters=toggle.playerbrowserdistance(rec);local distance=not self and p.meters and p.meters==p.meters and p.meters<math.huge and tostring(math.floor(p.meters+0.5)).."m"or nil
+    local health=p.health and tostring(math.floor(p.health+0.5))or nil;local scrap=tostring(math.floor(p.scrap or 0))
+    local namex=avatarx+76;local namew=math.max(32,right+width-pad-namex)
+    local headerkey=tostring(namew)..":"..(rec.displayname or rec.username)..":"..rec.username
+    if p.headerwrapkey~=headerkey then p.headerwrapkey=headerkey;p.headernamescache=toggle.browserwrap(rec.displayname or rec.username,namew);p.headeruserscache=toggle.browserwrap("@"..rec.username,namew)end
+    local names,users=p.headernamescache,p.headeruserscache
+    p.headernames=p.headernames or{};p.headerusers=p.headerusers or{}
+    local blockh=(#names+#users)*16+3;local namey=top+18+avatarsize/2-blockh/2+8
+    for j,value in ipairs(names)do if not p.headernames[j]then p.headernames[j]=j==1 and p.detail.name or toggle.browserdrawing("text")end;leftlabel(p.headernames[j],value,namex,namey,ink);namey=namey+16 end
+    namey=namey+3
+    local usernameink=toggle.colormix(muted,color("bg"),0.16)
+    for j,value in ipairs(users)do if not p.headerusers[j]then p.headerusers[j]=j==1 and p.username or toggle.browserdrawing("text")end;leftlabel(p.headerusers[j],value,namex,namey,usernameink);namey=namey+16 end
+    local separator=math.max(top+18+avatarsize, namey-8)+14
+    p.separator=p.separator or toggle.browserdrawing("square");box(p.separator,right+pad,separator,width-pad*2,1,color("outline"),0.28,false,0)
+    local scrapcfg=espcfg.Scrap5;local scraptint=scrapcfg and(scrapcfg.rgb and rgb(0)or scrapcfg.labelcolor)or ink
+    local stats={};if distance then stats[#stats+1]={icon=p.distanceicon,text=p.distance,value=distance,tint=muted,key="distance",glyph="target"}end
+    if health then stats[#stats+1]={icon=p.healthicon,text=p.healthtext,value=health,tint=toggle.healthtint(p.health/100,p.health>100),key="health",glyph="heart"}end
+    stats[#stats+1]={icon=p.scrapicon,text=p.scraptext,value=scrap,tint=scraptint,key="scrap",glyph="tag"}
+    local total=0;for _,item in ipairs(stats)do item.w=toggle.uiwidth(item.value)+43;total=total+item.w end;total=total+math.max(0,#stats-1)*6
+    local statx=cx-total/2;local staty=separator+13;p.statframes=p.statframes or{}
+    for _,item in ipairs(stats)do
+        local frame=p.statframes[item.key];if not frame then frame={bg=toggle.browserdrawing("square"),border=toggle.browserdrawing("border")};p.statframes[item.key]=frame end
+        toggle.registerespsheen(frame.bg,0.8)
+        box(frame.bg,statx,staty,item.w,32,toggle.colormix(color("bg"),item.tint,0.06),0.85);box(frame.border,statx,staty,item.w,32,color("outline"),0.18,true)
+        if staty>=cliptop and staty+32<=bottom then
+            local groupw=13+7+toggle.uiwidth(item.value);local gx=statx+(item.w-groupw)/2
+            toggle.seticon(item.icon,item.glyph,gx,staty+9.5,13,item.tint,alpha*elementfade(staty,32),true);useddraws[item.icon]=true
+            text(item.text,item.value,gx+20+toggle.uiwidth(item.value)/2,staty+16,item.tint)
+        end
+        statx=statx+item.w+6
+    end
+    local inventorytop=staty+48
+    local columns=5;local used={}
+    p.inventorybg=p.inventorybg or toggle.browserdrawing("square");p.inventoryborder=p.inventoryborder or toggle.browserdrawing("border")
+    local itemcount=#p.inventory;local rows=math.max(1,math.ceil(itemcount/columns));local ih=rows*44+16
+    local iw=math.max(1,width-24);local ix=cx-iw/2;local iy=inventorytop;local cellwidth=math.min(44,(iw-16)/columns)
+    local height=iy-top+ih+16;if p.detailheight~=height then p.detailheight=height;menustate.positionanimating=true end
+    toggle.registerespsheen(p.inventorybg,0.8)
+    box(p.inventorybg,ix,iy,iw,ih,color("bg"),0.85);box(p.inventoryborder,ix,iy,iw,ih,color("outline"),0.20,true)
+    for i,item in ipairs(p.inventory)do
+        local row=math.floor((i-1)/columns);local total=math.min(columns,#p.inventory-row*columns);local x=cx-total*cellwidth/2+((i-1)%columns)*cellwidth+(cellwidth-36)/2;local y=iy+12+row*44
+        if y>=cliptop and y+36<=bottom-8 then
+            local d=p.items[i];if d and toggle.itemimagekeys[d]~=item.key then toggle.releaseitemimage(d);d=nil;p.items[i]=nil end
+            if not d then d=toggle.acquireitemimage(item.key);p.items[i]=d end
+            if d then toggle.paintitemimage(d,x,y,36,alpha*elementfade(y,36),123*256,true);used[i]=true end
+        end
+    end
+    for i,d in pairs(p.items)do if not used[i]then toggle.releaseitemimage(d);p.items[i]=nil end end
+    if #p.inventory==0 then text(p.inventoryempty,"No items found",cx,iy+ih/2,muted)end;finish()
+end
+
+toggle.preloadplayerbrowser=function()
+    local p=toggle.playerbrowser;local saved={tab=menustate.tab,menu=toggle.menu,minimized=menustate.minimized,style=toggle.visualstyle,w=menustate.w,h=menustate.h,bodytop=menustate.bodytop,detailopen=p.detailopen,selected=p.selected}
+    local ok=pcall(function()
+        p.preloading=true;menustate.tab=4;toggle.menu=true;menustate.minimized=false;p.next=0;toggle.playerbrowserstep()
+        for _,style in ipairs({"modern","compact"})do
+            toggle.visualstyle=style;menustate.w=style=="compact"and 304 or 600;menustate.bodytop=style=="compact"and 78 or 118
+            p.detailopen=false;toggle.paintplayerbrowser(1);p.detailopen=true;toggle.paintplayerbrowser(1)
+        end
+        for _,d in ipairs(p.draws)do
+            toggle.setvisible(d,false);local owner=p.avatarowners[d];if owner and owner.avatarbytes and toggle.avatarimages[d]~=owner.avatarbytes then d.Data=owner.avatarbytes;toggle.avatarimages[d]=owner.avatarbytes end
+            local state=toggle.drawingstates[d];if state and not state.native and not state.removed then state.backgroundprime=true;pcall(state.prime);state.backgroundprime=nil end;toggle.wait()
+        end
+    end)
+    p.preloading=nil;p.detailopen=saved.detailopen;p.selected=saved.selected;menustate.tab=saved.tab;toggle.menu=saved.menu;menustate.minimized=saved.minimized;toggle.visualstyle=saved.style;menustate.w=saved.w;menustate.h=saved.h;menustate.bodytop=saved.bodytop
+    for _,d in ipairs(p.draws)do toggle.setvisible(d,false)end;for d in pairs(p.profiledraws)do toggle.setvisible(d,false)end;toggle.browserreleaseitems();menustate.itemsdirty=true
+end
 local function menuupdate(animateonly)
     if toggle.uibatch then menustate.itemsdirty=true;return end
+    local paintnow=toggle.frametime or tick()
+    if animateonly and not menustate.itemsdirty and paintnow<(menustate.nextpaint or 0)then return end
+    menustate.nextpaint=paintnow+1/90
     if not animateonly then menustate.itemsdirty=true elseif toggle.frametime and menustate.renderframe==toggle.frametime and not menustate.itemsdirty and menustate.layoutx==menustate.x and menustate.layouty==menustate.y and menustate.layouth==menustate.h then return end;menustate.renderframe=toggle.frametime
     local mt=menustate.minimized and 1 or 0;menustate.minimizeanim=toggle.ease(menustate.minimizeanim,mt,0.17);if math.abs(menustate.minimizeanim-mt)<0.001 then menustate.minimizeanim=mt end
     menustate.menuanim=toggle.ease(menustate.menuanim,toggle.menu and 1 or 0,toggle.menu and 0.13 or 0.17);if math.abs(menustate.menuanim-(toggle.menu and 1 or 0))<0.001 then menustate.menuanim=toggle.menu and 1 or 0 end;menustate.contentfade=clamp(1-menustate.minimizeanim,0,1)
@@ -2141,7 +2647,7 @@ local function menuupdate(animateonly)
     if not animateonly or menustate.itemsdirty or menustate.positionanimating or transitioning or moved or math.abs((menustate.scrolltarget[menustate.tab]or 0)-(menustate.scroll[menustate.tab]or 0))>0.001 then menupos();menustate.layouth=menustate.h;menustate.layoutx=menustate.x;menustate.layouty=menustate.y;menustate.layouttab=menustate.tab;menustate.layoutminimized=menustate.minimized;menustate.layoutphase=menustate.minimizeanim;menustate.layoutviewportx=cam.ViewportSize.X;menustate.layoutviewporty=cam.ViewportSize.Y end
     toggle.footerupdate();local mx,my=mouse.X,mouse.Y;local accent=toggle.accentvisual();local shell=menuopacity*menustate.menuanim;local alpha=menustate.menuanim*menustate.contentfade;local bright=toggle.textbrightness(color("bg"))>0.58
     local presetlayout
-    local compact=toggle.visualstyle=="compact";local surface=toggle.colormix(color("bg"),color("text"),compact and 0.035 or bright and 0.025 or 0.035);local field=toggle.colormix(color("bg"),themes.borderblack,bright and 0.025 or 0.20)
+    local compact=toggle.visualstyle=="compact";local surface=toggle.colormix(color("bg"),color("text"),compact and 0.035 or bright and 0.025 or 0.035);local field=toggle.menufieldcolor(surface)
     toggle.setprop(menubg,"Color",color("bg"));toggle.setprop(menubg,"Transparency",shell);toggle.setprop(menuchrome.border,"Color",color("select"));toggle.setprop(menuchrome.border,"Transparency",0.24*shell)
     toggle.setprop(menutitle,"Text",toggle.menutitle());toggle.setprop(menutitle,"Color",color("text"));toggle.setprop(menutitle,"Transparency",menustate.menuanim);toggle.uioutline(menutitle,menustate.menuanim,color("text"))
     toggle.seticon(menuclose,menustate.minimized and"plus"or"minus",menuclose.Position.X,menuclose.Position.Y,10,color("text"),menustate.menuanim,true)
@@ -2187,6 +2693,7 @@ local function menuupdate(animateonly)
             if item.colorindex then local cfg=entrycfg(item.colorindex);toggle.setprop(toggle.inlinecolors.mark[i],"Color",cfg and(cfg.rgb and rgb(0)or cfg.labelcolor)or accent);toggle.setprop(toggle.inlinecolors.mark[i],"Transparency",fade)end
         end
     end
+    toggle.paintplayerbrowser(alpha*menustate.tabfade)
     menuobjects(menustate.menuanim>0.001)
     local previewon=presetlayout and presetlayout.fieldvisible and presetlayout.valuevisible and menustate.contentfade>0.01 and alpha>0.001 and presetlayout.controly+presetlayout.controlh/2-7>=presetlayout.cliptop and presetlayout.controly+presetlayout.controlh/2+7<=presetlayout.clipbottom
     if previewon then toggle.paintpresetpreview("selected",themeindex,presetlayout.controlx+presetlayout.controlw-80,presetlayout.controly+presetlayout.controlh/2-7,48,14,presetlayout.valuefade*alpha,true)else toggle.paintpresetpreview("selected",nil,0,0,0,0,0,false)end
@@ -2202,7 +2709,7 @@ toggle.warmmenu=function(critical)
     local saved={tab=menustate.tab,menu=toggle.menu,minimized=menustate.minimized,minimizeanim=menustate.minimizeanim,menuanim=menustate.menuanim,contentfade=menustate.contentfade,tabfade=menustate.tabfade,tabslide=menustate.tabslide}
     local function prime(d)local state=d and toggle.drawingstates[d];if state and not state.removed and not state.native then local ok=pcall(toggle.primedrawing,d);if not ok then toggle.startuperrors=(toggle.startuperrors or 0)+1 end;toggle.prepareslice()end end
     toggle.menu=true;menustate.minimized=false;menustate.minimizeanim=0;menustate.menuanim=1;menustate.contentfade=1;menustate.tabfade=1;menustate.tabslide=0
-    for tab=1,4 do
+    for tab=1,#tabnames do
         local items=currentitems(tab);local heights={0,0};local compact=toggle.visualstyle=="compact";local viewport=math.max(80,menustate.h-(compact and 94 or 144));local gap=compact and 13 or 24
         for i,item in ipairs(items)do
             local col=compact and 1 or item.col or 1
@@ -2299,7 +2806,7 @@ local function powerpos()
     if geometrychanged then local inset=toggle.gradientinset();toggle.setpos(p.outer,p.x-3,drawy+2);toggle.setprop(p.outer,"Size",Vector2.new(p.w+6,p.h+4));toggle.setpos(p.middle,p.x+1,drawy+1);p.middle.Size=Vector2.new(p.w-2,p.h-2);toggle.setpos(p.inner,p.x+2,drawy+2);p.inner.Size=Vector2.new(p.w-4,p.h-4);toggle.setpos(p.bg,p.x+1,drawy+1);p.bg.Size=Vector2.new(p.w-2,p.h-2);toggle.setpos(p.top,p.x+3,drawy+3);p.top.Size=Vector2.new(p.w-6,24);p.accent.Visible=false;toggle.layoutgradient(p.gradient,p.x+inset,drawy+3,math.max(1,p.w-inset*2));toggle.lefttext(powerlabel,p.x+18,drawy+(modern and 23.5 or 18))end
     toggle.setvisible(p.outer,false);toggle.setprop(p.middle,"Color",color("outline"));toggle.setprop(p.middle,"Transparency",0.16*alpha*toggle.panelopacity(toggle.hudstyle));toggle.setvisible(p.middle,drawon and toggle.panelopacity(toggle.hudstyle)>0.001);toggle.setprop(p.inner,"Color",themes.borderblack);toggle.setprop(p.inner,"Transparency",0);toggle.setvisible(p.inner,false);toggle.setprop(p.bg,"Color",toggle.visualsurface());toggle.setprop(p.bg,"Transparency",alpha*toggle.panelopacity(toggle.hudstyle));toggle.setvisible(p.bg,drawon and toggle.panelopacity(toggle.hudstyle)>0.001);toggle.setprop(p.top,"Color",color("top"));toggle.setprop(p.top,"Transparency",0);toggle.setvisible(p.top,false);toggle.paintgradient(p.gradient,drawon and modern and toggle.accentbars.activity,alpha);toggle.setvisible(p.divider,false);local titlecolor=toggle.hudtextcolor(color("text"));toggle.setprop(powerlabel,"Color",titlecolor);toggle.setvisible(powerlabel,drawon);toggle.setprop(powerlabel,"Transparency",contentalpha);toggle.applytextoutline(powerlabel,contentalpha,titlecolor)
 end
--- Container geometry follows dragging directly; only visibility is animated.
+ 
 toggle.placehudcontent=function(item,x,valuey,labely)
     item.drawx=x;item.drawy=valuey
     toggle.centertext(item.value,x,valuey);toggle.centertext(item.label,x,labely or valuey+toggle.hudlineheight+12)
@@ -2324,8 +2831,8 @@ local function hudpos()
     local grouped=toggle.containergrouping~="ungrouped";local vertical=toggle.containerorientation=="vertical";local compact=toggle.containerstyle=="compact";local line=toggle.hudlineheight
     local cellw=math.max(compact and 88 or 126,(compact and 88 or 126)*toggle.panelsize/13);local cellh=(compact and 54 or 74)+(line-13)*2
     if grouped then for _,item in ipairs(active)do cellw=math.max(cellw,toggle.textwidth(item.value)+32,toggle.textwidth(item.label)+32)end end
-    local rowh=line+(compact and 9 or 13);local head=compact and 36 or 48;local pad=compact and 14 or 18
-    local w=vertical and math.max(compact and 166 or 190,cellw)or count*cellw+(not grouped and math.max(0,count-1)*6 or 0);local h=vertical and(grouped and head+count*rowh+10 or count*(rowh+pad)+math.max(0,count-1)*6)or cellh
+    local rowh=line+(compact and 8 or 11);local head=compact and 36 or 48;local pad=compact and 14 or 18
+    local w=vertical and math.max(compact and 166 or 190,cellw)or count*cellw+(not grouped and math.max(0,count-1)*6 or 0);local h=vertical and(grouped and head+math.max(0,count-1)*rowh+line+12 or count*(rowh+pad)+math.max(0,count-1)*6)or cellh
     if grouped and vertical then for _,item in ipairs(active)do w=math.max(w,toggle.textwidth(item.label)+toggle.textwidth(item.value)+pad*2+20)end end
     if not grouped then
         local total,widest=0,0;local basew=vertical and(compact and 166 or 190)or cellw
@@ -2408,7 +2915,7 @@ end
 toggle.keybindpos=function()
     if toggle.uibatch then toggle.huddirty=true;return end
     if(not toggle.hud or not toggle.keybindpanel)and(toggle.keybindpanelstate.anim or 0)<=0.001 then toggle.keybindpanelstate.target=0;toggle.keybindpanelstate.rowanimating=false;return end
-    local p=toggle.keybindpanelstate;local modern=toggle.hudstyle=="modern";local rows=toggle.keybindrowcount();local contentw=toggle.textwidth(toggle.keybindtitle);local tier
+    local p=toggle.keybindpanelstate;local modern=toggle.hudstyle=="modern";local rows=toggle.keybindrowcount();local contentw=toggle.textwidth(toggle.keybindtitle);if rows==0 then contentw=math.max(contentw,toggle.measuretext("No keybinds active",toggle.fontvalue("hud"),toggle.panelsize))end;local tier
     if toggle.bindvisible("scrap")and toggle.choosescrap then local _,selected=toggle.choosescrap(false);tier=selected end
     local keyw=26;local tierw=0;toggle.setprop(toggle.keybindtier,"Size",toggle.panelsize);toggle.setprop(toggle.keybindtier,"Text",tier and"Tier "..tier or"")
     if tier then tierw=toggle.textwidth(toggle.keybindtier)+8 end
@@ -2420,6 +2927,8 @@ toggle.keybindpos=function()
     local drawon=p.anim>0.01;local drawy=p.y+math.floor((1-p.anim)*8+0.5);local contenttop=(modern and 48 or 36)+(toggle.panelsize-13)
     toggle.placewidget(toggle.keybindframe,p.x,drawy,p.w,p.h);toggle.keybindframe.top.Size=Vector2.new(p.w-6,24);toggle.paintwidget(toggle.keybindframe,drawon,p.anim,toggle.accentbars.keybinds)
     toggle.lefttext(toggle.keybindtitle,p.x+18,drawy+(modern and 23.5 or 18));local titlecolor=toggle.hudtextcolor(color("text"));toggle.setprop(toggle.keybindtitle,"Color",titlecolor);toggle.setprop(toggle.keybindtitle,"Transparency",p.anim);toggle.applytextoutline(toggle.keybindtitle,p.anim,titlecolor);toggle.setvisible(toggle.keybindtitle,drawon)
+    if not toggle.keybindempty then toggle.keybindempty=setz(newtext("No keybinds active",Color3.fromRGB(150,150,150),false,false),35)end
+    toggle.lefttext(toggle.keybindempty,p.x+18,drawy+contenttop+toggle.hudlineheight/2);toggle.setprop(toggle.keybindempty,"Size",toggle.panelsize);toggle.setprop(toggle.keybindempty,"Color",Color3.fromRGB(150,150,150));toggle.setprop(toggle.keybindempty,"Transparency",p.anim);toggle.setvisible(toggle.keybindempty,drawon and rows==0)
     local row=0;local tiervisible=false
     for i=1,#bindorder do local id=bindorder[i];local label,value=toggle.keybindlines[i],toggle.keybindvalues[i];local visible=drawon and toggle.bindvisible(id)
         if visible then row=row+1;local y=drawy+contenttop+(row-1)*(toggle.hudlineheight+(modern and 11 or 8));local cy=y+toggle.hudlineheight/2;local right=p.x+p.w-18
@@ -2450,17 +2959,18 @@ toggle.hascrateitem=function(name,force)
 end
 toggle.refreshcrateitems=function(rec,now)
     local ok,children=pcall(function()return rec.folder and rec.folder.Parent and rec.folder:GetChildren()end)
-    if not ok or type(children)~="table"then rec.itemscache={};return end
-    local cached=rec.itemscache or{};local count=0
+    if not ok or type(children)~="table"then return end
+    local cached=rec.itemscache or{};local bykey={};for _,item in ipairs(cached)do if type(item)=="table"and rawget(item,"crateitem")then bykey[item.key]=item end end
+    local fresh,seen={},{}
     for i=1,math.min(6,#children)do
         local valid,name,key,taken=pcall(function()local child=children[i];return child.Name,toggle.instanceaddress(child),toggle.cratetaken(child)end)
-        if valid and type(name)=="string"and key then
-            count=count+1;local item=cached[count];if type(item)~="table"or not rawget(item,"crateitem")or item.key~=key then item={crateitem=true,key=key};cached[count]=item end
-            item.Name=name;item.taken=taken==true
-        end
+        if valid and type(name)=="string"and key and not seen[key]then local item=bykey[key]or{crateitem=true,key=key};item.Name=name;item.taken=taken==true;seen[key]=item;fresh[#fresh+1]=item end
     end
-    for i=#cached,count+1,-1 do cached[i]=nil end;rec.itemscache=cached;rec.itemcachetime=now
+    local ordered={};for _,item in ipairs(cached)do if seen[item.key]then ordered[#ordered+1]=seen[item.key];seen[item.key]=nil end end
+    for _,item in ipairs(fresh)do if seen[item.key]then ordered[#ordered+1]=item;seen[item.key]=nil end end
+    rec.itemscache=ordered;rec.itemcachetime=now
 end
+
 toggle.crateunavailable=function(rec,child)
     if not child or toggle.cratetaken(child)then return true end;if rec and rec.cratecollected and rec.cratecollected[toggle.crateitemkey(child)]then return true end;return toggle.hascrateitem(child.Name)
 end
@@ -2647,9 +3157,12 @@ toggle.loadshineconfig=function(data)
     local cfg=toggle.shinesettings;cfg.enabled=type(data)~="table"or data.enabled~=false;cfg.brightness=0.07;cfg.width=0.6;cfg.speed=1.1;cfg.direction="right";cfg.intensity=nil
 end
 
-toggle.espsheens=setmetatable({},{__mode="k"});toggle.espsheencount=0
-toggle.registerespsheen=function(bg)
-    if bg and not toggle.removeddraw[bg]and not toggle.espsheens[bg]and toggle.espsheencount<384 then toggle.espsheens[bg]={};toggle.espsheencount=toggle.espsheencount+1 end
+toggle.espsheens={};toggle.espsheencount=0
+toggle.registerespsheen=function(bg,intensity)
+    if not bg or toggle.removeddraw[bg]then return end
+    local state=toggle.espsheens[bg]
+    if not state and toggle.espsheencount<384 then state={};toggle.espsheens[bg]=state;toggle.espsheencount=toggle.espsheencount+1 end
+    if state and intensity~=nil then state.intensity=clamp(intensity,0,1)end
 end
 toggle.espsheenassets={"iVBORw0KGgoAAAANSUhEUgAAAGAAAAAgCAYAAADtwH1UAAADZUlEQVR42rVaa28jIQwcoGl7///HXl9Av+xJe8iPsSErWUs3UZqM7fHYUOacAPAA8AKgXfe7PW72erO3m70L9ke5r/a2fO5j+T71snIZAEwA47IO4OeybwBfN/u82Ydgf5Xnn4t9LfZ92c9i/Wbjdp/CfQIYFfL17w33tWRjASNr1v/QrqJYNawJfzfnPVX4/CI8Xw3LWrzqAjqWH70Dfk84YSTBtwBvC7BNAL4pzqiKM6oDPATgi/S8CpEPAYQV+GGsNUf0Q5lQDGewke893wFfWqtZ8KLQD5yol9a79KNlwVQyIENDVvRHwI/QEFgKkpzA0NAp05wAkorqJv9r67KZCcWioaqAzAIfpaEdCppkEWYdogHfEoBL4EvfNZwBkkMiNNQPOiKaCcWhoBasBcVQRmkaqsZrTCZMhUZOUpAUDKwULcHoZwux5wwQNKSqIIaOMqBbamiSTvAKMQs8Q0HNyYII96s0VJXCCzL6MzQ0NmloBhqziBKKyNNygIaKRkFsMc7QDtMTTEOORimoPomCLCdYTRg0FaRlwQzWgIgK6s7rkhyNRH9mPJFpzFgqEjOiEsCzBZnNiE7Qk9WQzaAaOpUJRYl6rybAUkPVacKgyNChFONML7DrBC3id+pAOyBH4dCSWYSjxXcerAHZTFh/9K4U9dRQ1OCpICu9T/M/4wS2EIPMhsiYItsb0OqHoaCZMCbie8IJIxj9EfCZiPdAj4wpTBXEjCKyTZnlhO7UAiYbMk7IRL7WCUs7d54cpUYRIFRPpinLbNgwFLTjBLYBqwG+tzpjcxSRacqiNaHj3HTUKsYlAfwu/5vAM6OISdaGkdgfzmZCdkztydJMDWAzwtwZq0n1k9mc744TmDoQjf5sY5Ztylg1VDwVNAPUxHTCfQE6G/3DGFV7XbF231VC3ljadEglCy/IsfR8Uh3IUBDjhIxFN2bCo4gdGopMSDUK6sHojzZlmb1jlobqziiCoSFs1oT+hAL8rP3iFii+EWn637PIwSwkAJ+BRiy6iRPNhFMUFJWiyGRAhIZGUo72oBLK9AWFOFZ4AnhGGaU64ZkYS+w0ZmwWTIcmsUlB7RANwXOCdTQxelArGvlW9HeDnqyMYDdqdjZsMvvD7sEsEMU4QkPedHSH/0+doi6HuH/rlPQvUCrren8xRE8AAAAASUVORK5CYII="}
 toggle.espsheendata=function()
@@ -2665,7 +3178,7 @@ toggle.drawespsheens=function()
             if on then
                 if not state.image then state.image=toggle.newicon(1);toggle.setprop(state.image,"Data",toggle.espsheendata())end
                 local width=math.max(2,math.min(size.X,size.X*cfg.width));local image=state.image;local tint=toggle.textbrightness(bg.Color)<0.5 and toggle.white or Color3.new(0,0,0);local radius=math.min(bg.Corner or toggle.borderradius or 0,width/2,size.Y/2)
-                toggle.setprop(image,"Position",Vector2.new(bg.Position.X+(size.X-width)*phase,bg.Position.Y));toggle.setprop(image,"Size",Vector2.new(width,size.Y));toggle.setprop(image,"Rounding",radius);toggle.setprop(image,"ZIndex",(bg.ZIndex or 0)+1);toggle.setprop(image,"Color",tint);toggle.setprop(image,"Transparency",base*bg.Transparency);toggle.setvisible(image,true)
+                toggle.setprop(image,"Position",Vector2.new(bg.Position.X+(size.X-width)*phase,bg.Position.Y));toggle.setprop(image,"Size",Vector2.new(width,size.Y));toggle.setprop(image,"Rounding",radius);toggle.setprop(image,"ZIndex",(bg.ZIndex or 0)+1);toggle.setprop(image,"Color",tint);toggle.setprop(image,"Transparency",base*bg.Transparency*(state.intensity or 1));toggle.setvisible(image,true)
             elseif state.image then toggle.setvisible(state.image,false)end
         end
     end
@@ -2718,11 +3231,13 @@ local function makecrate(rec)
     for i=1,6 do rec.items[i]=setz(toggle.esptext("",cratetext,true,false,true),8);rec.items[i].Font=font;rec.status[i]=setz(toggle.esptext("",color("muted"),true,false,true),9);rec.status[i].Font=font end
 end
 local function hiderec(rec)
+    if rec.itempictures then for i,d in pairs(rec.itempictures)do toggle.releaseitemimage(d);rec.itempictures[i]=nil end end
     if rec.hidden then return end;rec.hidden=true;rec.inventoryvisible=false
     hide(rec.name);hide(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon})do hide(d)end;hidering(rec);hide(rec.bg);hide(rec.bgouter);hide(rec.bgmiddle);hide(rec.bginner);hide(rec.take);hide(rec.crateheadbg);hide(rec.crateheadborder);hide(rec.cratetitle);hide(rec.crategift);hide(rec.takekey)
     if rec.items then for i=1,#rec.items do hide(rec.items[i]);hide(rec.status and rec.status[i])end end
 end
 local function removerec(rec)
+    if rec.itempictures then for _,d in pairs(rec.itempictures)do toggle.releaseitemimage(d)end;rec.itempictures=nil end
     remove(rec.name);remove(rec.distance);for _,d in pairs({rec.labelbg,rec.labelborder,rec.labelicon,rec.distancebg,rec.distanceborder,rec.distanceicon})do remove(d)end;
     toggle.releasering(rec)
     remove(rec.bg);remove(rec.bgouter);remove(rec.bgmiddle);remove(rec.bginner);remove(rec.take);remove(rec.crateheadbg);remove(rec.crateheadborder);remove(rec.cratetitle);remove(rec.crategift);remove(rec.takekey)
@@ -2789,6 +3304,49 @@ local function dist(a,b)
     local x,y,z=b.X-a.X,b.Y-a.Y,b.Z-a.Z
     if x~=x or y~=y or z~=z or math.abs(x)==math.huge or math.abs(y)==math.huge or math.abs(z)==math.huge then return math.huge end
     return math.sqrt(x*x+y*y+z*z)*stud2m
+end
+toggle.playerbrowserstep=function()
+    local p=toggle.playerbrowser;local now=tick();if now<(p.next or 0)then return end;p.next=now+0.2
+    if not p.preloading and(menustate.tab~=4 or not toggle.menu or menustate.minimized)then return end
+    toggle.refreshplayers(now,nil,false)
+    local list={};for _,rec in pairs(toggle.playeresp.records)do if not rec.departed and rec.player and rec.player~=lp then list[#list+1]=rec end end
+    if lp.Name then
+        p.self=p.self or{id="local",player=lp,username=lp.Name};p.self.displayname=toggle.playerdisplayname or lp.Name
+        if toggle.footer and toggle.footer.ready then local bytes=toggle.footer.image.Data;if type(bytes)=="string"and #bytes>0 then p.self.avatarbytes=bytes end end
+        if p.self.avatarbytes and not p.self.profileimages then toggle.prepareprofileimages(p.self,p.preloading==true)end
+        list[#list+1]=p.self
+    end
+    table.sort(list,function(a,b)local alocal=a.player==lp or a.id=="local";local blocal=b.player==lp or b.id=="local";if alocal~=blocal then return not alocal end;return a.username:lower()<b.username:lower()end);p.list=list
+    local chosen=nil;for _,rec in ipairs(list)do if rec.id==p.selected then chosen=rec;break end end
+    if not chosen then chosen=list[1];p.selected=chosen and chosen.id or nil end
+    if p.owner~=chosen then toggle.browserreleaseitems();p.owner=chosen;p.inventory={};p.health=nil;p.scrap=nil end
+    local inventory={};local meters=nil;local valid=false
+    if chosen then
+        p.scrap=toggle.readplayerscrap(chosen.player)
+        local ok=pcall(function()
+            local character=ws:FindFirstChild(chosen.username)or chosen.character
+            if not character then local good,value=pcall(function()return chosen.player.Character end);if good then character=value end end
+            local root=character and(character:FindFirstChild("HumanoidRootPart")or character:FindFirstChild("Torso"))or chosen.root
+            if root and root:IsA("BasePart")then meters=dist(viewpos(),root.Position)end
+            chosen.humanoid=character and(character:FindFirstChild("Humanoid")or character:FindFirstChildOfClass("Humanoid"))or chosen.humanoid
+            toggle.sampleplayerhealth(chosen,now);p.health=chosen.health
+            local owned,flarecount=toggle.playerbackpackread(chosen.player,character);if not owned then return end
+            for _,entry in ipairs(toggle.playeresp.order)do
+                local item=owned[entry.name]
+                if entry.name=="FlareGun"then item=item or owned.FlareGunPickUp or owned.FlareGunTool elseif entry.name=="Vest"then local vest=owned.VestModel;item=item or vest and vest:IsA("MeshPart")end
+                if item then inventory[#inventory+1]={key=entry.name,count=entry.name=="FlareGun"and flarecount or 1}end
+            end;valid=true
+        end)
+        if ok and valid then p.inventory=inventory end
+    else p.inventory={}end;p.meters=meters
+end
+toggle.playerbrowserdistance=function(rec)
+    local ok,value=pcall(function()
+        local root=rec.root
+        if not root or not root.Parent then local character=ws:FindFirstChild(rec.username)or rec.character;root=character and(character:FindFirstChild("HumanoidRootPart")or character:FindFirstChild("Torso"))end
+        return root and dist(viewpos(),root.Position)or nil
+    end)
+    return ok and value or nil
 end
 toggle.makepromptrecord=function(id,options,commands)
     local state=toggle.promptstate;local rec=state.records[id];if not rec then rec={id=id,options={},commands={},selected=1,anim=0,shutter=0,selectanim={},bg=setz(newsquare(Color3.fromHex("#000000"),1),41),shutterdraw=setz(newsquare(Color3.fromHex("#000000"),0),43),outer=setz(newborder(Color3.fromHex("#000000"),1),44),middle=setz(newborder(Color3.fromHex("#555555"),1),44),inner=setz(newborder(Color3.fromHex("#000000"),1),44),texts={},actionkey=setz(toggle.esptext("F",color("accent"),false,false,false),46),action=setz(toggle.esptext("Toggle",color("text"),false,false,false),46)};rec.action.Font=font;rec.actionkey.Font=font;state.records[id]=rec end
@@ -2891,15 +3449,19 @@ local function drawcrate(rec,screen,meters,yoffset)
     rec.crateanim=toggle.ease(rec.crateanim or 0,target and 1 or 0,target and 0.18 or 0.16);if math.abs(rec.crateanim-(target and 1 or 0))<0.005 then rec.crateanim=target and 1 or 0 end
     local anim=rec.crateanim;rec.inventoryvisible=anim>0.01 and rec.itemscache and #rec.itemscache>0 or false
     if not target and anim<=0.01 then
+        if rec.itempictures then for i,d in pairs(rec.itempictures)do toggle.releaseitemimage(d);rec.itempictures[i]=nil end end
         for _,d in pairs({rec.bg,rec.bgouter,rec.bgmiddle,rec.bginner,rec.take,rec.crateheadbg,rec.crateheadborder,rec.cratetitle,rec.crategift,rec.takekey})do hide(d)end
         if rec.items then for i=1,#rec.items do hide(rec.items[i]);hide(rec.status[i])end end;return
     end
     makecrate(rec);local modern=toggle.espvisualstyle=="modern";local now=toggle.frametime or tick()
     if target and(not rec.itemscache or now-(rec.itemcachetime or 0)>=0.2)then toggle.refreshcrateitems(rec,now)end
-    local children=rec.itemscache or{};local count=math.min(#children,#rec.items);local active=toggle.instacrate and not rec.crateused and toggle.instacratestate.active==rec
+    rec.itempictures=rec.itempictures or{};local children=rec.itemscache or{};local count=math.min(#children,#rec.items);local active=toggle.instacrate and not rec.crateused and toggle.instacratestate.active==rec
     rec.inventoryvisible=anim>0.01 and count>0
     if active and(not rec.crateselected or toggle.crateunavailable(rec,children[rec.crateselected]))then rec.crateselected=toggle.nextcrateitem(rec,rec.crateselected or 0,1)end
-    local basey=screen.Y-12+yoffset+(modern and cratey or 36)+(rec.cratestack or 0)+(1-anim)*7;local owneditems=toggle.refreshinventory(false);local takeindex=nil;local cellw=(cratewidth-24)/3;local rowheight=toggle.esplineheight*(modern and 3 or 2)+6;local rowspans={rowheight,rowheight}
+    local imagegrid=toggle.crateinventorystyle=="Image";local picturesize=imagegrid and 36 or 28;local itemgap=imagegrid and 1 or 3;local panelpad=imagegrid and 4 or cratepady
+    local cellw=imagegrid and math.max(picturesize+20,toggle.espwidth("Owned")+16,toggle.instacrate and toggle.espwidth(toggle.bindname("crate"))+toggle.espwidth("Take")+11 or 0)or(cratewidth-24)/3
+    local panelwidth=imagegrid and math.ceil(cellw*3+16)or cratewidth
+    local basey=screen.Y-12+yoffset+(modern and cratey or 36)+(rec.cratestack or 0)+(1-anim)*7;local owneditems=toggle.refreshinventory(false);local takeindex=nil;local rowheight=imagegrid and(picturesize+toggle.esplineheight+itemgap)or toggle.esplineheight*(modern and 3 or 2)+6;local rowspans={rowheight,rowheight}
     for i=1,#rec.items do
         local d,status,child=rec.items[i],rec.status[i],children[i];local safe,alive=pcall(function()return child and(type(child)=="table"and rawget(child,"crateitem")and type(child.Name)=="string"or child.Parent~=nil)end)
         local state=rec.craterows[i]or{phase=0,statusphase=0};rec.craterows[i]=state;state.alive=safe and alive
@@ -2908,26 +3470,32 @@ local function drawcrate(rec,screen,meters,yoffset)
             local selected=active and meters<=1.8 and rec.crateselected==i and not unavailable;local auto=toggle.autocollect.enabled and toggle.autocollect.selected[child.Name]and not unavailable
             state.phase=toggle.ease(state.phase,selected and 1 or 0,0.22);local itemstyle=toggle.cratestyles[child.Name];local full=itemstyle and(itemstyle.rgb and rgb((i-1)/#rec.items)or itemstyle.labelcolor)or cratetext
             local normal=unavailable and color("muted")or toggle.colormix(toggle.colormix(full,color("bg"),0.58),full,state.phase);if not state.tint then state.tint=normal end;state.tint=toggle.colormix(state.tint,normal,1-(1-0.24)^((toggle.framedt or 1/60)*60))
-            local itemcolor=toggle.hudtextcolor(state.tint,toggle.espvisualstyle);toggle.setprop(d,"Text",toggle.uititle(cratenames[child.Name]or child.Name));toggle.setprop(d,"Size",espfontsize);toggle.setprop(d,"Color",itemcolor);toggle.setprop(d,"Transparency",anim);toggle.applypanelespoutline(d,anim,itemcolor);toggle.setvisible(d,anim>0.01)
-            local text=taken and"Taken"or owned and"Owned"or auto and"Auto"or"";if text~=state.status then state.status=text;state.statusphase=0 end;state.statusphase=toggle.ease(state.statusphase,text~=""and 1 or 0,0.2)
-            local statuscolor=unavailable and toggle.colormix(itemcolor,themes.borderblack,0.28)or color("accent");toggle.setprop(status,"Size",espfontsize);toggle.setprop(status,"Text",text);toggle.setprop(status,"Color",statuscolor);toggle.setprop(status,"Transparency",anim*state.statusphase);toggle.applypanelespoutline(status,anim*state.statusphase,statuscolor);toggle.setvisible(status,text~=""and state.statusphase>0.01 and anim>0.01)
-            state.blockheight=toggle.esplineheight+(text~=""and toggle.esplineheight+3 or 0);local row=math.floor((i-1)/3)+1;rowspans[row]=math.max(rowspans[row],state.blockheight);if selected then takeindex=i end
-        else toggle.setvisible(d,false);toggle.setvisible(status,false)end
+            local itemcolor=toggle.hudtextcolor(state.tint,toggle.espvisualstyle);toggle.setprop(d,"Text",toggle.uititle(cratenames[child.Name]or child.Name));toggle.setprop(d,"Size",espfontsize);toggle.setprop(d,"Color",itemcolor);toggle.setprop(d,"Transparency",anim);toggle.applypanelespoutline(d,anim,itemcolor)
+            local text=taken and"Taken"or owned and"Owned"or auto and"Auto"or"";local itemkey=toggle.crateitemkey(child)
+            if state.statusitem~=itemkey then state.statusitem=itemkey;state.status="";state.statusphase=0;state.statusemptyat=nil end
+            if text==""and state.status~=""then state.statusemptyat=state.statusemptyat or now;if now-state.statusemptyat<0.15 then text=state.status end else state.statusemptyat=nil end
+            if text~=state.status then local visible=state.status and state.status~="";state.status=text;if not visible then state.statusphase=0 end end;state.statusphase=toggle.ease(state.statusphase,text~=""and 1 or 0,0.2)
+            local statuscolor=(text=="Taken"or text=="Owned")and toggle.colormix(itemcolor,themes.borderblack,0.28)or color("accent");toggle.setprop(status,"Size",espfontsize);toggle.setprop(status,"Text",text);toggle.setprop(status,"Color",statuscolor);toggle.setprop(status,"Transparency",anim*state.statusphase);toggle.applypanelespoutline(status,anim*state.statusphase,statuscolor);toggle.setvisible(status,text~=""and state.statusphase>0.01 and anim>0.01)
+            state.pictureheight=imagegrid and picturesize or toggle.esplineheight;state.blockheight=toggle.crateinventorystyle=="Image"and rowheight or state.pictureheight+(text~=""and toggle.esplineheight+3 or 0);local row=math.floor((i-1)/3)+1;rowspans[row]=math.max(rowspans[row],state.blockheight);if selected and state.status==""then takeindex=i end
+        else toggle.setvisible(d,false);toggle.setvisible(status,false);if rec.itempictures[i]then toggle.setvisible(rec.itempictures[i],false)end end
     end
     if takeindex and takeindex~=rec.takeindex then rec.takeindex=takeindex;rec.takeanim=0 end;rec.takeanim=toggle.ease(rec.takeanim or 0,takeindex and 1 or 0,0.22)
-    if rec.takeindex and rec.takeanim>0.01 then local index=rec.takeindex;local row=math.floor((index-1)/3)+1;local state=rec.craterows[index];if state and state.alive then state.blockheight=(state.blockheight or toggle.esplineheight)+toggle.esplineheight+3;rowspans[row]=math.max(rowspans[row],state.blockheight)end end
-    local rows=2;local rowtops={0,rowspans[1]+8};local contents=rowspans[1]+8+rowspans[2]
-    for i=1,#rec.items do local state=rec.craterows[i];if state and state.alive then local row=math.floor((i-1)/3)+1;local col=(i-1)%3;local center=screen.X+(col-1)*cellw;local y=basey+rowtops[row]+(rowspans[row]-(state.blockheight or toggle.esplineheight))/2;state.texty=y;toggle.centertext(rec.items[i],center,y+toggle.esplineheight/2);toggle.centertext(rec.status[i],center,y+toggle.esplineheight*1.5+3+(1-state.statusphase)*3)end end
+    local rowgap=imagegrid and 4 or 8;local rowtops={0,rowspans[1]+rowgap};local contents=imagegrid and count<=3 and rowspans[1]or rowspans[1]+rowgap+rowspans[2]
+    for i=1,#rec.items do local state=rec.craterows[i];if state and state.alive then local row=math.floor((i-1)/3)+1;local col=(i-1)%3;local center=screen.X+(col-1)*cellw;local y=basey+rowtops[row]+(rowspans[row]-(state.blockheight or toggle.esplineheight))/2;state.texty=y;toggle.centertext(rec.items[i],center,y+toggle.esplineheight/2);local image=rec.itempictures[i];if toggle.crateinventorystyle~="Image"and image then toggle.releaseitemimage(image);image=nil;rec.itempictures[i]=nil end;local key=toggle.itemkey(children[i].Name);if image and toggle.itemimagekeys[image]~=key then toggle.releaseitemimage(image);image=nil;rec.itempictures[i]=nil end
+        if toggle.crateinventorystyle=="Image"and not image then image=toggle.acquireitemimage(key);rec.itempictures[i]=image end
+        local picture=toggle.crateinventorystyle=="Image"and image~=nil;toggle.setvisible(rec.items[i],not picture and(not imagegrid or not toggle.itemart[key])and anim>0.01)
+        if image then toggle.paintitemimage(image,center-picturesize/2,y,picturesize,anim*((state.status=="Taken"or state.status=="Owned")and 0.45 or 1),rec.items[i].ZIndex or 2500,picture)end
+        toggle.centertext(rec.status[i],center,y+(state.pictureheight or toggle.esplineheight)+toggle.esplineheight/2+itemgap+(toggle.crateinventorystyle=="Image"and 0 or(1-state.statusphase)*3))end end
     if rec.takeindex then
-        local index=rec.takeindex;local row=math.floor((index-1)/3)+1;local col=(index-1)%3;local center=screen.X+(col-1)*cellw;local y=(rec.craterows[index].texty or basey)+toggle.esplineheight+3+(rec.status[index].Text~=""and espfontsize+3 or 0)+(1-rec.takeanim)*3
+        local index=rec.takeindex;local row=math.floor((index-1)/3)+1;local col=(index-1)%3;local center=screen.X+(col-1)*cellw;local y=(rec.craterows[index].texty or basey)+(rec.craterows[index].pictureheight or toggle.esplineheight)+itemgap+(toggle.crateinventorystyle=="Image"and 0 or(1-rec.takeanim)*3)
         local key=toggle.bindname("crate");toggle.setprop(rec.takekey,"Text",key);toggle.setprop(rec.takekey,"Size",espfontsize);toggle.setprop(rec.takekey,"Color",color("accent"));toggle.setprop(rec.takekey,"Transparency",anim*rec.takeanim);toggle.applypanelespoutline(rec.takekey,anim*rec.takeanim,color("accent"))
         toggle.setprop(rec.take,"Text","Take");toggle.setprop(rec.take,"Size",espfontsize);toggle.setprop(rec.take,"Color",color("text"));toggle.setprop(rec.take,"Transparency",anim*rec.takeanim);toggle.applypanelespoutline(rec.take,anim*rec.takeanim,color("text"))
         local width=toggle.textwidth(rec.takekey)+7+toggle.textwidth(rec.take);toggle.centertext(rec.takekey,center-width/2+toggle.textwidth(rec.takekey)/2,y+toggle.esplineheight/2);toggle.centertext(rec.take,center-width/2+toggle.textwidth(rec.takekey)+7+toggle.textwidth(rec.take)/2,y+toggle.esplineheight/2)
     end
-    local takeon=rec.takeindex~=nil and rec.takeanim>0.01 and anim>0.01;toggle.setvisible(rec.take,takeon);toggle.setvisible(rec.takekey,takeon)
-    local miny=basey-cratepady;local height=contents+cratepady*2;local left=screen.X-cratewidth/2;local titlewidth=toggle.textwidth(rec.cratetitle);local crateicons=toggle.iconenabled(rec);local headwidth=titlewidth+(crateicons and 50 or 24);local headleft=screen.X-headwidth/2;local headheight=toggle.esplineheight+(modern and 18 or 12);local heady=miny-headheight-4
+    local takeon=rec.takeindex~=nil and rec.craterows[rec.takeindex]and rec.craterows[rec.takeindex].status==""and rec.takeanim>0.01 and anim>0.01;toggle.setvisible(rec.take,takeon);toggle.setvisible(rec.takekey,takeon)
+    local miny=basey-panelpad;local height=contents+panelpad*2;local left=screen.X-panelwidth/2;local titlewidth=toggle.textwidth(rec.cratetitle);local crateicons=toggle.iconenabled(rec);local headwidth=titlewidth+(crateicons and 50 or 24);local headleft=screen.X-headwidth/2;local headheight=toggle.esplineheight+(modern and 18 or 12);local heady=miny-headheight-4
     rec.crateheight=count>0 and height+headheight+4 or 0;local panelon=anim>0.01 and count>0
-    toggle.registerespsheen(rec.bg);toggle.registerespsheen(rec.crateheadbg);for _,entry in ipairs({{rec.bg,left+1,miny+1,cratewidth-2,height-2},{rec.bgmiddle,left,miny,cratewidth,height},{rec.crateheadbg,headleft+1,heady+1,headwidth-2,headheight-2},{rec.crateheadborder,headleft,heady,headwidth,headheight}})do local d=entry[1];toggle.setpos(d,entry[2],entry[3]);toggle.setprop(d,"Size",Vector2.new(entry[4],entry[5]));toggle.setprop(d,"Corner",math.max(0,toggle.borderradius-1));toggle.setprop(d,"Color",(d==rec.bgmiddle or d==rec.crateheadborder)and color("outline")or toggle.visualsurface());toggle.setprop(d,"Transparency",anim*toggle.espbackgroundopacity(toggle.espvisualstyle)*((d==rec.bgmiddle or d==rec.crateheadborder)and 0.24 or 1));toggle.setvisible(d,panelon and toggle.espbackgroundopacity(toggle.espvisualstyle)>0.01)end
+    toggle.registerespsheen(rec.bg);toggle.registerespsheen(rec.crateheadbg);for _,entry in ipairs({{rec.bg,left+1,miny+1,panelwidth-2,height-2},{rec.bgmiddle,left,miny,panelwidth,height},{rec.crateheadbg,headleft+1,heady+1,headwidth-2,headheight-2},{rec.crateheadborder,headleft,heady,headwidth,headheight}})do local d=entry[1];toggle.setpos(d,entry[2],entry[3]);toggle.setprop(d,"Size",Vector2.new(entry[4],entry[5]));toggle.setprop(d,"Corner",math.max(0,toggle.borderradius-1));toggle.setprop(d,"Color",(d==rec.bgmiddle or d==rec.crateheadborder)and color("outline")or toggle.visualsurface());toggle.setprop(d,"Transparency",anim*toggle.espbackgroundopacity(toggle.espvisualstyle)*((d==rec.bgmiddle or d==rec.crateheadborder)and 0.24 or 1));toggle.setvisible(d,panelon and toggle.espbackgroundopacity(toggle.espvisualstyle)>0.01)end
     toggle.setvisible(rec.bgouter,false);toggle.setvisible(rec.bginner,false);local tint=rec.cfg.rgb and rgb(0)or rec.cfg.labelcolor;local texty=heady+(headheight-toggle.esplineheight)/2
     toggle.centertext(rec.cratetitle,crateicons and headleft+38+titlewidth/2 or screen.X,heady+headheight/2);toggle.setprop(rec.cratetitle,"Size",espfontsize);toggle.setprop(rec.cratetitle,"Color",tint);toggle.setprop(rec.cratetitle,"Transparency",anim);toggle.applypanelespoutline(rec.cratetitle,anim,tint);toggle.setvisible(rec.cratetitle,count>0 and anim>0.01);toggle.seticon(rec.crategift,"gift-box",headleft+12,heady+(headheight-18)/2,18,tint,anim,crateicons and count>0 and anim>0.01)
 end
@@ -2950,7 +3518,7 @@ toggle.captureprojection=function()
         local sample=Vector3.new(p.X+l.X*20+r.X*3+u.X,p.Y+l.Y*20+r.Y*3+u.Y,p.Z+l.Z*20+r.Z*3+u.Z)
         local checked,screen,on=pcall(WorldToScreen,sample);local sx,sy=width*0.5+focal*0.15,height*0.5-focal*0.05
         if not checked or not on or not screen or not toggle.drawingfinite(screen.X,1000000)or not toggle.drawingfinite(screen.Y,1000000)or math.abs(screen.X-sx)>2 or math.abs(screen.Y-sy)>2 then toggle.projectionretry=now+0.25;return end
-        state.nextcheck=now
+        state.nextcheck=now+1
     end
     state.camera=cam;state.fov=fov;state.width=width;state.height=height;state.cx=width*0.5;state.cy=height*0.5;state.focal=focal;state.x=p.X;state.y=p.Y;state.z=p.Z;state.rx=r.X;state.ry=r.Y;state.rz=r.Z;state.ux=u.X;state.uy=u.Y;state.uz=u.Z;state.lx=l.X;state.ly=l.Y;state.lz=l.Z;state.frame=toggle.frametime;toggle.projection=state
 end
@@ -3059,6 +3627,8 @@ toggle.drawtracers=function()
     end
 end
 local function drawrec(rec,viewer)
+    local cfg=rec.cfg;local requested=toggle.esp and espgroups[cfg.group]and espgroups.items[rec.cfgname]~=false or cfg.crate and toggle.supplyitems and(toggle.esp or toggle.instacrate)
+    if not requested and(rec.labelanim or 0)<=0.01 and(rec.ringanim or 0)<=0.01 and not rec.inventoryvisible then hiderec(rec);return true end
     local object=rec.object
     if rec.active==false or not object or not object.Parent then hiderec(rec);toggle.paintworldlabel(rec,nil,rec.lastmeters or 0,false);if rec.lastworld and(rec.ringanim or 0)>0.01 then drawring(rec,rec.lastworld,rec.lastmeters or 0,false)end;return(rec.labelanim or 0)>0.01 or(rec.ringanim or 0)>0.01 end
     local group=rec.cfg.group
@@ -3068,10 +3638,10 @@ local function drawrec(rec,viewer)
     local screen,on;if rec.cfg.crate and rec.cratelayouttime==toggle.frametime then screen,on=rec.cratescreen,rec.crateonscreen else screen,on=toggle.projectworld(world)end
     if not on or not screen or screen.X~=screen.X or screen.Y~=screen.Y or math.abs(screen.X)==math.huge or math.abs(screen.Y)==math.huge then hiderec(rec);toggle.paintworldlabel(rec,nil,meters,false);drawring(rec,world,meters,false);return true end
     rec.hidden=false
-    local yoffset=rec.cfg.textyoffset or 0;local crateok=true;if rec.cfg.crate then crateok=pcall(drawcrate,rec,screen,meters,yoffset)end;local sx,sy=screen.X,screen.Y
+    local yoffset=rec.cfg.textyoffset or 0;local crateok=true;if rec.cfg.crate then local err;crateok,err=pcall(drawcrate,rec,screen,meters,yoffset);if not crateok then toggle.health.crateerror=tostring(err)end end;local sx,sy=screen.X,screen.Y
     makelabels(rec)
     local labelvisible=toggle.esp and(not rec.cfg.crate or toggle.supplylabel and not rec.inventoryvisible);toggle.paintworldlabel(rec,screen,meters,labelvisible)
-    if not crateok then rec.inventoryvisible=false; rec.folder=nil;rec.itemscache=nil;for _,d in pairs({rec.bg,rec.bgouter,rec.bgmiddle,rec.bginner,rec.take,rec.crateheadbg,rec.crateheadborder,rec.cratetitle,rec.crategift,rec.takekey})do hide(d)end;if rec.items then for i=1,#rec.items do hide(rec.items[i]);hide(rec.status[i])end end end
+    if not crateok then if rec.itempictures then for _,d in pairs(rec.itempictures)do hide(d)end end;rec.inventoryvisible=false; rec.folder=nil;rec.itemscache=nil;for _,d in pairs({rec.bg,rec.bgouter,rec.bgmiddle,rec.bginner,rec.take,rec.crateheadbg,rec.crateheadborder,rec.cratetitle,rec.crategift,rec.takekey})do hide(d)end;if rec.items then for i=1,#rec.items do hide(rec.items[i]);hide(rec.status[i])end end end
     if not pcall(drawring,rec,world,meters)then if rec.ring then for i=1,#rec.ring do remove(rec.ring[i])end end;rec.ring=nil;rec.ringfail=math.min(4,(rec.ringfail or 0)+1);rec.ringretry=(toggle.frametime or tick())+math.min(2,0.25*2^(rec.ringfail-1))elseif rec.ring and(toggle.frametime or tick())>=(rec.ringretry or 0)then rec.ringfail=0;rec.ringretry=0 end
     return true
 end
@@ -3088,18 +3658,26 @@ end
 toggle.playeroutline=function(d,fade,c,style)toggle.playerprop(d,"Outline",toggle.espoutlineallowed(c,fade,style))end
 toggle.playerkey=function(player)return tostring(player.Name)end
 toggle.hideplayerrecord=function(rec)
-    if not rec then return end;rec.anim=0;if rec.texts then for i=1,#rec.texts do toggle.playerprop(rec.texts[i],"Visible",false)end end
+    if not rec then return end;rec.anim=0;if rec.itemnodes then for _,node in ipairs(rec.itemnodes)do if node.image then toggle.releaseitemimage(node.image);node.image=nil end end end;if rec.texts then for i=1,#rec.texts do toggle.playerprop(rec.texts[i],"Visible",false)end end
     if rec.draws then for i=1,#rec.draws do toggle.playerprop(rec.draws[i],"Visible",false)end end
 end
-toggle.removeplayerrecord=function(rec)
-    if not rec then return end;if rec.texts then for i=1,#rec.texts do remove(rec.texts[i])end end;if rec.draws then for i=1,#rec.draws do remove(rec.draws[i])end end;rec.frames=nil;rec.draws=nil;rec.layercount=nil;rec.healthpane=nil;rec.distancepane=nil;rec.detailbg=nil;rec.detailtop=nil;rec.detailouter=nil;rec.detailmiddle=nil;rec.detailinner=nil;rec.itemnodes=nil;rec.nodelookup=nil;rec.texts={}
+toggle.removeplayerrecord=function(rec,departed)
+    if not rec then return end;if rec.backpackimage then remove(rec.backpackimage);rec.backpackimage=nil;rec.backpackbatchkey=nil end;toggle.backpackbatch.owners[rec]=nil;if departed then
+        local browser=toggle.playerbrowser
+        if browser then
+            for d,owner in pairs(browser.avatarowners)do if owner==rec then browser.avatarowners[d]=nil;browser.profiledraws[d]=nil end end
+            for i=#browser.list,1,-1 do if browser.list[i]==rec then table.remove(browser.list,i)end end
+            if browser.owner==rec then toggle.browserreleaseitems();browser.owner=nil;browser.inventory={};browser.health=nil;browser.scrap=nil;browser.meters=nil end
+        end
+        rec.departed=true;rec.avatarbytes=nil;if rec.profileimages then for _,d in pairs(rec.profileimages)do remove(d)end;rec.profileimages=nil end;if rec.skull then remove(rec.skull);rec.skull=nil end;if toggle.releaseplayerarrows then toggle.releaseplayerarrows(rec)end end;if rec.texts then for i=1,#rec.texts do remove(rec.texts[i])end end;if rec.draws then for i=1,#rec.draws do remove(rec.draws[i])end end;if rec.itemnodes then for _,node in ipairs(rec.itemnodes)do toggle.releaseitemimage(node.image);node.image=nil end end;rec.frames=nil;rec.draws=nil;rec.layercount=nil;rec.healthpane=nil;rec.distancepane=nil;rec.scrappane=nil;rec.scraptext=nil;rec.scrapicon=nil;rec.detailbg=nil;rec.detailtop=nil;rec.detailouter=nil;rec.detailmiddle=nil;rec.detailinner=nil;rec.itemnodes=nil;rec.nodelookup=nil;rec.texts={}
 end
 toggle.makeplayerpanel=function(rec)
     if rec.draws then local valid=true;for i=1,#rec.draws do if toggle.removeddraw[rec.draws[i]]then valid=false;break end end;if valid then if(rec.detailanim or 0)>0.01 then toggle.makeplayerdetails(rec)end;return end;for i=1,#rec.draws do remove(rec.draws[i])end end
     rec.bg=setz(newsquare(color("bg"),1),1);rec.top=setz(newsquare(color("top"),0.25),2);rec.outer=setz(newborder(themes.borderblack,1),3);rec.middle=setz(newborder(color("outline"),1),3);rec.inner=setz(newborder(themes.borderblack,1),3)
-    rec.title=setz(toggle.esptext(rec.shortname or"player",color("text"),false,false,true),3);rec.person=toggle.newicon(3);rec.healthtext=setz(toggle.esptext("",toggle.white,false,false,true),3);rec.heart=toggle.newicon(3);rec.distancetext=setz(toggle.esptext("",toggle.white,false,false,true),3);rec.distanceicon=toggle.newicon(3)
-    rec.draws={rec.outer,rec.middle,rec.inner,rec.bg,rec.top,rec.title,rec.person,rec.healthtext,rec.heart,rec.distancetext,rec.distanceicon};rec.frames={{rec.outer,0},{rec.middle,1},{rec.inner,2},{rec.bg,3},{rec.top,3}};if rec.rake then rec.statustext=setz(toggle.esptext("",color("text"),false,false,true),3);rec.draws[#rec.draws+1]=rec.statustext end;rec.radius=-1
-    for _,kind in ipairs({"health","distance"})do local pane={};rec[kind.."pane"]=pane;pane.bg=setz(newsquare(color("bg"),1),1);pane.top=setz(newsquare(color("top"),0.25),2);pane.outer=setz(newborder(themes.borderblack,1),3);pane.middle=setz(newborder(color("outline"),1),3);pane.inner=setz(newborder(themes.borderblack,1),3);for _,entry in ipairs({{pane.outer,0,false,kind},{pane.middle,1,false,kind},{pane.inner,2,false,kind},{pane.bg,3,false,kind},{pane.top,3,false,kind}})do rec.frames[#rec.frames+1]=entry;rec.draws[#rec.draws+1]=entry[1]end end
+    rec.title=setz(toggle.esptext(rec.shortname or"player",color("text"),false,false,true),3);rec.person=rec.profileimages and rec.profileimages.nametag and not toggle.removeddraw[rec.profileimages.nametag]and rec.profileimages.nametag or toggle.newicon(3);rec.healthtext=setz(toggle.esptext("",toggle.white,false,false,true),3);rec.heart=toggle.newicon(3);rec.distancetext=setz(toggle.esptext("",toggle.white,false,false,true),3);rec.distanceicon=toggle.newicon(3)
+    rec.draws={rec.outer,rec.middle,rec.inner,rec.bg,rec.top,rec.title,rec.person,rec.healthtext,rec.heart,rec.distancetext,rec.distanceicon};rec.frames={{rec.outer,0},{rec.middle,1},{rec.inner,2},{rec.bg,3},{rec.top,3}};
+    if not rec.rake then rec.scraptext=setz(toggle.esptext("0",toggle.white,true,false,true),3);rec.scrapicon=toggle.newicon(3);rec.draws[#rec.draws+1]=rec.scraptext;rec.draws[#rec.draws+1]=rec.scrapicon end;if rec.rake then rec.statustext=setz(toggle.esptext("",color("text"),false,false,true),3);rec.draws[#rec.draws+1]=rec.statustext end;rec.radius=-1;if rec.skull and not toggle.removeddraw[rec.skull]then rec.draws[#rec.draws+1]=rec.skull else rec.skull=nil end
+    for _,kind in ipairs({"health","distance","scrap"})do local pane={};rec[kind.."pane"]=pane;pane.bg=setz(newsquare(color("bg"),1),1);pane.top=setz(newsquare(color("top"),0.25),2);pane.outer=setz(newborder(themes.borderblack,1),3);pane.middle=setz(newborder(color("outline"),1),3);pane.inner=setz(newborder(themes.borderblack,1),3);for _,entry in ipairs({{pane.outer,0,false,kind},{pane.middle,1,false,kind},{pane.inner,2,false,kind},{pane.bg,3,false,kind},{pane.top,3,false,kind}})do rec.frames[#rec.frames+1]=entry;rec.draws[#rec.draws+1]=entry[1]end end
     if(rec.detailanim or 0)>0.01 then toggle.makeplayerdetails(rec)end
 end
 toggle.makeplayerdetails=function(rec)
@@ -3107,15 +3685,28 @@ toggle.makeplayerdetails=function(rec)
     rec.detailbg=setz(newsquare(color("bg"),1),1);rec.detailtop=setz(newsquare(color("top"),0.25),2);rec.detailouter=setz(newborder(themes.borderblack,1),3);rec.detailmiddle=setz(newborder(color("outline"),1),3);rec.detailinner=setz(newborder(themes.borderblack,1),3)
     for _,entry in ipairs({{rec.detailouter,0,true},{rec.detailmiddle,1,true},{rec.detailinner,2,true},{rec.detailbg,3,true},{rec.detailtop,3,true}})do rec.frames[#rec.frames+1]=entry;rec.draws[#rec.draws+1]=entry[1]end;rec.radius=-1
 end
+ 
+toggle.shortplayername=function(name)
+    local count,cut=0,#name
+    for at in name:gmatch("()[%z\1-\127\194-\244][\128-\191]*")do count=count+1;if count==11 then cut=at-1;break end end
+    return cut<#name and name:sub(1,cut)..".."or name
+end
+toggle.refreshplayeridentity=function(rec,now)
+    if rec.departed then return end;now=now or tick();if now<(rec.nextidentity or 0)and rec.identityoffset==toggle.displaynameoffset then return end
+    local name=toggle.readplayerdisplayname(rec.player);rec.identityoffset=toggle.displaynameoffset
+    rec.displayname=name or rec.displayname or rec.username or"Player";rec.shortname=rec.displayname
+    rec.identityfailures=name and 0 or math.min(4,(rec.identityfailures or 0)+1);rec.nextidentity=name and math.huge or now+math.min(60,5*2^rec.identityfailures)
+end
 toggle.playerrecord=function(player)
     local key=toggle.playerkey(player);local rec=toggle.playeresp.records[key];if rec then rec.player=player;return rec end
-    rec={id=key,player=player,username=player.Name,shortname=string.sub(player.Name,1,10)..(#player.Name>10 and".."or""),texts={},items={},anim=0,stackoffset=0,stackx=0,targetoffset=0,targetx=0};toggle.playeresp.records[key]=rec;return rec
+    rec={id=key,player=player,username=player.Name,displayname=player.Name,shortname=player.Name,createdat=tick(),texts={},items={},anim=0,stackoffset=0,stackx=0,targetoffset=0,targetx=0};toggle.playeresp.records[key]=rec;return rec
 end
 toggle.refreshplayerselection=function()
     local state=toggle.playeresp;local count=0;for i=1,#state.order do if state.selected[state.order[i].name]==true then count=count+1 end end;state.selectedcount=count;state.enabled=true;state.nextroster=0;state.nextscan=0;state.nextlayout=0;state.scancursor=1
-    for _,rec in pairs(state.records)do rec.layoutkey=nil end
+    for _,rec in pairs(state.records)do rec.layoutkey=nil;rec.itemlayout=nil end
 end
 toggle.layoutplayeritems=function(rec)
+    rec.itemrevision=(rec.itemrevision or 0)+1
     rec.itemnodes=rec.itemnodes or{};rec.nodelookup=rec.nodelookup or{}
     for i=1,#rec.itemnodes do rec.itemnodes[i].active=false end
     for i=1,#rec.items do local item=rec.items[i];local node=rec.nodelookup[item.name]
@@ -3125,20 +3716,20 @@ toggle.layoutplayeritems=function(rec)
 end
 toggle.scanplayer=function(player,rec,viewer)
     local character=ws:FindFirstChild(player.Name)or player.Character;local characterkey=toggle.instanceaddress(character)or character;if characterkey~=rec.characterkey then rec.characterkey=characterkey;rec.stackoffset=0;rec.stackx=0;rec.nexthealth=0; end;rec.character=character;rec.root=character and(character:FindFirstChild("HumanoidRootPart")or character:FindFirstChild("Torso"));rec.humanoid=character and(character:FindFirstChild("Humanoid")or character:FindFirstChildOfClass("Humanoid"));if rec.root and rec.root:IsA("BasePart")then rec.footheight=rec.root.Size.Y/2+2.4 end
-    local count=0;local itemschanged=false;if rec.root and rec.root:IsA("BasePart")and dist(viewer,rec.root.Position)<=math.min(25,toggle.playeresp.distance) and toggle.playeresp.selectedcount>0 then
-        local owned={};local flarecount=0;for _,parent in pairs({backpack=player:FindFirstChild("Backpack"),character=character})do local children=parent:GetChildren();for i=1,#children do local child=children[i];local name=child.Name;owned[name]=child;if name=="FlareGun"or name=="FlareGunPickUp"or name=="FlareGunTool"then flarecount=flarecount+1 end end end;if rec.flarecount~=flarecount then rec.flarecount=flarecount;itemschanged=true end
+    local count=0;local itemschanged=false;if rec.root and rec.root:IsA("BasePart")and dist(viewer,rec.root.Position)<=toggle.playeresp.detaildistance and toggle.playeresp.selectedcount>0 then
+        local owned,flarecount=toggle.playerbackpackread(player,character);if not owned then return end;if rec.flarecount~=flarecount then rec.flarecount=flarecount;itemschanged=true end
         for i=1,#toggle.playeresp.order do local entry=toggle.playeresp.order[i];if toggle.playeresp.selected[entry.name]==true then local item=owned[entry.name];if entry.name=="FlareGun"then item=item or owned.FlareGunPickUp or owned.FlareGunTool elseif entry.name=="Vest"then local vest=owned.VestModel;item=item or vest and vest:IsA("MeshPart")end;if item then count=count+1;if rec.items[count]~=entry then itemschanged=true;rec.items[count]=entry end end end end
     end
     toggle.sampleplayerhealth(rec,toggle.frametime or tick());if #rec.items~=count then itemschanged=true end;for i=#rec.items,count+1,-1 do rec.items[i]=nil end;if itemschanged then toggle.layoutplayeritems(rec)end
 end
 toggle.playeritemstyle=function(name)return toggle.cratestyles[name]or name=="FlareGun"and espcfg.FlareGunPickUp or name=="RakeTrap"and espcfg.RakeTrapModel or themes.accentstyle end
-toggle.refreshplayers=function(now,viewer)
+toggle.refreshplayers=function(now,viewer,active)
     local state=toggle.playeresp
     if now>=(state.nextroster or 0)then state.nextroster=now+0.75;state.scanid=(state.scanid or 0)+1;local source=players:GetPlayers();local list=state.scanlist;local count=0
         for i=1,#source do local player=source[i];if player.Name~=lp.Name then count=count+1;list[count]=player;local rec=toggle.playerrecord(player);rec.seen=state.scanid end end
-        for i=#list,count+1,-1 do list[i]=nil end;for key,rec in pairs(state.records)do if rec.seen~=state.scanid then toggle.removeplayerrecord(rec);state.records[key]=nil end end;state.scancursor=clamp(state.scancursor or 1,1,math.max(1,count))
+        for i=#list,count+1,-1 do list[i]=nil end;for key,rec in pairs(state.records)do if rec.seen~=state.scanid then toggle.removeplayerrecord(rec,true);state.records[key]=nil end end;state.scancursor=clamp(state.scancursor or 1,1,math.max(1,count))
     end
-    local list=state.scanlist;if now>=(state.nextscan or 0)and #list>0 then local cursor=state.scancursor or 1;if cursor>#list then cursor=1 end;local player=list[cursor];local rec=player and state.records[toggle.playerkey(player)];if rec then local ok=pcall(toggle.scanplayer,player,rec,viewer);if not ok then rec.root=nil;rec.humanoid=nil;toggle.hideplayerrecord(rec)end end;state.scancursor=cursor%#list+1;state.nextscan=now+0.025 end
+    local list=state.scanlist;if active~=false and now>=(state.nextscan or 0)and #list>0 then local cursor=state.scancursor or 1;if cursor>#list then cursor=1 end;local player=list[cursor];local rec=player and state.records[toggle.playerkey(player)];if rec then local ok=pcall(toggle.scanplayer,player,rec,viewer);if not ok then rec.root=nil;rec.humanoid=nil;toggle.hideplayerrecord(rec)end end;state.scancursor=cursor%#list+1;state.nextscan=now+0.025 end
 end
 toggle.playersort=function(a,b)local ad,bd=a.rec.meters or math.huge,b.rec.meters or math.huge;if ad~=bd then return ad<bd end;return a.id<b.id end
 toggle.layoutnametag=function(rec)
@@ -3146,8 +3737,13 @@ toggle.layoutnametag=function(rec)
     rec.namew=(toggle.espwidth(rec.shortname)*(font==Drawing.Fonts.Minecraft and 0.78 or 1)+cellpad+rec.nameiconw)*(rec.nameanim or 0)
     rec.healthw=(toggle.espwidth(rec.healthlabel or"")+cellpad+rec.healthiconw)*(rec.healthanim or 0)
     rec.distancepanelw=(toggle.espwidth(rec.distancelabel or"")+cellpad+rec.distanceiconw)*(rec.distanceanim or 0)
-    local d,n,h=rec.distanceanim or 0,rec.nameanim or 0,rec.healthanim or 0;local visible=math.min(1,d+n+h);local edge=compact and pad*visible or 0;rec.distancex=edge;rec.namex=edge+rec.distancepanelw+gap*math.min(d,math.min(1,n+h));rec.healthx=rec.namex+rec.namew+gap*math.min(n,h);rec.headerw=rec.healthx+rec.healthw+edge;rec.headerwidth=rec.headerw
+    local d,n,h=rec.distanceanim or 0,rec.nameanim or 0,rec.healthanim or 0;local visible=math.min(1,d+n+h+(rec.scrapanim or 0));local edge=compact and pad*visible or 0;rec.distancex=edge;rec.namex=edge+rec.distancepanelw+gap*math.min(d,math.min(1,n+h));rec.healthx=rec.namex+rec.namew+gap*math.min(n,h);rec.headerw=rec.healthx+rec.healthw+edge;rec.headerwidth=rec.headerw
+    if not rec.rake then
+        local a=rec.scrapanim or 0;rec.scrapiconw=icons and 17 or 0;rec.scrapw=(toggle.espwidth(rec.scraplabel or"0")+cellpad+rec.scrapiconw)*a
+        rec.scrapx=rec.healthx+rec.healthw+gap*math.min(math.min(1,d+n+h),a);rec.headerw=rec.scrapx+rec.scrapw+edge;rec.headerwidth=rec.headerw
+    end
 end
+
 toggle.nametagoutline=function(d,fade,c,rec)
     toggle.playeroutline(d,fade,c,rec and rec.style)
 end
@@ -3155,41 +3751,98 @@ toggle.sampleplayerhealth=function(rec,now)
     if now<(rec.nexthealth or 0)then return end;rec.nexthealth=now+0.1
     local ok,hp=pcall(function()local hum=rec.humanoid;return hum and hum.Parent and hum:IsA("Humanoid")and hum.Health end);rec.health=ok and tonumber(hp)or nil
 end
+toggle.layoutplayerbackpack=function(rec)
+    local image=toggle.playerbackpackstyle=="Image";local columns=image and 6 or 3;local minimal=toggle.playeresp.style=="compact";local rowh=image and 30 or toggle.esplineheight+(minimal and 1 or 3);local dead=rec.health~=nil and rec.health<=0
+    local cache=rec.itemlayout
+    local dirty=not cache or cache.revision~=rec.itemrevision or cache.image~=image or cache.minimal~=minimal or cache.font~=font or cache.size~=espfontsize or cache.line~=toggle.esplineheight or cache.far~=rec.far or cache.dead~=dead
+    if not dirty and not cache.animating then return cache end
+    cache=cache or{};rec.itemlayout=cache;if dirty then cache.batchnames=nil;cache.batchkey=nil end;cache.revision=rec.itemrevision;cache.image=image;cache.minimal=minimal;cache.font=font;cache.size=espfontsize;cache.line=toggle.esplineheight;cache.far=rec.far;cache.dead=dead;cache.animating=false
+    local rowalphas=rec.rowalphas or{};rec.rowalphas=rowalphas;for i=#rowalphas,1,-1 do rowalphas[i]=nil end
+    local nodes=rec.itemnodes or{};local count=0
+    for i=1,#nodes do local node=nodes[i];local desired=not rec.far and node.active and toggle.playeresp.selected[node.item.name]==true and not dead;local target=desired and 1 or 0
+        if dirty then node.itemwidth=image and 26 or toggle.espwidth(node.label)end
+        node.anim=toggle.ease(node.anim or 0,target,0.22);if node.anim~=target then cache.animating=true end
+        if node.anim>0.01 then count=count+1;node.slot=count;local row=math.floor((count-1)/columns)+1;rowalphas[row]=math.max(rowalphas[row]or 0,node.anim)else node.slot=nil end
+    end
+    local offset,widest=0,0
+    for row=1,math.ceil(count/columns)do local width=0
+        for i=1,#nodes do local node=nodes[i];if node.slot and math.floor((node.slot-1)/columns)+1==row then width=width+(node.itemwidth+8)*node.anim end end
+        width=math.max(0,width-8);widest=math.max(widest,width);local cursor=-width/2
+        for i=1,#nodes do local node=nodes[i];if node.slot and math.floor((node.slot-1)/columns)+1==row then local w=node.itemwidth*node.anim;node.x=cursor+w/2;node.y=offset;cursor=cursor+w+8*node.anim end end
+        offset=offset+rowh*(rowalphas[row]or 0)
+    end
+    rec.itemrows=math.ceil(count/columns);rec.itemwidth=widest;cache.count=count;cache.offset=offset;cache.rowh=rowh
+    return cache
+end
 toggle.playerheader=function(rec,now)
-    local state=toggle.playeresp;local minimal=state.style=="compact";rec.style=state.style;rec.background=true;rec.headertop=0;local charw=espfontsize*7/13;local rowh=toggle.esplineheight+(minimal and 1 or 3);rec.targeted=toggle.targetplayername==rec.username;rec.far=(rec.meters or 0)>25;rec.faranim=toggle.ease(rec.faranim or 0,rec.far and 1 or 0,0.2)
+    local state=toggle.playeresp;local columns=toggle.playerbackpackstyle=="Image"and 6 or 3;local minimal=state.style=="compact";rec.style=state.style;rec.background=true;rec.headertop=0;local charw=espfontsize*7/13;local rowh=toggle.playerbackpackstyle=="Image"and 30 or toggle.esplineheight+(minimal and 1 or 3);rec.targeted=toggle.targetplayername==rec.username;rec.far=(rec.meters or 0)>(state.detaildistance or 25);rec.faranim=toggle.ease(rec.faranim or 0,rec.far and 1 or 0,0.2)
     toggle.sampleplayerhealth(rec,now)
+    if(state.showscrap or(rec.scrapanim or 0)>0.01)and now>=(rec.nextscrap or 0)then rec.nextscrap=now+0.2;rec.scrap=toggle.readplayerscrap(rec.player)end
+    rec.scraplabel=tostring(rec.scrap or 0);rec.scrapanim=toggle.ease(rec.scrapanim or 0,state.showscrap and 1 or 0,0.2)
     rec.healthlabel=rec.health and rec.health>0 and(state.showhealth or(rec.healthanim or 0)>0.01)and (tostring(math.floor(rec.health+0.5))..(toggle.espicons.health and""or"hp"))or""
     local nameon=state.showusername;rec.nameanim=toggle.ease(rec.nameanim or 0,nameon and 1 or 0,0.2);local healthon=not rec.far and state.showhealth and rec.health and rec.health>0;rec.healthanim=toggle.ease(rec.healthanim or 0,healthon and 1 or 0,0.2);if rec.far then rec.healthanim=0 end;if not rec.health or rec.health<=0 or rec.healthanim<=0.01 then rec.healthlabel=""end
     rec.headerwidth=(toggle.espwidth(rec.shortname)+19)*rec.nameanim+(rec.healthlabel~=""and toggle.espwidth(rec.healthlabel)+17+8*rec.nameanim or 0)*rec.healthanim
-    rec.itemy=10+(rowh+3)*math.min(1,rec.nameanim+rec.healthanim);local count=0;local rowalphas=rec.rowalphas or{};rec.rowalphas=rowalphas;for i=#rowalphas,1,-1 do rowalphas[i]=nil end;local nodes=rec.itemnodes or{};local widest=0
-    for i=1,#nodes do local node=nodes[i];local desired=not rec.far and node.active and state.selected[node.item.name]==true and not(rec.health~=nil and rec.health<=0);node.anim=toggle.ease(node.anim or 0,desired and 1 or 0,0.22);if node.anim>0.01 then count=count+1;node.slot=count;local row=math.floor((count-1)/3)+1;rowalphas[row]=math.max(rowalphas[row]or 0,node.anim)else node.slot=nil;toggle.playerprop(node.text,"Visible",false)end end
-    local offset=0;for row=1,math.ceil(count/3)do local width=0;for i=1,#nodes do local node=nodes[i];if node.slot and math.floor((node.slot-1)/3)+1==row then width=width+toggle.espwidth(node.label)*node.anim+8*node.anim end end;width=math.max(0,width-8);widest=math.max(widest,width);local cursor=-width/2
-        for i=1,#nodes do local node=nodes[i];if node.slot and math.floor((node.slot-1)/3)+1==row then local w=toggle.espwidth(node.label)*node.anim;node.x=cursor+w/2;node.y=offset;cursor=cursor+w+8*node.anim end end;offset=offset+rowh*(rowalphas[row]or 0)
-    end
-    rec.itemrows=math.ceil(count/3);rec.itemwidth=widest;rec.headery=minimal and 6 or 9
+    local itemlayout=toggle.layoutplayerbackpack(rec);local count,offset,rowh=itemlayout.count,itemlayout.offset,itemlayout.rowh;local rowalphas=rec.rowalphas;local widest=rec.itemwidth;rec.headery=minimal and 6 or 9
     local itemalpha=0;for row=1,#rowalphas do itemalpha=math.max(itemalpha,rowalphas[row])end;rec.headeranim=math.min(1,rec.nameanim+rec.healthanim);rec.distanceanim=rec.health~=nil and rec.health<=0 and 0 or toggle.ease(rec.distanceanim or 0,state.showdistance and not(rec.health~=nil and rec.health<=0)and 1 or 0,0.2);rec.distancelabel=tostring(math.floor(rec.meters or 0)).."m";rec.distancewidth=(toggle.espwidth(rec.distancelabel)+17)*rec.distanceanim;rec.headeranim=math.min(1,rec.nameanim+rec.healthanim+rec.distanceanim);rec.distancegap=8*rec.distanceanim*math.min(1,rec.nameanim+rec.healthanim);rec.headerwidth=rec.headerwidth+rec.distancewidth+rec.distancegap;rec.detailanim=itemalpha;if rec.health~=nil and rec.health<=0 then rec.detailanim=0 end
-    local lineheight=toggle.esplineheight+(minimal and 12 or 18);rec.headerh=toggle.ease(rec.headerh,lineheight*rec.headeranim,0.24);local gap=(minimal and 2 or 4)*math.min(rec.headeranim,rec.detailanim);rec.detaily=rec.headerh+gap;rec.itemy=rec.detaily+math.max(0,(lineheight-rowh)/2);rec.footery=rec.itemy+(count>0 and offset+(minimal and 0 or 3)or 0)
+    rec.headeranim=math.min(1,rec.headeranim+(rec.scrapanim or 0));local lineheight=toggle.esplineheight+(minimal and 12 or 18);rec.headerh=toggle.ease(rec.headerh,lineheight*rec.headeranim,0.24);local gap=(minimal and 2 or 4)*math.min(rec.headeranim,rec.detailanim);rec.detaily=rec.headerh+gap;rec.itemy=rec.detaily+math.max(0,((toggle.playerbackpackstyle=="Image"and 38 or lineheight)-rowh)/2+(toggle.playerbackpackstyle=="Image"and(rowh-26)/2 or 0));rec.footery=rec.itemy+(count>0 and offset+(minimal and 0 or 3)or 0)
     local extrarows=count>0 and math.max(0,offset-rowh*(rowalphas[rec.itemrows]or 0))or 0
-    rec.distancey=rec.headery;local detailheight=(lineheight+extrarows)*rec.detailanim;rec.detailh=toggle.ease(rec.detailh,detailheight,0.24)
+    rec.distancey=rec.headery;local detailheight=((toggle.playerbackpackstyle=="Image"and 38 or lineheight)+extrarows)*rec.detailanim;rec.detailh=toggle.ease(rec.detailh,detailheight,0.24)
     toggle.layoutnametag(rec);rec.detailw=toggle.ease(rec.detailw,math.max(40,widest+20),0.24)
     rec.panelh=rec.headerh+gap+rec.detailh;rec.panelw=math.max(rec.headerw,rec.detailanim>0.01 and rec.detailw or 0)
 end
 toggle.playertext=function(d,text,x,y,c,a,on,rec)
     toggle.playerprop(d,"Text",text);toggle.playerprop(d,"Font",font);toggle.playerprop(d,"Size",espfontsize);toggle.playerprop(d,"Color",c);toggle.playerprop(d,"Transparency",a);toggle.centertext(d,x+toggle.espwidth(text)/2,y+toggle.esplineheight/2);toggle.nametagoutline(d,a,c,rec);toggle.playerprop(d,"Visible",on and a>0.01)
 end
+toggle.paintplayerbackpack=function(rec,x,y,w,alpha)
+    if toggle.playerbackpackstyle=="Image"and toggle.paintbackpackbatch(rec,x,y,w,alpha)then return end
+    if toggle.playerbackpackstyle~="Image"and rec.backpackimage then toggle.setvisible(rec.backpackimage,false)end
+    local pictures=toggle.playerbackpackstyle=="Image";local nodes=rec.itemnodes or{}
+    for j=1,#nodes do local node=nodes[j];local text=node.text;local itemalpha=alpha*node.anim
+        if rec.far or rec.health~=nil and rec.health<=0 then itemalpha=0 end
+        if not pictures and node.image then toggle.releaseitemimage(node.image);node.image=nil end
+        if node.slot and itemalpha>0.01 then
+            if pictures and not node.image then node.image=toggle.acquireitemimage(node.item.name)end
+            if pictures and node.image then
+                if node.item.name=="FlareGun"and(rec.flarecount or 0)>1 then
+                    local style=toggle.playeritemstyle(node.item.name);local itemcolor=toggle.hudtextcolor(style.rgb and rgb((j-1)/math.max(1,#nodes))or style.labelcolor)
+                    toggle.playerprop(text,"Text","x"..tostring(rec.flarecount));toggle.playerprop(text,"Font",font);toggle.playerprop(text,"Size",11);toggle.playerprop(text,"Color",toggle.white);toggle.playerprop(text,"Transparency",itemalpha);toggle.nametagoutline(text,itemalpha,itemcolor,rec);toggle.centertext(text,x+w/2+node.x+8,y+rec.itemy+node.y+24);toggle.playerprop(text,"Visible",true)
+                else toggle.playerprop(text,"Visible",false)end
+                toggle.paintitemimage(node.image,x+w/2+node.x-13,y+rec.itemy+node.y,26,itemalpha,text.ZIndex or 1024,true)
+            else
+                local style=toggle.playeritemstyle(node.item.name);local itemcolor=toggle.hudtextcolor(style.rgb and rgb((j-1)/math.max(1,#nodes))or style.labelcolor)
+                toggle.playerprop(text,"Text",node.label);toggle.playerprop(text,"Font",font);toggle.playerprop(text,"Size",espfontsize);toggle.playerprop(text,"Color",itemcolor);toggle.playerprop(text,"Transparency",itemalpha);toggle.nametagoutline(text,itemalpha,itemcolor,rec);toggle.centertext(text,x+w/2+node.x,y+rec.itemy+node.y+toggle.esplineheight/2+(1-node.anim)*3);toggle.playerprop(text,"Visible",true)
+            end
+        else
+            toggle.playerprop(text,"Visible",false)
+            if node.image then if not node.slot then toggle.releaseitemimage(node.image);node.image=nil else toggle.setvisible(node.image,false)end end
+        end
+    end
+end
 toggle.paintplayer=function(entry)
-    local rec=entry.rec;toggle.makeplayerpanel(rec);local x=toggle.pixel(entry.basex+(rec.stackx or 0));local y=toggle.pixel(entry.basey+(rec.stackoffset or 0));local w,h=entry.w,entry.h;local alpha=rec.anim;local panelalpha=alpha*(1-0.28*(rec.rake and 0 or(rec.faranim or 0)));local palette=rec.palette or toggle.playeresp.palette;rec.targetanim=toggle.ease(rec.targetanim or 0,rec.targeted and 1 or 0,0.12);local targetmix=rec.targetanim;local namecolor=rec.rake and palette.target or toggle.colormix(palette.title,palette.target,targetmix);if not rec.rake and(rec.faranim or 0)>0 then namecolor=toggle.colormix(namecolor,Color3.new(0,0,0),rec.faranim*0.28)end;local statuscolor=toggle.colormix(palette.title,palette.target,rec.statusanim or 0);local darktarget=toggle.colormix(toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor,Color3.new(0,0,0),0.62);local panelcolor=toggle.colormix(palette.bg,darktarget,targetmix*0.65);local topcolor=toggle.colormix(palette.top,darktarget,targetmix*0.65);local bordertint=toggle.colormix(palette.outline,darktarget,targetmix*0.65);local statusmix=rec.rake and(rec.statusanim or 0)*0.65 or 0;local statusbg=statusmix>0 and toggle.colormix(palette.bg,darktarget,statusmix)or palette.bg;local statustop=statusmix>0 and toggle.colormix(palette.top,darktarget,statusmix)or palette.top;local statusborder=statusmix>0 and toggle.colormix(palette.outline,darktarget,statusmix)or palette.outline;rec.panelbgcolor=panelcolor;rec.statusbgcolor=statusbg
+    local rec=entry.rec;toggle.playerdrawcall(toggle.makeplayerpanel,rec);local x=toggle.pixel(entry.basex+(rec.stackx or 0));local y=toggle.pixel(entry.basey+(rec.stackoffset or 0));local w,h=entry.w,entry.h;local alpha=rec.anim;local panelalpha=alpha*(1-0.28*(rec.rake and 0 or(rec.faranim or 0)));local palette=rec.palette or toggle.playeresp.palette;rec.targetanim=toggle.ease(rec.targetanim or 0,rec.targeted and 1 or 0,0.12);local targetmix=rec.targetanim;local namecolor=rec.rake and palette.target or toggle.colormix(palette.title,palette.target,targetmix);if not rec.rake and(rec.faranim or 0)>0 then namecolor=toggle.colormix(namecolor,Color3.new(0,0,0),rec.faranim*0.28)end;local statuscolor=toggle.colormix(palette.title,palette.target,rec.statusanim or 0);local darktarget=toggle.colormix(toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor,Color3.new(0,0,0),0.62);local panelcolor=toggle.colormix(palette.bg,darktarget,targetmix*0.65);local topcolor=toggle.colormix(palette.top,darktarget,targetmix*0.65);local bordertint=toggle.colormix(palette.outline,darktarget,targetmix*0.65);local statusmix=rec.rake and(rec.statusanim or 0)*0.65 or 0;local statusbg=statusmix>0 and toggle.colormix(palette.bg,darktarget,statusmix)or palette.bg;local statustop=statusmix>0 and toggle.colormix(palette.top,darktarget,statusmix)or palette.top;local statusborder=statusmix>0 and toggle.colormix(palette.outline,darktarget,statusmix)or palette.outline;rec.panelbgcolor=panelcolor;rec.statusbgcolor=statusbg
+    local hp=rec.health or 0;if rec.tinthealth~=hp then rec.tinthealth=hp;rec.healthcolor=toggle.healthtint(hp/(rec.rake and 400 or 100),not rec.rake and hp>100)end
+    local healthbased=rec.rake and toggle.rakehealthcoloring or not rec.rake and toggle.playeresp.healthcoloring
     local statuscx=x+w/2;if rec.rake then local namecx=x+(w-rec.headerw)/2+rec.namex+rec.namew/2;statuscx=statuscx+(namecx-statuscx)*(rec.nameanim or 0)end
     if rec.radius~=toggle.borderradius then rec.radius=toggle.borderradius;for i=1,#rec.frames do local frame=rec.frames[i];pcall(function()frame[1].Corner=math.max(0,toggle.borderradius-1)end)end end
-    for i=1,#rec.frames do local entry=rec.frames[i];local d,inset,detail,kind=entry[1],entry[2],entry[3],entry[4];local pane=kind and rec[kind.."pane"];local framew=detail and rec.detailw or kind=="health"and rec.healthw or kind=="distance"and rec.distancepanelw or rec.namew;local groupx=x+(w-rec.headerw)/2;local framex=detail and(rec.rake and statuscx-framew/2 or x+(w-framew)/2)or groupx+(kind=="health"and rec.healthx or kind=="distance"and 0 or rec.namex);local framey=y+(detail and rec.detaily or(rec.headertop or 0));local frameh=detail and rec.detailh or rec.headerh;local framealpha=panelalpha*(detail and rec.detailanim or kind=="health"and rec.healthanim or kind=="distance"and rec.distanceanim or rec.nameanim);local unified=rec.style=="compact"and not detail;if unified and not kind then framew=rec.headerw;framex=groupx;framealpha=panelalpha*rec.headeranim end
+    for i=1,#rec.frames do local entry=rec.frames[i];local d,inset,detail,kind=entry[1],entry[2],entry[3],entry[4];local pane=kind and rec[kind.."pane"];local framew=detail and rec.detailw or kind=="health"and rec.healthw or kind=="distance"and rec.distancepanelw or kind=="scrap"and(rec.scrapw or 0)or rec.namew;local groupx=x+(w-rec.headerw)/2;local framex=detail and(rec.rake and statuscx-framew/2 or x+(w-framew)/2)or groupx+(kind=="health"and rec.healthx or kind=="distance"and 0 or kind=="scrap"and(rec.scrapx or 0)or rec.namex);local framey=y+(detail and rec.detaily or(rec.headertop or 0));local frameh=detail and rec.detailh or rec.headerh;local framealpha=panelalpha*(detail and rec.detailanim or kind=="health"and rec.healthanim or kind=="distance"and rec.distanceanim or kind=="scrap"and(rec.scrapanim or 0)or rec.nameanim);local unified=rec.style=="compact"and not detail;if unified and not kind then framew=rec.headerw;framex=groupx;framealpha=panelalpha*rec.headeranim end
         local isbg=d==rec.bg or d==rec.detailbg or pane and d==pane.bg;local istop=d==rec.top or d==rec.detailtop or pane and d==pane.top;local isborder=d==rec.middle or d==rec.detailmiddle or pane and d==pane.middle;local bg=kind and palette.bg or detail and statusbg or panelcolor;local top=kind and palette.top or detail and statustop or topcolor;local border=kind and palette.outline or detail and statusborder or bordertint
+        if kind=="scrap"then local cfg=espcfg.Scrap5;local tint=cfg.rgb and rgb(0)or cfg.labelcolor;bg=toggle.colormix(palette.bg,tint,0.06)end
+        if kind=="health"and healthbased then bg=toggle.colormix(palette.bg,rec.healthcolor,0.06)end
         if isbg then toggle.registerespsheen(d)end
-        if(isbg or isborder)and not(unified and kind)then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
+        if (kind=="health"and healthbased or kind=="scrap")and unified then toggle.playerprop(d,"ZIndex",(rec.bg.ZIndex or 0)+1)end
+        if(isbg or isborder)and not(unified and kind and not(kind=="health"and healthbased or kind=="scrap"))then toggle.playerpos(d,framex+1,framey+1);toggle.playerprop(d,"Size",Vector2.new(math.max(1,framew-2),math.max(1,frameh-2)));local tint=isbg and bg or istop and top or isborder and border or themes.borderblack;toggle.playerprop(d,"Color",tint);toggle.playerprop(d,"Transparency",framealpha*toggle.espbackgroundopacity(rec.style)*(isborder and 0.16 or 1));toggle.playerprop(d,"Visible",toggle.espbackgroundopacity(rec.style)>0.01 and(isbg or isborder)and framealpha>0.01 and frameh>2 and framew>2)else toggle.playerprop(d,"Visible",false)end
     end
     local hx=x+(w-rec.headerw)/2+rec.namex+(rec.textpad or 10);local hy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);local username=(rec.nameanim or 0)>0.01;local namealpha=alpha*(rec.nameanim or 0);local healthalpha=alpha*(rec.healthanim or 0)
-    toggle.seticon(rec.person,rec.rake and"skull"or rec.health~=nil and rec.health<=0 and"skull"or"person",hx,hy+(toggle.esplineheight-14)/2,14,namecolor,namealpha,rec.icons and username and namealpha>0.01);toggle.playerprop(rec.person,"Visible",rec.icons and username and namealpha>0.01);toggle.playertext(rec.title,rec.shortname,rec.icons and hx+(rec.nameiconw or 0)or x+(w-rec.headerw)/2+rec.namex+(rec.namew-toggle.espwidth(rec.shortname))/2,hy+(1-(rec.nameanim or 0))*3,namecolor,namealpha,username,rec);hx=x+(w-rec.headerw)/2+rec.healthx+(rec.textpad or 10)
-    local hp=rec.health or 0;if rec.tinthealth~=hp then rec.tinthealth=hp;rec.healthcolor=toggle.healthtint(hp/(rec.rake and 400 or 100),not rec.rake and hp>100)end;toggle.seticon(rec.heart,"heart",hx,hy+(toggle.esplineheight-13)/2,13,toggle.heartcolor,healthalpha,rec.healthicons and rec.healthlabel~=""and healthalpha>0.01);toggle.playerprop(rec.heart,"Visible",rec.healthicons and rec.healthlabel~=""and healthalpha>0.01);toggle.playertext(rec.healthtext,rec.healthlabel,rec.healthicons and hx+(rec.healthiconw or 0)or x+(w-rec.headerw)/2+rec.healthx+(rec.healthw-toggle.espwidth(rec.healthlabel))/2,hy+(1-(rec.healthanim or 0))*3,(rec.rake and toggle.rakehealthcoloring or not rec.rake and toggle.playeresp.healthcoloring)and rec.healthcolor or palette.title,healthalpha,rec.healthlabel~="",rec)
-    for j=1,#(rec.itemnodes or{})do local node=rec.itemnodes[j];local text=node.text;local itemalpha=alpha*node.anim;if rec.far or rec.health~=nil and rec.health<=0 then itemalpha=0 end;if node.slot then local style=toggle.playeritemstyle(node.item.name);local itemcolor=toggle.hudtextcolor(style.rgb and rgb((j-1)/math.max(1,#rec.itemnodes))or style.labelcolor);toggle.playerprop(text,"Text",node.label);toggle.playerprop(text,"Font",font);toggle.playerprop(text,"Size",espfontsize);toggle.playerprop(text,"Color",itemcolor);toggle.playerprop(text,"Transparency",itemalpha);toggle.nametagoutline(text,itemalpha,itemcolor,rec);toggle.centertext(text,x+w/2+node.x,y+rec.itemy+node.y+toggle.esplineheight/2+(1-node.anim)*3);toggle.playerprop(text,"Visible",itemalpha>0.01)else toggle.playerprop(text,"Visible",false)end end
+    local iconon=rec.icons and username and namealpha>0.01
+    if rec.rake or not toggle.setplayeravatar(rec.person,rec,hx,hy+(toggle.esplineheight-14)/2,14,namealpha,iconon)then toggle.seticon(rec.person,rec.rake and"skull"or rec.health~=nil and rec.health<=0 and"skull"or"person",hx,hy+(toggle.esplineheight-14)/2,14,namecolor,namealpha,iconon)end;toggle.playerprop(rec.person,"Visible",rec.icons and username and namealpha>0.01);toggle.paintdeadplayer(rec,"skull",hx,hy+(toggle.esplineheight-14)/2,14,namecolor,namealpha,(rec.person.ZIndex or 0)+1,iconon);toggle.playertext(rec.title,rec.shortname,rec.icons and hx+(rec.nameiconw or 0)or x+(w-rec.headerw)/2+rec.namex+(rec.namew-toggle.espwidth(rec.shortname))/2,hy+(1-(rec.nameanim or 0))*3,namecolor,namealpha,username,rec);hx=x+(w-rec.headerw)/2+rec.healthx+(rec.textpad or 10)
+;toggle.seticon(rec.heart,"heart",hx,hy+(toggle.esplineheight-13)/2,13,healthbased and rec.healthcolor or toggle.heartcolor,healthalpha,rec.healthicons and rec.healthlabel~=""and healthalpha>0.01);toggle.playerprop(rec.heart,"Visible",rec.healthicons and rec.healthlabel~=""and healthalpha>0.01);toggle.playertext(rec.healthtext,rec.healthlabel,rec.healthicons and hx+(rec.healthiconw or 0)or x+(w-rec.headerw)/2+rec.healthx+(rec.healthw-toggle.espwidth(rec.healthlabel))/2,hy+(1-(rec.healthanim or 0))*3,(rec.rake and toggle.rakehealthcoloring or not rec.rake and toggle.playeresp.healthcoloring)and rec.healthcolor or palette.title,healthalpha,rec.healthlabel~="",rec)
+    toggle.paintplayerbackpack(rec,x,y,w,alpha)
+    if not rec.rake and rec.scraptext then
+        local sa=alpha*(rec.scrapanim or 0);local cfg=espcfg.Scrap5;local tint=cfg.rgb and rgb(0)or cfg.labelcolor
+        local sx=x+(w-rec.headerw)/2+(rec.scrapx or 0)+(rec.textpad or 10);local sy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2)
+        toggle.seticon(rec.scrapicon,"tag",sx,sy+(toggle.esplineheight-13)/2,13,tint,sa,rec.icons and sa>0.01)
+        toggle.playertext(rec.scraptext,rec.scraplabel or"0",sx+(rec.icons and 17 or 0),sy,tint,sa,sa>0.01,rec)
+    end
     if rec.rake then local tagx=x+(w-rec.headerw)/2+rec.namex+(rec.namew-rec.footerwidth)/2;local tagy=y+rec.footery;toggle.playertext(rec.statustext,toggle.uititle(rec.statuslabel or""),statuscx-toggle.espwidth(toggle.uititle(rec.statuslabel or""))/2,tagy+(1-(rec.statuslabelanim or 0))*3,statuscolor,alpha*(rec.statuslabelanim or 0),(rec.statuslabelanim or 0)>0.01,rec)end
     local da=alpha*(rec.distanceanim or 0);local distanceon=da>0.01;local dx=x+(w-rec.headerw)/2+(rec.distancex or 0)+(rec.textpad or 10);local distancecolor=toggle.colormix(palette.title,Color3.new(0,0,0),0.18);local dy=y+(rec.headertop or 0)+math.max(0,(rec.headerh-toggle.esplineheight)/2);toggle.seticon(rec.distanceicon,"target",dx,dy+(toggle.esplineheight-13)/2,13,distancecolor,da,rec.distanceicons and distanceon);toggle.playerprop(rec.distanceicon,"Visible",rec.distanceicons and distanceon);toggle.playertext(rec.distancetext,rec.distancelabel or"",rec.distanceicons and dx+(rec.distanceiconw or 0)or x+(w-rec.headerw)/2+(rec.distancex or 0)+(rec.distancepanelw-toggle.espwidth(rec.distancelabel or""))/2,dy,distancecolor,da,distanceon,rec)
 end
@@ -3217,10 +3870,10 @@ toggle.fadenametag=function(rec)
     rec.anim=toggle.ease(rec.anim,0,0.65);if rec.anim<=0.01 then toggle.hideplayerrecord(rec);return false end;return pcall(toggle.paintplayer,entry)
 end
 toggle.drawplayers=function(viewer)
-    local state=toggle.playeresp;local enabled=toggle.esp and(state.selectedcount>0 or state.showusername or state.showdistance or state.showhealth);local now=toggle.frametime or tick();if enabled then toggle.refreshplayers(now,viewer)end
+    local state=toggle.playeresp;local enabled=toggle.esp and(state.selectedcount>0 or state.showusername or state.showdistance or state.showhealth or state.showscrap);local now=toggle.frametime or tick()
     local list=state.visible;local count=0;local layoutchanged=false
     for _,rec in pairs(state.records)do
-        local ok,screen,on=pcall(function()if not enabled and(rec.anim or 0)<=0.01 or now<(rec.drawretry or 0)then return nil,false end;local root=rec.root;if not root or not root.Parent or not root:IsA("BasePart")then return nil,false end;local position=root.Position;rec.meters=dist(viewer,position);if not enabled or rec.meters~=rec.meters or rec.meters==math.huge or rec.meters>state.distance or rec.meters>25 and not(state.showusername or state.showdistance)then return nil,false end;if not rec.sortmeters or math.abs(rec.meters-rec.sortmeters)>5 then rec.sortmeters=math.floor(rec.meters/5+0.5)*5 end;toggle.playerheader(rec,now);local show=enabled and((rec.nameanim or 0)>0.01 or(rec.healthanim or 0)>0.01 or(rec.distanceanim or 0)>0.01 or rec.detailanim>0.01)and rec.meters<=state.distance;if not show then return nil,false end;return toggle.projectworld(position-Vector3.new(0,rec.footheight or 3.4,0))end)
+        local ok,screen,on=pcall(function()if not enabled and(rec.anim or 0)<=0.01 or now<(rec.drawretry or 0)then return nil,false end;local root=rec.root;if not root or not root.Parent or not root:IsA("BasePart")then return nil,false end;local position=root.Position;rec.meters=dist(viewer,position);if not enabled or rec.meters~=rec.meters or rec.meters==math.huge or rec.meters>state.distance or rec.meters>(state.detaildistance or 25) and not(state.showusername or state.showdistance or state.showscrap)then return nil,false end;if not rec.sortmeters or math.abs(rec.meters-rec.sortmeters)>5 then rec.sortmeters=math.floor(rec.meters/5+0.5)*5 end;local projected,projectedon=toggle.projectworld(position-Vector3.new(0,rec.footheight or 3.4,0));if not projectedon then return nil,false end;toggle.playerheader(rec,now);local show=enabled and((rec.nameanim or 0)>0.01 or(rec.healthanim or 0)>0.01 or(rec.distanceanim or 0)>0.01 or(rec.scrapanim or 0)>0.01 or rec.detailanim>0.01)and rec.meters<=state.distance;if not show then return nil,false end;return projected,projectedon end)
         if ok and on and screen and type(screen.X)=="number"and type(screen.Y)=="number"and screen.X==screen.X and screen.Y==screen.Y and math.abs(screen.X)<math.huge and math.abs(screen.Y)<math.huge then rec.anim=toggle.ease(rec.anim or 0,1,0.18);count=count+1;local entry=rec.renderentry or{};rec.renderentry=entry;if not rec.wasvisible or math.abs((entry.layoutw or 0)-(rec.panelw or 0))>=1 or math.abs((entry.layouth or 0)-(rec.panelh or 0))>=1 or entry.sortmeters~=rec.sortmeters then layoutchanged=true end;rec.wasvisible=true;entry.rec=rec;entry.id=rec.id;entry.sortmeters=rec.sortmeters;entry.w=rec.panelw or 96;entry.h=rec.panelh or 29;entry.basex=screen.X-entry.w/2;entry.basey=screen.Y+4;entry.x=entry.basex+(rec.targetx or 0);entry.y=entry.basey+(rec.targetoffset or 0);list[count]=entry
         else if rec.wasvisible then layoutchanged=true end;rec.wasvisible=false;local entry=rec.renderentry;rec.anim=toggle.ease(rec.anim or 0,0,0.65)
             if entry and rec.anim>0.01 then count=count+1;entry.rec=rec;entry.id=rec.id;entry.w=rec.panelw or entry.w;entry.h=rec.panelh or entry.h;list[count]=entry
@@ -3232,13 +3885,13 @@ toggle.drawplayers=function(viewer)
     if layoutchanged or #order~=count or now>=(state.nextsort or 0)then
         table.sort(list,toggle.playersort);for i=1,count do order[i]=list[i]end;for i=#order,count+1,-1 do order[i]=nil end;state.nextsort=now+0.05
     else for i=1,count do list[i]=order[i]end end
-    if count==0 then return end;if layoutchanged or now>=(state.nextlayout or 0)then toggle.placeplayerpanels(list);for i=1,count do local entry=list[i];entry.layoutw=entry.w;entry.layouth=entry.h end;state.nextlayout=now+0.05 end
+    if count==0 then state.stacklist={};state.stackobstacles={};return end;if layoutchanged or now>=(state.nextlayout or 0)then toggle.placeplayerpanels(list);for i=1,count do local entry=list[i];entry.layoutw=entry.w;entry.layouth=entry.h end;state.nextlayout=now+0.05 end
     local palette=state.palette or{};state.palette=palette;palette.bg=toggle.visualsurface();palette.top=color("top");palette.outline=color("outline");palette.title=toggle.hudtextcolor(color("text"),toggle.espvisualstyle);palette.muted=toggle.hudtextcolor(color("muted"));palette.target=toggle.colormix(toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor,toggle.white,0.35)
-    for i=1,count do local entry=list[i];local rec=entry.rec;rec.stackx=toggle.ease(rec.stackx or 0,rec.targetx or 0,0.20);rec.stackoffset=toggle.ease(rec.stackoffset or 0,rec.targetoffset or 0,0.20);if not pcall(toggle.paintplayer,entry)then toggle.hideplayerrecord(rec);toggle.removeplayerrecord(rec);rec.bg=nil;rec.layoutkey=nil;rec.drawfail=math.min(4,(rec.drawfail or 0)+1);rec.drawretry=now+math.min(2,0.25*2^(rec.drawfail-1));state.nextscan=0 else rec.drawfail=0;rec.drawretry=0;
+    for i=1,count do local entry=list[i];local rec=entry.rec;rec.stackx=toggle.ease(rec.stackx or 0,rec.targetx or 0,0.20);rec.stackoffset=toggle.ease(rec.stackoffset or 0,rec.targetoffset or 0,0.20);if not pcall(toggle.paintplayer,entry)then toggle.hideplayerrecord(rec);rec.layoutkey=nil;rec.drawfail=math.min(4,(rec.drawfail or 0)+1);rec.drawretry=now+math.min(2,0.25*2^(rec.drawfail-1));state.nextscan=0 else rec.drawfail=0;rec.drawretry=0;
         local layer=math.max(0,4*256-4-(i-1)*3);if rec.zlayer~=layer or rec.layercount~=#rec.draws or rec.layertextcount~=#rec.texts then rec.zlayer=layer;rec.layercount=#rec.draws;rec.layertextcount=#rec.texts;for j=1,#rec.draws do setz(rec.draws[j],(layer+2)/256)end;for j=1,#rec.texts do setz(rec.texts[j],(layer+2)/256)end;for j=1,#rec.frames do local frame=rec.frames[j];local bg=frame[1]==rec.bg or frame[1]==rec.detailbg or frame[4]and frame[1]==rec[frame[4].."pane"].bg;setz(frame[1],(layer+(bg and 0 or 1))/256)end end
     end end
 end
-toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=200;toggle.rakepanel={rake=true,shortname="rake",texts={},itemnodes={},anim=0,background=true}
+toggle.rakeespstyle="modern";toggle.rakestatus=true;toggle.rakerenderdistance=200;toggle.rakepanel={rake=true,shortname="rake",texts={},itemnodes={},anim=0,background=true}
 toggle.raketarget=nil;toggle.rakeroof=nil;toggle.rakehp=nil
 local function rakeinfo()
     local rake=ws:FindFirstChild("Rake")
@@ -3288,11 +3941,11 @@ local function targethud()
     local rake=ws:FindFirstChild("Rake");if not toggle.raketarget or not toggle.raketarget.Parent then toggle.raketarget=rake and rake:FindFirstChild("TargetVal")or nil end;if not toggle.rakepart or not toggle.rakepart.Parent then toggle.rakepart=rake and(rake:FindFirstChild("HumanoidRootPart")or rake:FindFirstChild("Torso")or findclass(rake,"BasePart"))or nil end
     local target=toggle.raketarget and toggle.raketarget.Value or nil;local shown="None";local char=nil
     if target and typeof(target)=="Instance"then
-        if target:IsA("BasePart")then char=getchar(target)elseif target:IsA("Model")then char=target elseif target:IsA("Player")then char=target.Character end;local player=char and players:FindFirstChild(char.Name);if player then shown=player.Name==lp.Name and"You"or string.sub(player.Name,1,10) else char=nil end
+        if target:IsA("BasePart")then char=getchar(target)elseif target:IsA("Model")then char=target elseif target:IsA("Player")then char=target.Character end;local player=char and players:FindFirstChild(char.Name);if player then shown=player.Name==lp.Name and"You"or toggle.shortplayername(toggle.playerrecord(player).displayname) else char=nil end
     end
     toggle.targetplayername=char and char.Name or nil;local state=toggle.notifications;local raketint=toggle.rakestyle.rgb and rgb(0)or toggle.rakestyle.labelcolor;local targeted=char and char.Name==lp.Name or false;if targeted and not state.targeted then toggle.notifyevent("rake","rake is targeting you",raketint)end;state.targeted=targeted
-    local present=toggle.rakepart and toggle.rakepart.Parent;local meters=present and dist(viewpos(),toggle.rakepart.Position)or nil;if meters then local teleporting=meters>=800;if teleporting and not state.raketeleporting then toggle.notifyevent("rake","rake is teleporting",raketint)elseif not teleporting and state.raketeleporting then toggle.notifyevent("rake","rake finished teleporting ["..tostring(math.floor(meters)).."m]",raketint)end;state.raketeleporting=teleporting;if meters<=toggle.notifysettings.rakedistance and not state.rakenear then state.rakenear=true;toggle.notifyevent("rake","rake is nearby ["..tostring(math.floor(meters)).."m]",raketint)elseif meters>toggle.notifysettings.rakedistance+5 then state.rakenear=false end else state.rakenear=false end
-    local night=rs:FindFirstChild("Night");local safe,nighton=pcall(function()return night and night.Value==true end);nighton=safe and nighton==true;local nightchanged=toggle.targetnight~=nighton;toggle.targetnight=nighton;local worldchanged=toggle.refreshworldstats();if targettxt.Text~=shown then targettxt.Text=shown;return true end;return worldchanged or nightchanged
+    local present=toggle.rakepart and toggle.rakepart.Parent;local meters=present and dist(viewpos(),toggle.rakepart.Position)or nil;if meters then local teleporting=meters>=800;if teleporting and not state.raketeleporting then toggle.notifyevent("rake","rake is teleporting",raketint)elseif not teleporting and state.raketeleporting then toggle.notifyevent("rake","rake finished teleporting ["..tostring(math.floor(meters)).."m]",raketint)end;state.raketeleporting=teleporting;if meters<=toggle.notifysettings.rakedistance and not state.rakenear then state.rakenear=true;toggle.notifyevent("rake","rake is nearby ["..tostring(math.floor(meters)).."m]",raketint)elseif meters>toggle.notifysettings.rakedistance+5 then state.rakenear=false end else state.rakenear=false;state.raketeleporting=false end
+    local night=rs:FindFirstChild("Night");local safe,nighton=pcall(function()return night and night.Value==true end);nighton=safe and nighton==true;local nightchanged=toggle.targetnight~=nighton;toggle.targetnight=nighton;local worldchanged=toggle.refreshworldstats();if state.raketeleporting then shown="Teleporting"end;if targettxt.Text~=shown then targettxt.Text=shown;return true end;return worldchanged or nightchanged
 end
 toggle.readstationpower=function()
     local state=toggle.powerreading;local offsets=state.offsets;if not offsets then toggle.requestshiftlockoffset();return nil end
@@ -3349,7 +4002,7 @@ local function showhud()
 end
 local function drawrgb()
     local themechanged=toggle.updatetheme();if(themechanged or themes.accentstyle.rgb)and toggle.menu then menuupdate(true)end;local now=toggle.frametime or tick();local backgroundchanged=toggle.hudbackgroundpaint~=(toggle.hudbackgroundanim or toggle.hudbackgroundalpha);toggle.hudbackgroundpaint=toggle.hudbackgroundanim or toggle.hudbackgroundalpha;local periodic=now>=(toggle.nextpanelrefresh or 0);if periodic then toggle.nextpanelrefresh=now+0.1 end
-    if themechanged or periodic then local hudcolor=toggle.hudtextcolor(toggle.hudautocolor());local hudlabelcolor=toggle.hudtextcolor(color("muted"));for i=1,#toggle.hudvaluedraws do toggle.setprop(toggle.hudvaluedraws[i],"Color",hudcolor)end;for i=1,#toggle.hudlabeldraws do toggle.setprop(toggle.hudlabeldraws[i],"Color",hudlabelcolor)end;toggle.setprop(powerlabel,"Color",hudcolor);for i=1,#toggle.huditems do local item=toggle.huditems[i];toggle.applytextoutline(item.value,item.anim,hudcolor);toggle.applytextoutline(item.label,item.anim,hudlabelcolor)end end
+    if themechanged or periodic then local hudcolor=toggle.hudtextcolor(toggle.containerorientation=="vertical"and color("text")or toggle.hudautocolor());local hudlabelcolor=toggle.hudtextcolor(color("muted"));for i=1,#toggle.hudvaluedraws do toggle.setprop(toggle.hudvaluedraws[i],"Color",hudcolor)end;for i=1,#toggle.hudlabeldraws do toggle.setprop(toggle.hudlabeldraws[i],"Color",hudlabelcolor)end;toggle.setprop(powerlabel,"Color",hudcolor);for i=1,#toggle.huditems do local item=toggle.huditems[i];toggle.applytextoutline(item.value,item.anim,hudcolor);toggle.applytextoutline(item.label,item.anim,hudlabelcolor)end end
     if toggle.hudanimating or backgroundchanged then hudpos()end;toggle.paintgradient(rgbline,toggle.accentbars.hud and toggle.hudbarvisible(),toggle.hudalpha or 0);toggle.paintcontainer()
     if not toggle.menu and(menustate.menuanim or 0)>0.001 then menuupdate(true)end;toggle.paintgradient(menurgb,toggle.accentbars.menu and(menustate.menuanim or 0)>0.001,menuopacity*(menustate.menuanim or 0));toggle.paintgradient(picker.gradient,false)
     local p=toggle.powerpanel;if themechanged or periodic or backgroundchanged or p.rowanimating or math.abs((p.anim or 0)-(p.target or 0))>0.001 then powerpos()else toggle.paintgradient(p.gradient,toggle.hudstyle=="modern"and p.anim>0.01 and toggle.accentbars.activity,(p.anim or 0))end;local k=toggle.keybindpanelstate;if themechanged or periodic or backgroundchanged or k.rowanimating or math.abs((k.anim or 0)-(k.target or 0))>0.001 then toggle.keybindpos()else toggle.paintgradient(toggle.keybindframe.gradient,toggle.hudstyle=="modern"and k.anim>0.01 and toggle.accentbars.keybinds,(k.anim or 0))end;local w=toggle.worldpanelstate;if themechanged or periodic or backgroundchanged or math.abs((w.anim or 0)-(w.target or 0))>0.001 then worldpos()else toggle.paintgradient(toggle.worldframe.gradient,toggle.hudstyle=="modern"and w.anim>0.01 and toggle.accentbars.world,(w.anim or 0))end;toggle.drawnotifications()
@@ -3502,23 +4155,40 @@ end
 toggle.setkeybindpanel=function(value,quiet)
     toggle.keybindpanel=value==true;toggle.keybindpos();menuupdate();if not quiet then bindlog(toggle.keybindpanel and"enabled keybind panel"or"disabled keybind panel")end
 end
+toggle.gameactive=function()
+    if type(isrbxactive)~="function"then return false end
+    local ok,active=pcall(isrbxactive);return ok and active==true
+end
 toggle.restoreidle=function()
-    local state=toggle.idle;local root=state.root
-    if root and state.original and state.moved then pcall(function()if root.Parent and lp.Character==state.character and (root.Position-state.moved.Position).Magnitude<0.2 then root.CFrame=state.original end end)end
-    state.root=nil;state.original=nil;state.moved=nil;state.busy=false
+    local state=toggle.idle;local key=state.key;state.key=nil
+    if key and type(keyrelease)=="function"then pcall(keyrelease,key)end
+    if state.injecting and type(setrobloxinput)=="function"then pcall(setrobloxinput,false)end
+    state.injecting=nil;state.busy=false
 end
+
 toggle.applyidle=function()
-    local state=toggle.idle;local now=tick();if not toggle.client.preventIdle or state.busy or now<state.nextsample then return end;state.nextsample=now+1
-    local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart");if not root or not root.Parent or not root:IsA("BasePart")then state.lastactive=now;return end
-    local position=root.Position;local mx,my=mouse.X,mouse.Y;local active=state.character~=character or not state.position or (position-state.position).Magnitude>0.1 or state.mx~=mx or state.my~=my
-    if not active then for _,key in ipairs({0x57,0x41,0x53,0x44,0x20})do if iskeypressed(key)then active=true;break end end end
-    state.character=character;state.position=position;state.mx=mx;state.my=my;if active then state.lastactive=now;return end;if now-state.lastactive<60 then return end;state.lastactive=now;state.busy=true
-    toggle.spawn(function()
-        if not toggle.running or not toggle.client.preventIdle or lp.Character~=character or not root.Parent then state.busy=false;return end
-        local ok=pcall(function()state.root=root;state.original=root.CFrame;state.moved=state.original*CFrame.new(0,0,1);root.CFrame=state.moved end)
-        if ok then toggle.wait(0.1)end;toggle.restoreidle();state.position=nil
+    local state=toggle.idle;local now=tick()
+    if not toggle.client.preventIdle then if state.key then toggle.restoreidle()end;return end
+    if not toggle.gameactive()then if state.key then toggle.restoreidle()end;return end
+    if state.busy or now<(state.nextsample or 0)then return end;state.nextsample=now+0.5
+    if toggle.menu and not menustate.minimized then state.lastactive=now;return end
+    local mx,my=mouse.X,mouse.Y;local active=state.mx~=mx or state.my~=my;state.mx=mx;state.my=my
+    for key=0x08,0xFE do if iskeypressed(key)then active=true;break end end
+    if active then state.lastactive=now;return end
+    if now-(state.lastactive or now)<60 then return end
+    if type(keypress)~="function"or type(keyrelease)~="function"then return end
+    local character=ws:FindFirstChild(lp.Name)or lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart")
+    if not root or not root.Parent then return end
+    local key=state.reverse and 0x53 or 0x57;state.reverse=not state.reverse
+    if iskeypressed(key)or not toggle.gameactive()then return end
+    state.busy=true;state.lastactive=now;state.key=key
+    local ok=pcall(function()
+        if type(setrobloxinput)=="function"then setrobloxinput(true);state.injecting=true end
+        keypress(key);task.wait(0.035)
     end)
+    toggle.restoreidle()
 end
+
 toggle.doors={entries={},touched=setmetatable({},{__mode="k"}),nextresolve=0,nextapply=0}
 toggle.restoredoors=function()
     local state=toggle.doors;for part,data in pairs(state.touched)do pcall(function()if part.Parent then local desired=data.original;if data.open and data.open.Parent then desired=data.open.Value~=true end;if part.CanCollide~=desired then part.CanCollide=desired end end end);state.touched[part]=nil end;state.entries={};state.nextresolve=0;state.nextapply=0
@@ -3587,18 +4257,18 @@ toggle.applyautoheal=function(force)
     local kit=character:FindFirstChild("FirstAidKit");local remote=kit and kit:FindFirstChild("RemoteEvent");if not kit or not kit:IsA("Tool")or not remote then return false end;local ok=toggle.fireevent(remote,"YourselfStart");if ok then toggle.autohealnext=now+0.25 end;return ok
 end
 toggle.setrakeshield=function(value,quiet)
-    toggle.safetystate.route=nil;toggle.safetystate.planat=0;toggle.safetystate.next=0;toggle.safetystate.escapedirection=nil
+    toggle.safetystate.next=0;toggle.safetystate.escapedirection=nil
     toggle.rakeshield=value==true;local state=toggle.shieldstate;state.retreating=false;state.laststep=nil;state.nextapply=0;state.nextresolve=0;state.character=nil;state.rake=nil;state.root=nil;state.part=nil;state.humanoid=nil;state.monster=nil
     menuupdate();if not quiet then bindlog(toggle.rakeshield and"enabled rake shield"or"disabled rake shield")end
 end
 toggle.setrakeshieldrange=function(value,quiet)
     local range=tonumber(value);if not range or range~=range then range=30 end
-    toggle.safetystate.route=nil;toggle.safetystate.planat=0;toggle.safetystate.next=0;toggle.safetystate.escapedirection=nil
+    toggle.safetystate.next=0;toggle.safetystate.escapedirection=nil
     toggle.rakeshieldrange=math.floor(clamp(range,20,50)+0.5);toggle.shieldstate.retreating=false;toggle.shieldstate.laststep=nil;toggle.shieldstate.nextapply=0
     menuupdate();if not quiet then bindlog("rake shield range set to "..tostring(toggle.rakeshieldrange).."m")end
 end
--- Shared safety movement. One controller owns all three gradual teleports.
--- Horizontal exclusion disks are deliberately conservative at different heights.
+ 
+ 
 toggle.safetynotice=function(message)
     local state=toggle.safetystate;local now=tick()
     if state.active or string.find(message,"safe spot",1,true)or string.find(message,"arrived",1,true)or state.huduntil and now<state.huduntil then
@@ -3609,7 +4279,7 @@ toggle.safetynotice=function(message)
     if state.notice~=message or now>=(state.noticeat or 0)then state.notice=message;state.noticeat=now+5;bindlog(message,"teleports")end
 end
 toggle.cancelsafespot=function(reason)
-    local state=toggle.safetystate;state.active=false;state.arrivalsince=nil;state.route=nil;state.routeindex=1;state.lastwrite=nil;state.planat=0;state.nextsafe=0
+    local state=toggle.safetystate;state.active=false;state.arrivalsince=nil;state.lastwrite=nil;state.nextsafe=0
     if reason then toggle.safetynotice(reason)end
 end
 toggle.startsafespot=function()
@@ -3617,12 +4287,12 @@ toggle.startsafespot=function()
     if state.active then toggle.cancelsafespot("safe spot travel cancelled");return end
     local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart");local humanoid=character and character:FindFirstChildOfClass("Humanoid")
     if not root or not humanoid or humanoid.Health<=0 then toggle.safetynotice("safe spot: character unavailable");return end
-    state.character=character;state.arrivalsince=nil;state.active=true;state.route=nil;state.routeindex=1;state.lastwrite=nil;state.planat=0;state.next=0;state.nextsafe=0;state.nexttraps=0
+    state.character=character;state.arrivalsince=nil;state.active=true;state.lastwrite=nil;state.next=0;state.nextsafe=0;state.nexttraps=0
     state.startdistance=math.max(0.01,(root.Position-state.target).Magnitude*stud2m);state.progresspeak=0;state.hudprogress=0;state.hudcomplete=false
     toggle.safetynotice("travelling to safe spot; press again to cancel")
 end
 toggle.setautoevadetrap=function(value,quiet)
-    toggle.autoevadetrap=value==true;local state=toggle.safetystate;state.route=nil;state.planat=0;state.next=0;state.nexttraps=0;state.escapedirection=nil
+    toggle.autoevadetrap=value==true;local state=toggle.safetystate;state.next=0;state.nexttraps=0;state.escapedirection=nil
     menuupdate();if not quiet then bindlog(toggle.autoevadetrap and"enabled auto-evade trap"or"disabled auto-evade trap")end
 end
 toggle.safetycomponents=function(x,y,z)
@@ -3634,8 +4304,8 @@ toggle.safetyfinite=function(v)
     return ok and toggle.safetycomponents(x,y,z)or false
 end
 toggle.safetyreadvector=function(object,property)
-    -- Copy scalar components inside the protected read. Never carry a nil or
-    -- partially readable engine vector into the hazard geometry.
+     
+     
     if not object then return nil end
     local ok,x,y,z=pcall(function()
         local value=object[property];if not value then return nil end
@@ -3666,9 +4336,9 @@ toggle.safetytraps=function(now)
             if hitbox then add(hitbox)elseif model:IsA("BasePart")then add(model)end
         end)end end
     end)
-    -- Supplement the live trap folder without depending on ESP toggles.
+     
     for i=1,#tracked do local rec=tracked[i];if rec and rec.cfgname=="RakeTrapModel"then add(rec.object,rec.worldframe and now-rec.worldframe<0.5 and rec.lastworld or nil)end end
-    -- A transient folder/model read must not discard a verified live trap.
+     
     for key,entry in pairs(cache)do if not seen[key]then add(entry.part)end end
     for key in pairs(cache)do if not seen[key]then cache[key]=nil end end
     state.traps=list;return list
@@ -3684,7 +4354,7 @@ toggle.safetytraphazard=function(entry,now,lead)
             local size=toggle.safetyreadvector(part,"Size")
             if size and size.X>=0 and size.Y>=0 and size.Z>=0 then entry.extent=math.sqrt(size.X^2+size.Z^2)*0.5 end
         else
-            -- Retry stale handles slowly. No error(), console print, or toast.
+             
             entry.nextread=now+0.5;entry.failures=(entry.failures or 0)+1
         end
     end
@@ -3726,14 +4396,29 @@ toggle.safetysegment=function(a,b,hazards,escape)
         local t=length2>0 and clamp(-(ax*dx+az*dz)/length2,0,1)or 0
         local x,z=ax+dx*t,az+dz*t;local nearest=x*x+z*z
         if start2<h.r*h.r-0.0001 then
-            -- Already inside: escape may only move away, never cut deeper.
+             
             if not escape or nearest<start2-0.0001 or(ax+dx)^2+(az+dz)^2<start2+0.0001 then return false end
         elseif nearest<h.r*h.r-0.0001 then return false end
     end
     return true
 end
+toggle.safetyunitdirections={}
+for i=0,63 do local angle=i*math.pi/32;toggle.safetyunitdirections[i+1]={x=math.cos(angle),z=math.sin(angle)}end
 toggle.safetyescape=function(position,hazards,step)
-    local state=toggle.safetystate;local directions={};local threats={};local sx,sz=0,0
+    local state=toggle.safetystate
+     
+     
+    if #hazards==1 and hazards[1].kind=="rake"then
+        local h=hazards[1];local dx,dz=position.X-h.x,position.Z-h.z;local squared=dx*dx+dz*dz
+        if squared>=h.guard*h.guard then state.escapedirection=nil;return nil,false end
+        if tick()<(state.nextshield or 0)then return nil,true,"shield"end
+        if squared>0.0000000001 then
+            local length=math.sqrt(squared);local x,z=dx/length,dz/length;local travel=step or state.shieldstepmeters/stud2m
+            local target=Vector3.new(position.X+x*travel,position.Y,position.Z+z*travel)
+            if toggle.safetysegment(position,target,hazards,true)then state.escapedirection={x=x,z=z};return target,true,"shield"end
+        end
+    end
+    local directions={};local threats={};local sx,sz=0,0
     local function add(x,z)local length=math.sqrt(x*x+z*z);if length>0.00001 then directions[#directions+1]={x=x/length,z=z/length}end end
     if state.escapedirection then add(state.escapedirection.x,state.escapedirection.z)end
     for _,h in ipairs(hazards)do
@@ -3746,13 +4431,15 @@ toggle.safetyescape=function(position,hazards,step)
     end
     if #threats==0 then state.escapedirection=nil;return nil,false end
     local mode="shield";for _,entry in ipairs(threats)do if entry.h.kind=="trap"then mode="trap";break end end
+     
+    if mode=="shield"and tick()<(state.nextshield or 0)then return nil,true,mode end
     if not step then step=(mode=="trap"and state.trapstepmeters or state.shieldstepmeters)/stud2m end
-    add(sx,sz);for i=0,63 do local angle=i*math.pi/32;add(math.cos(angle),math.sin(angle))end
+    add(sx,sz);for _,direction in ipairs(toggle.safetyunitdirections)do directions[#directions+1]=direction end
     local best,bestscore,besttravel=nil,-math.huge,math.huge
     for _,d in ipairs(directions)do
         local travel=step
-        -- If a trap was already too close (spawn/server correction), one
-        -- emergency correction must reach its hard boundary immediately.
+         
+         
         for _,entry in ipairs(threats)do if entry.h.kind=="trap"and entry.d<entry.h.r then
             local h=entry.h;local x,z=position.X-h.x,position.Z-h.z;local dot=x*d.x+z*d.z
             local exit=-dot+math.sqrt(math.max(0,dot*dot+h.r*h.r-x*x-z*z));travel=math.max(travel,exit+0.05/stud2m)
@@ -3771,21 +4458,22 @@ toggle.safetyescape=function(position,hazards,step)
 end
 toggle.safetywrite=function(root,character,position,target,hazards,escape)
     if not toggle.running or toggle.replacing or lp.Character~=character or root.Parent~=character or not toggle.safetyfinite(target)then return false end
-    -- Original pre-panel position write and boundary checks.
+     
     local current=root.Position
     if not toggle.safetyfinite(current)or not toggle.safetysegment(current,target,hazards,escape)then return false end
     if not escape and(target-current).Magnitude>toggle.safetystate.safestepmeters/stud2m+0.001 then return false end
     for _,h in ipairs(hazards)do if h.kind=="trap"and(target.X-h.x)^2+(target.Z-h.z)^2<h.r*h.r-0.0001 then return false end end
     root.Position=target
-    -- Remove residual inward walking/falling velocity between teleport steps.
+     
     pcall(function()root.AssemblyLinearVelocity=Vector3.new(0,0,0)end)
     toggle.safetystate.lastwrite=target;return true
 end
+toggle.safetynext=function(previous,interval)local now=tick();return(previous and previous>0 and previous<=now and now-previous<interval and previous or now)+interval end
 toggle.applysafety=function()
     local state=toggle.safetystate
     if not toggle.running or toggle.replacing or toggle.loading or toggle.starting then state.next=0;return false end
     if not toggle.rakeshield and not toggle.autoevadetrap and not state.active then state.lastwrite=nil;return false end
-    local now=tick();if now<(state.next or 0)then return false end;state.next=now+state.interval
+    local now=tick();if now<(state.next or 0)then return false end;state.next=toggle.rakeshield and toggle.safetynext(state.next,math.min(state.interval,state.shieldinterval))or now+state.interval
     local character=lp.Character;local root=character and character:FindFirstChild("HumanoidRootPart");local hum=character and character:FindFirstChildOfClass("Humanoid")
     if not root or not hum or hum.Health<=0 then if state.active then toggle.cancelsafespot("safe spot travel stopped: character unavailable")end;state.character=nil;return false end
     if state.character and state.character~=character then toggle.cancelsafespot("safe spot travel stopped after respawn")end;state.character=character
@@ -3796,15 +4484,15 @@ toggle.applysafety=function()
     local escape,threatened,mode=toggle.safetyescape(position,hazards)
     toggle.shieldstate.retreating=threatened
     if threatened then
-        state.route=nil;state.planat=0
-        -- Independent clocks: safe spot's half-second wait never delays an
-        -- immediate trap response or the more frequent shield updates.
+        
+         
+         
         if mode=="shield"and now<(state.nextshield or 0)then return false end
         if escape then
-            -- Refresh live hazard centers after any planning/scanning work.
+             
             local fresh=toggle.safetyhazards(tick(),velocity)
             local moved=toggle.safetywrite(root,character,position,escape,fresh,true)
-            if moved then state.nextsafe=tick()+state.safeinterval;if mode=="shield"then state.nextshield=tick()+state.shieldinterval end end
+            if moved then state.nextsafe=toggle.safetynext(state.nextsafe,state.safeinterval);if mode=="shield"then state.nextshield=toggle.safetynext(state.nextshield,state.shieldinterval) end end
             return moved
         end
         toggle.safetynotice("safety movement blocked by overlapping danger radii");return false
@@ -3821,17 +4509,17 @@ toggle.applysafety=function()
     local horizontal=math.sqrt((state.target.X-position.X)^2+(state.target.Z-position.Z)^2)
     local travelto=horizontal>5/stud2m and Vector3.new(waypoint.X,position.Y,waypoint.Z)or waypoint
     local delta=travelto-position;local length=delta.Magnitude
-    if length<=0.08 then state.routeindex=state.routeindex+1;return false end
+    if length<=0.08 then return false end
     local target=length<=step and travelto or position+delta*(step/length)
     local fresh=toggle.safetyhazards(tick(),velocity)
-    if not toggle.safetywrite(root,character,position,target,fresh,false)then state.route=nil;state.planat=0;return false end
-    state.nextsafe=tick()+state.safeinterval
+    if not toggle.safetywrite(root,character,position,target,fresh,false)then return false end
+    state.nextsafe=toggle.safetynext(state.nextsafe,state.safeinterval)
     return true
 end
--- Retained as an entry point for existing callers; it shares the controller.
+ 
 toggle.applyrakeshield=function()return toggle.applysafety()end
 
--- Reuse HUD appearance, cached Drawing writes and the shared tracer line pool.
+ 
 toggle.hidesafetyhud=function(release)
     local ui=toggle.safetystate.hudui;if not ui then return end
     for _,d in pairs(ui.draws)do toggle.setvisible(d,false)end
@@ -3886,14 +4574,14 @@ toggle.drawsafetyhud=function()
     state.espring=state.espring or{cfg={group='safespot',ringradius=3,ringyoffset=0},ringanim=0}
     local ring=state.espring;ring.cfg.labelcolor=tint;ring.cfg.rgb=false
     drawring(ring,state.target,meters,toggle.safespothud and state.active)
-    -- Tracer selection is independent of panel visibility.
+     
     if not toggle.tracers.selected["safe spot"] then for _,d in ipairs(ui.dashes)do toggle.setvisible(d,false)end;return end
     local projected,on=toggle.projectworld(state.target);local mx,my=mouse and mouse.X,mouse and mouse.Y
     if not state.active or not on or not projected or not toggle.drawingfinite(mx,1000000)or not toggle.drawingfinite(my,1000000)then
         for _,d in ipairs(ui.dashes)do toggle.setvisible(d,false)end;return
     end
-    -- Identical cursor origin, curve response, thickness and alpha pulse as
-    -- ordinary tracers. The only geometry difference is the animated gaps.
+     
+     
     local tr=toggle.tracers;state.hudcurve=toggle.ease(state.hudcurve or tr.curve,tr.curve,0.18)
     state.hudphase=((state.hudphase or 0)+dt*0.65*tr.speed)%1
     local phase=tr.count>0 and tr.phase or state.hudphase
@@ -4096,7 +4784,7 @@ toggle.setplayersesp=function(value,quiet)
     toggle.playeresp.enabled=true;toggle.refreshplayerselection();menuupdate()
 end
 toggle.setplayerdistance=function(value,quiet)
-    toggle.playeresp.distance=toggle.nametagrange(value or toggle.playeresp.distance,false);menuupdate();if not quiet then bindlog("player ESP distance set to "..tostring(toggle.playeresp.distance).."m")end
+    toggle.playeresp.distance=200;toggle.playeresp.detaildistance=math.floor(clamp(tonumber(value)or 25,15,150)+0.5);toggle.playeresp.nextscan=0;menuupdate();if not quiet then bindlog("detailed render distance set to "..tostring(toggle.playeresp.detaildistance).."m")end
 end
 toggle.refreshfonts=function()
     if toggle.uibatch then toggle.fontrefreshpending=true;menustate.itemsdirty=true;return end;toggle.fontrefreshpending=false
@@ -4311,7 +4999,7 @@ local function configdata()
     for _,id in ipairs({"themebg","themetop","themeborder","themeoutline","themetext"})do local cfg=entrycfg(id);local c=cfg.labelcolor;themecolors[id]={r=channel(c.R),g=channel(c.G),b=channel(c.B)}end
     themecolors.border_radius=toggle.borderradius
     for id,cfg in pairs(toggle.cratestyles)do local c=cfg.labelcolor;crateitemcolors[id]={r=channel(c.R),g=channel(c.G),b=channel(c.B),rgb=cfg.rgb==true}end
-    return {container_grouping=toggle.containergrouping,container_positions=toggle.containerpositions,container_orientation=toggle.containerorientation,nametag_range_schema=1,highlight_target_scrap=toggle.highlightscrap,preset_esp_colors=toggle.presetespcolors,esp_color_overrides=toggle.paletteoverrides(),shine_effect=toggle.shinesettings,custom_visuals=toggle.visualconfig(),tracer_opacity=toggle.tracers.opacity,tracer_speed=toggle.tracers.speed,tracer_curve=toggle.tracers.curve,show_tracers=toggle.tracers.selected,nametag_defaults_version=2,interface_design_schema=1,crate_label_version=2,menu_default_version=5,gui_outline_default_version=3,hud_style_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_schema=2,esp_font_name=fontnames[fontindex],hud_font_name=fontnames[toggle.hudfontindex],font_size=espfontsize,visual_style=toggle.visualstyle,visual_styles={menu=toggle.visualstyle,hud=toggle.hudstyle,esp=toggle.espvisualstyle},esp_icons=toggle.espicons,esp_background_opacity=toggle.espbackgroundalpha,hud_background_opacity=toggle.hudbackgroundalpha,overlay_defaults_schema=1,compact_layout_schema=8,watermark_defaults_schema=1,watermark_schema=2,watermark_elements=toggle.watermarkelements,fonts={menu=toggle.menufontindex,panels=toggle.hudfontindex,esp=fontindex,panel_size=toggle.panelsize,esp_size=espfontsize},preset=themeindex,preset_schema=4,theme_schema=6,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,menu_opacity=menuopacity,opacity_scope_schema=1,watermark=toggle.watermark,hybrid_mode=true,hybrid_features=toggle.hybridfeatures,unsafe_luau=true,client=toggle.client,auto_radio=toggle.autoradio,auto_claim_nightvision=toggle.autoclaimnightvision,auto_recover=toggle.autorecover,auto_buy_items=toggle.autobuyitems.selected,auto_sell_scrap=toggle.autosellscrap,auto_sell_items=toggle.autosellitems.selected,action_toggles={sell=toggle.sellenabled,scrap=toggle.scrapteleportenabled,flare=toggle.flareteleportenabled},shop_item=toggle.shop.selected,kill_aura=toggle.killaura,kill_aura_range=toggle.killaurarange,kill_aura_delay=toggle.killauradelay,auto_heal=toggle.autoheal,auto_heal_health=toggle.autohealth,safe_spot_tracer_schema=1,safe_spot_elements=toggle.safespotelements,safe_spot_hud=toggle.safespothud,auto_evade_trap=toggle.autoevadetrap,rake_shield=toggle.rakeshield,rake_shield_range=toggle.rakeshieldrange,auto_power=toggle.autopower,auto_power_require_toolbox=toggle.autopowerrequiretoolbox,player_esp=true,player_stacking=toggle.playeresp.stacking,player_stacking_defaults_schema=1,player_layout_schema=3,player_item_defaults_schema=2,player_health_coloring=toggle.playeresp.healthcoloring,rake_health_coloring=toggle.rakehealthcoloring,player_show_username=toggle.playeresp.showusername,player_show_health=toggle.playeresp.showhealth,player_show_distance=toggle.playeresp.showdistance,player_show_background=toggle.playeresp.background,player_esp_style=toggle.playeresp.style,rake_esp_style=toggle.rakeespstyle,rake_status=toggle.rakestatus,rake_render_distance=toggle.rakerenderdistance,player_esp_distance=toggle.playeresp.distance,player_esp_items=toggle.playeresp.selected,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,shift_lock=toggle.shiftlockstate.active,insta_crate=toggle.instacrate,auto_collect={enabled=toggle.autocollect.enabled,selected=toggle.autocollect.selected},prompts=toggle.promptsettings,panel_style=toggle.hudstyle,container_style=toggle.containerstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,centerx=toggle.widgetgroup.centerx,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=ringseg,ring_fade=ringfade,ring_opacity=toggle.ringopacity,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y,dragged=toggle.powerpanel.dragged},keybind_panel={enabled=toggle.keybindpanel,x=toggle.keybindpanelstate.x,y=toggle.keybindpanelstate.y,dragged=toggle.keybindpanelstate.dragged},world_panel={enabled=toggle.worldpanel,x=toggle.worldpanelstate.x,y=toggle.worldpanelstate.y,dragged=toggle.worldpanelstate.dragged,items=toggle.worldpanelitems},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,chroma_accent=themes.accentstyle.rgb,chroma_gradient_bar=toggle.barrgb,bar_rgb=toggle.barrgb,accent_bars=toggle.accentbars,accent_direction=toggle.rgbdirection,accent_speed=rgbspeed,accent_bar_speed=rgbspeed,chroma_saturation=toggle.chromasaturation,chroma_speed=toggle.chromaspeed,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,teleport_cooldown=toggle.teleportcooldown,teleport_cooldown_seconds=toggle.cooldownseconds,notifications={style=toggle.notifysettings.style,opacity=toggle.notifysettings.opacity,position=toggle.notifysettings.position,duration=toggle.notifysettings.duration,rakedistance=toggle.notifysettings.rakedistance,types=toggle.notifysettings.types},distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_elements=toggle.scrapelements,scrap_edit=toggle.scrapedit,location_edit=toggle.locationedit,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,height=menustate.h,minimized=menustate.minimized}}
+    return {players_tab_schema=1,player_roster_view=toggle.playerbrowser.view,player_backpack_style=toggle.playerbackpackstyle,crate_inventory_style=toggle.crateinventorystyle,oof_arrows=toggle.extra.selected,oof_radius=toggle.extra.radius,oof_opacity=toggle.extra.arrowopacity,oof_distance_fade=toggle.extra.distancefade,oof_elements=toggle.extra.elements,oof_size=toggle.extra.size,container_grouping=toggle.containergrouping,container_positions=toggle.containerpositions,container_orientation=toggle.containerorientation,nametag_range_schema=1,highlight_target_scrap=toggle.highlightscrap,preset_esp_colors=toggle.presetespcolors,esp_color_overrides=toggle.paletteoverrides(),shine_effect=toggle.shinesettings,custom_visuals=toggle.visualconfig(),tracer_opacity=toggle.tracers.opacity,tracer_speed=toggle.tracers.speed,tracer_curve=toggle.tracers.curve,show_tracers=toggle.tracers.selected,nametag_defaults_version=2,interface_design_schema=1,crate_label_version=2,menu_default_version=5,gui_outline_default_version=3,hud_style_default_version=4,font=fontindex,esp_font=fontindex,hud_font=toggle.hudfontindex,font_schema=2,esp_font_name=fontnames[fontindex],hud_font_name=fontnames[toggle.hudfontindex],font_size=espfontsize,visual_style=toggle.visualstyle,visual_styles={menu=toggle.visualstyle,hud=toggle.hudstyle,esp=toggle.espvisualstyle},esp_icons=toggle.espicons,esp_background_opacity=toggle.espbackgroundalpha,hud_background_opacity=toggle.hudbackgroundalpha,overlay_defaults_schema=1,compact_layout_schema=8,watermark_defaults_schema=1,watermark_schema=2,watermark_elements=toggle.watermarkelements,fonts={menu=toggle.menufontindex,panels=toggle.hudfontindex,esp=fontindex,panel_size=toggle.panelsize,esp_size=espfontsize},preset=themeindex,preset_schema=4,theme_schema=6,rgb_defaults_schema=2,preset_name=themes[themeindex].name,accent={r=channel(accent.R),g=channel(accent.G),b=channel(accent.B)},theme_colors=themecolors,menu_opacity=menuopacity,opacity_scope_schema=1,watermark=toggle.watermark,hybrid_mode=true,hybrid_features=toggle.hybridfeatures,unsafe_luau=true,client=toggle.client,auto_radio=toggle.autoradio,auto_claim_nightvision=toggle.autoclaimnightvision,auto_recover=toggle.autorecover,auto_buy_items=toggle.autobuyitems.selected,auto_sell_scrap=toggle.autosellscrap,auto_sell_items=toggle.autosellitems.selected,action_toggles={sell=toggle.sellenabled,scrap=toggle.scrapteleportenabled,flare=toggle.flareteleportenabled},shop_item=toggle.shop.selected,kill_aura=toggle.killaura,kill_aura_range=toggle.killaurarange,kill_aura_delay=toggle.killauradelay,auto_heal=toggle.autoheal,auto_heal_health=toggle.autohealth,safe_spot_tracer_schema=1,safe_spot_elements=toggle.safespotelements,safe_spot_hud=toggle.safespothud,auto_evade_trap=toggle.autoevadetrap,rake_shield=toggle.rakeshield,rake_shield_range=toggle.rakeshieldrange,auto_power=toggle.autopower,auto_power_require_toolbox=toggle.autopowerrequiretoolbox,player_esp=true,player_stacking=toggle.playeresp.stacking,player_stacking_defaults_schema=1,player_layout_schema=3,player_item_defaults_schema=2,player_health_coloring=toggle.playeresp.healthcoloring,rake_health_coloring=toggle.rakehealthcoloring,player_show_username=toggle.playeresp.showusername,player_show_health=toggle.playeresp.showhealth,player_show_distance=toggle.playeresp.showdistance,player_show_scrap=toggle.playeresp.showscrap,player_show_background=toggle.playeresp.background,player_esp_style=toggle.playeresp.style,rake_esp_style=toggle.rakeespstyle,rake_status=toggle.rakestatus,rake_render_distance=toggle.rakerenderdistance,player_esp_distance=200,player_detail_distance=toggle.playeresp.detaildistance,player_esp_items=toggle.playeresp.selected,third_person=toggle.zoom.thirdperson,zoom_amount=toggle.zoom.amount,shift_lock=toggle.shiftlockstate.active,insta_crate=toggle.instacrate,auto_collect={enabled=toggle.autocollect.enabled,selected=toggle.autocollect.selected},prompts=toggle.promptsettings,panel_style=toggle.hudstyle,container_style=toggle.containerstyle,widget_group={x=toggle.widgetgroup.x,y=toggle.widgetgroup.y,centerx=toggle.widgetgroup.centerx,dragged=toggle.widgetgroup.dragged},distance_minimum=toggle.distanceminimum,distance_min=toggle.distancemin,ring_enabled=toggle.ringenabled,ring_shape=toggle.ringshape,ring_segments=ringseg,ring_fade=ringfade,ring_opacity=toggle.ringopacity,ring_size=toggle.ringsize,ring_spin=toggle.ringspin,ring_spin_speed=toggle.ringspinspeed,esp=toggle.esp,hud=toggle.hud,hud_elements=toggle.hudelements,power_activity=toggle.poweractivity,power_activity_mode=toggle.poweractivitymode,power_panel={x=toggle.powerpanel.x,y=toggle.powerpanel.y,dragged=toggle.powerpanel.dragged},keybind_panel={enabled=toggle.keybindpanel,x=toggle.keybindpanelstate.x,y=toggle.keybindpanelstate.y,dragged=toggle.keybindpanelstate.dragged},world_panel={enabled=toggle.worldpanel,x=toggle.worldpanelstate.x,y=toggle.worldpanelstate.y,dragged=toggle.worldpanelstate.dragged,items=toggle.worldpanelitems},roof_hp=toggle.roof,rake_name_enabled=toggle.rakename,rake_health_enabled=toggle.rakehealth,rake_distance_enabled=toggle.rakedistance,rake_name=toggle.rakenamevalue,rake_name_y=toggle.rakenamey,chroma_accent=themes.accentstyle.rgb,chroma_gradient_bar=toggle.barrgb,bar_rgb=toggle.barrgb,accent_bars=toggle.accentbars,accent_direction=toggle.rgbdirection,accent_speed=rgbspeed,accent_bar_speed=rgbspeed,chroma_saturation=toggle.chromasaturation,chroma_speed=toggle.chromaspeed,rgb_direction=toggle.rgbdirection,rgb_speed=rgbspeed,power_format="percent",power_decimal=toggle.powerdecimal,teleport_cooldown=toggle.teleportcooldown,teleport_cooldown_seconds=toggle.cooldownseconds,notifications={style=toggle.notifysettings.style,opacity=toggle.notifysettings.opacity,position=toggle.notifysettings.position,duration=toggle.notifysettings.duration,rakedistance=toggle.notifysettings.rakedistance,types=toggle.notifysettings.types},distance=toggle.distance,distance_position=toggle.distanceposition,scrap_style=toggle.scrapstyle,scrap_elements=toggle.scrapelements,scrap_edit=toggle.scrapedit,location_edit=toggle.locationedit,scrap_teleport=toggle.scrapteleport,supply_label=toggle.supplylabel,supply_items=toggle.supplyitems,esp_groups=espgroups,esp_items=espgroups.items,colors=colors,special_colors=special,crate_item_colors=crateitemcolors,binds=keybinds,menu={x=menustate.x,y=menustate.y,height=menustate.h,minimized=menustate.minimized}}
 end
 toggle.configsnapshot=function(value,ancestors)
     local kind=type(value);if kind=="boolean"or kind=="string"then return value elseif kind=="number"then return value==value and math.abs(value)~=math.huge and value or nil elseif kind~="table"then return nil end
@@ -4384,8 +5072,9 @@ end
 local function loadconfig(quiet)
     menustate.resizeheighttarget=nil;local data=toggle.readconfigdata(configpath());local backup=false;if not data then data=toggle.readconfigdata(configpath()..".backup.cfg");backup=data~=nil end
     if not data then if not quiet then bindlog("no readable saved config")end;return false end
+    toggle.playerbrowser.view=data.player_roster_view=="Grid"and"Grid"or"List";toggle.playerbrowser.pitch=nil;toggle.playerbrowser.viewopen=false
     toggle.uibatch=true;toggle.loadingpalette=true;toggle.presetespcolors=data.preset_esp_colors==true;for _,cfg in pairs(toggle.esppaletteentries())do cfg.presetoverride=nil end;toggle.loadshineconfig(data.shine_effect)
-    if type(data.menu_widgets)=="table"and type(data.menu_widgets.closed)=="table"then menustate.widgetclosed={};for key,closed in pairs(data.menu_widgets.closed)do local tab=tonumber(key);if tab and type(closed)=="table"then menustate.widgetclosed[tab]=closed end end;menustate.itemsdirty=true end
+    if type(data.menu_widgets)=="table"and type(data.menu_widgets.closed)=="table"then menustate.widgetclosed={};for key,closed in pairs(data.menu_widgets.closed)do local tab=tonumber(key);if tab==4 and data.players_tab_schema~=1 then tab=5 end;if tab and type(closed)=="table"then menustate.widgetclosed[tab]=closed end end;menustate.itemsdirty=true end
     toggle.hybridmode=true;toggle.unsafeluau=true;toggle.hybridfeatures=data.hybrid_features==true
     setfontindex(toggle.savedfontindex(data.esp_font_name,data.esp_font or data.font,data.font_schema),true);toggle.sethudfont(toggle.savedfontindex(data.hud_font_name,data.hud_font,data.font_schema),true)
     if type(data.font_size)=="number"then setfontsize(data.font_size,true)end
@@ -4412,18 +5101,22 @@ local function loadconfig(quiet)
     toggle.refreshshop(true);toggle.shop.selected=type(data.shop_item)=="string"and toggle.shop.lookup[data.shop_item]and toggle.shop.lookup[data.shop_item].name or"RakeTrap";toggle.autobuyitems.selected={};toggle.autosellitems.selected={};if type(data.auto_buy_items)=="table"then for i=1,#toggle.shop.items do local name=toggle.shop.items[i].name;if data.auto_buy_items[name]==true then toggle.autobuyitems.selected[name]=true end end end;if type(data.auto_sell_items)=="table"then for i=1,#toggle.shop.items do local name=toggle.shop.items[i].name;if data.auto_sell_items[name]==true then toggle.autosellitems.selected[name]=true end end end;toggle.autobuyitems.next=0;toggle.autosellitems.next=0
     toggle.cancelsafespot();toggle.setautoevadetrap(data.auto_evade_trap==true,true);toggle.safespothud=data.safe_spot_hud~=false;toggle.safespotelements={Label=true,Distance=true};if type(data.safe_spot_elements)=="table"then for _,key in ipairs({"Label","Distance"})do toggle.safespotelements[key]=data.safe_spot_elements[key]==true end end
     toggle.setkillaurarange(type(data.kill_aura_range)=="number"and data.kill_aura_range or 16,true);toggle.setkillauradelay(type(data.kill_aura_delay)=="number"and data.kill_aura_delay or 0.05,true);toggle.setkillaura(data.kill_aura==true,true);toggle.setautohealth(type(data.auto_heal_health)=="number"and data.auto_heal_health or 50,true);toggle.setautoheal(data.auto_heal==true,true);toggle.setrakeshieldrange(data.rake_shield_range,true);toggle.setrakeshield(data.rake_shield==true,true);toggle.setautopower(data.auto_power==true,true);toggle.setautopowertoolbox(data.auto_power_require_toolbox~=false,true)
-    toggle.playeresp.selected={};if type(data.player_esp_items)=="table"then for i=1,#toggle.playeresp.order do local name=toggle.playeresp.order[i].name;if data.player_esp_items[name]==true then toggle.playeresp.selected[name]=true end end end;toggle.playeresp.stacking=data.player_stacking_defaults_schema~=1 or data.player_stacking~=false;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=data.player_show_username==true;toggle.playeresp.showhealth=data.player_show_health==true;toggle.playeresp.healthcoloring=data.player_health_coloring==true;toggle.rakehealthcoloring=data.rake_health_coloring==true;toggle.playeresp.showdistance=data.player_show_distance==true;toggle.playeresp.background=true;toggle.playeresp.style=(data.player_esp_style=="compact"or data.player_esp_style=="legacy")and"compact"or"modern";toggle.rakeespstyle=(data.rake_esp_style=="compact"or data.rake_esp_style=="legacy")and"compact"or"modern";toggle.rakestatus=data.rake_status==true;toggle.rakerenderdistance=toggle.nametagrange(data.rake_render_distance,data.nametag_range_schema~=1);toggle.rakepanel.nextsample=0;toggle.setplayerdistance(toggle.nametagrange(data.player_esp_distance,data.nametag_range_schema~=1),true);toggle.setplayersesp(true,true)
+    toggle.playeresp.selected={};if type(data.player_esp_items)=="table"then for i=1,#toggle.playeresp.order do local name=toggle.playeresp.order[i].name;if data.player_esp_items[name]==true then toggle.playeresp.selected[name]=true end end end;toggle.playeresp.stacking=data.player_stacking==true;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=data.player_show_username==true;toggle.playeresp.showhealth=data.player_show_health==true;toggle.playeresp.healthcoloring=data.player_health_coloring==true;toggle.rakehealthcoloring=data.rake_health_coloring==true;toggle.playeresp.showdistance=data.player_show_distance==true;toggle.playeresp.showscrap=data.player_show_scrap==true;toggle.playeresp.background=true;toggle.playeresp.style=(data.player_esp_style=="compact"or data.player_esp_style=="legacy")and"compact"or"modern";toggle.rakeespstyle=(data.rake_esp_style=="compact"or data.rake_esp_style=="legacy")and"compact"or"modern";toggle.rakestatus=data.rake_status==true;toggle.rakerenderdistance=toggle.nametagrange(data.rake_render_distance,data.nametag_range_schema~=1);toggle.rakepanel.nextsample=0;toggle.setplayerdistance(data.player_detail_distance or 25,true);toggle.setplayersesp(true,true)
     local zoomamount=type(data.zoom_amount)=="number"and data.zoom_amount or type(data.min_zoom)=="number"and data.min_zoom>=0.5 and data.min_zoom or type(data.minZoom)=="number"and data.minZoom>=0.5 and data.minZoom or 8;toggle.setzoomamount(zoomamount,true);local thirdperson=false;if type(data.third_person)=="boolean"then thirdperson=data.third_person elseif type(data.min_zoom)=="number"then thirdperson=data.min_zoom>=9.5 elseif type(data.minZoom)=="number"then thirdperson=data.minZoom>=9.5 end;toggle.setthirdperson(thirdperson,true);toggle.setshiftlock(data.shift_lock==true,true)
     toggle.setinstacrate(data.insta_crate==true,true)
     toggle.autocollect.selected={};local savedauto=type(data.auto_collect)=="table"and data.auto_collect or{};local selected=type(savedauto.selected)=="table"and savedauto.selected or{};for i=1,#toggle.autocollect.order do local name=toggle.autocollect.order[i].name;if selected[name]==true then toggle.autocollect.selected[name]=true end end;toggle.autocollect.enabled=toggle.instacrate and savedauto.enabled==true
     for i=1,#toggle.promptoptionorder do local entry=toggle.promptoptionorder[i];local saved=type(data.prompts)=="table"and data.prompts[entry.id];if type(saved)~="boolean"and type(data.prompts)=="table"then saved=data.prompts[entry.panel]end;toggle.promptsettings[entry.id]=type(saved)=="boolean"and saved or true end;toggle.setpromptmaster(type(data.prompts)=="table"and data.prompts.master==true,true)
+    toggle.playerbackpackstyle=data.player_backpack_style=="Text"and"Text"or"Image";toggle.crateinventorystyle=data.crate_inventory_style=="Text"and"Text"or"Image"
+    toggle.extra.selected={};if type(data.oof_arrows)=="table"then for _,k in ipairs(toggle.extra.order)do toggle.extra.selected[k]=data.oof_arrows[k]==true end end
+    toggle.extra.size=clamp(tonumber(data.oof_size)or 18,6,28)
+    toggle.extra.radius=clamp(tonumber(data.oof_radius)or 330,60,450);toggle.extra.arrowopacity=clamp(tonumber(data.oof_opacity)or 0.9,0.1,1);toggle.extra.distancefade=data.oof_distance_fade~=false;toggle.extra.elements={Icon=true,Name=true,Distance=true};if type(data.oof_elements)=="table"then for _,k in ipairs({"Icon","Name","Distance"})do toggle.extra.elements[k]=data.oof_elements[k]==true end end
     toggle.containergrouping=data.container_grouping=="ungrouped"and"ungrouped"or"stacked";toggle.containerpositions={}
     if type(data.container_positions)=="table"then for _,item in ipairs(toggle.huditems)do local p=data.container_positions[item.id];if type(p)=="table"and toggle.drawingfinite(p.x,100000)and toggle.drawingfinite(p.y,100000)then toggle.containerpositions[item.id]={x=p.x,y=p.y,dragged=p.dragged==true}end end end
     toggle.widgetgroup.centerx=nil
     toggle.containerorientation=data.container_orientation=="vertical"and"vertical"or"horizontal"
     toggle.applyvisualstyles(data)
     toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,distance=true,health=true,locations={},locationgroup=false};if type(data.esp_icons)=="table"then for _,key in ipairs({"rake","players","crates","flare","traps","scraps","distance","health"})do if data.esp_icons[key]~=nil then toggle.espicons[key]=data.esp_icons[key]==true end end;toggle.espicons.locationgroup=data.esp_icons.locationgroup==true;if type(data.esp_icons.locations)=="table"then for i=1,#toggle.locationorder do toggle.espicons.locations[i]=data.esp_icons.locations[i]==true end end end
-    toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};if type(data.watermark_elements)=="table"then local e=data.watermark_elements;toggle.watermarkelements.avatar=e.avatar==true;toggle.watermarkelements.displayname=(e.displayname==true or e.username==true);toggle.watermarkelements.title=e.title==true;toggle.watermarkelements.uptime=e.uptime==true end;if data.watermark_schema~=2 and data.watermark==false then toggle.watermarkelements={title=false,avatar=false,displayname=false,uptime=false}end;toggle.syncwatermark()
+    toggle.watermarkelements={title=true,avatar=true,displayname=true,uptime=true};if type(data.watermark_elements)=="table"then local e=data.watermark_elements;toggle.watermarkelements.avatar=e.avatar==true;toggle.watermarkelements.displayname=(e.displayname==true or e.username==true);toggle.watermarkelements.title=e.title==true;toggle.watermarkelements.uptime=e.uptime==true end;if data.watermark_schema~=2 and data.watermark==false then toggle.watermarkelements={title=false,avatar=false,displayname=false,uptime=false}end;toggle.syncwatermark()
     if type(data.widget_group)=="table"and data.widget_group.dragged==true then toggle.widgetgroup.dragged=true;if toggle.drawingfinite(data.widget_group.centerx,100000)then toggle.widgetgroup.centerx=data.widget_group.centerx end;if type(data.widget_group.x)=="number"then toggle.widgetgroup.x=data.widget_group.x end;if type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end else toggle.widgetgroup.dragged=false;toggle.widgetgroup.x=nil;if type(data.widget_group)=="table"and type(data.widget_group.y)=="number"then toggle.widgetgroup.y=data.widget_group.y end end
     if type(data.distance_min)=="number"then toggle.distancemin=math.floor(clamp(data.distance_min,0,100)+0.5)else toggle.distancemin=0 end
     local savedmenuopacity=data.menu_opacity or data.gui_opacity;if type(savedmenuopacity)=="number"then setmenuopacity(savedmenuopacity,true)end
@@ -4503,14 +5196,15 @@ toggle.resettheme=function(quiet)
     setfontindex(1,true);toggle.sethudfont(1,true);toggle.setfontrole("menu",1,true);toggle.setfontrolesize("panels",13,true);toggle.setfontrolesize("esp",13,true);setthemeindex(toggle.defaultthemeindex,true);toggle.setchromasaturation(0.4,true);setmenuopacity(0.9,true);toggle.setborderradius(10,true);menuupdate();if not quiet then bindlog("reset theme")end
 end
 toggle.resettoggles=function(quiet)
+    toggle.extra.selected={};toggle.extra.size=18;toggle.extra.radius=330;toggle.extra.arrowopacity=0.9;toggle.extra.distancefade=true;toggle.extra.elements={Icon=true,Name=true,Distance=true}
     toggle.resetposteffects();toggle.cancelsafespot();toggle.setautoevadetrap(false,true);toggle.safespothud=true;toggle.safespotelements={Label=true,Distance=true}
-    toggle.containergrouping="stacked";toggle.containerorientation="horizontal";setesp(true,true);sethud(true,true);toggle.applyvisualstyles({visual_style="modern"});toggle.espbackgroundalpha=0.6;toggle.hudbackgroundalpha=0.9;toggle.setnotificationstyle("modern",true);toggle.setnotificationopacity(0.8,true);toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,distance=true,health=true,locations={},locationgroup=false};toggle.watermarkelements={title=false,avatar=true,displayname=false,uptime=false};for _,id in ipairs({"timer","target","scrap","power"})do toggle.sethudelement(id,id=="timer",true)end;toggle.watermark=true;toggle.hybridfeatures=false;toggle.hybridmode=true;toggle.unsafeluau=true;toggle.hudlabels=true;toggle.setcontainerstyle("modern",true);toggle.distanceminimum=true;toggle.distancemin=0;toggle.setpoweractivity(false,true);toggle.setpoweractivitymode("activity",true);toggle.cooldownuntil=0;toggle.cooldownremaining=0;toggle.setteleportcooldown(false,true);toggle.setcooldownseconds(10,true);toggle.setnotificationposition("bottom right",true);toggle.setkeybindpanel(false,true);toggle.setworldpanel(false,true);for _,entry in ipairs(toggle.worldorder)do toggle.worldpanelitems[entry.id]=true end;toggle.setnotificationduration(4,true);toggle.setrakenotifydistance(30,true);for _,id in ipairs(toggle.notifyorder)do toggle.notifysettings.types[id]=true end;toggle.setroof(true,true);toggle.setrakename(true,true);toggle.setrakehealth(false,true);toggle.setrakedistance(false,true);toggle.rakenamevalue="rake";toggle.rakedraw.name.Text="rake";toggle.setrakenamey(0,true);setbarrgb(false,true);toggle.setchromaaccent(false,true);toggle.setrgbdirection("right",true);toggle.setrgbspeed(0.6,true);toggle.setchromaspeed(0.6,true);setdistance(false,true);toggle.distancefade=false;toggle.setunit("meters",true);toggle.setdistanceposition("below",true);toggle.setscrapstyle("tiers",true);toggle.setscrapteleport("value",true);toggle.sethighlightscrap(false,true);toggle.setsupplylabel(true,true);toggle.setsupplyitems(true,true);toggle.setringenabled(true,true);toggle.setringshape("circle",true);toggle.setringfade(40,true);toggle.setringopacity(0.6,true);toggle.setringsize(1,true);toggle.setringspin(false,true);toggle.setringspinspeed(1,true);
-    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall","towerBarriers","antiCollide","doorNoCollide","preventIdle"})do toggle.setclient(id,false,true)end;toggle.setautoradio(false,true);toggle.setautoclaimnightvision(false,true);toggle.setautorecover(false,true);toggle.setautosellscrap(false,true);toggle.tracers.selected={["safe spot"]=true};toggle.tracers.opacity=0.8;toggle.tracers.speed=1;toggle.tracers.curve=1;toggle.tracers.drawcurve=1;toggle.autobuyitems.selected={};toggle.autobuyitems.next=0;toggle.autosellitems.selected={};toggle.autosellitems.next=0;toggle.sellenabled=true;toggle.scrapteleportenabled=true;toggle.flareteleportenabled=true;toggle.shop.selected="RakeTrap";toggle.setkillaura(false,true);toggle.setkillaurarange(16,true);toggle.setkillauradelay(0.05,true);toggle.setautoheal(false,true);toggle.setautohealth(50,true);toggle.setrakeshield(false,true);toggle.setrakeshieldrange(30,true);toggle.setautopower(false,true);toggle.setautopowertoolbox(true,true);toggle.playeresp.selected={};toggle.playeresp.stacking=true;toggle.playeresp.nextlayout=0;toggle.playeresp.showusername=false;toggle.playeresp.showhealth=false;toggle.playeresp.showdistance=false;toggle.playeresp.background=true;toggle.playeresp.style="modern";toggle.rakeespstyle="modern";toggle.rakestatus=false;toggle.rakerenderdistance=200;toggle.rakehealthcoloring=false;toggle.playeresp.healthcoloring=false;toggle.setplayerdistance(200,true);toggle.setplayersesp(true,true);toggle.setzoomamount(8,true);toggle.setthirdperson(false,true);toggle.setshiftlock(false,true);toggle.setinstacrate(false,true);toggle.autocollect.selected={};for i=1,#toggle.promptoptionorder do toggle.promptsettings[toggle.promptoptionorder[i].id]=true end;toggle.setpromptmaster(false,true);for _,entry in ipairs(toggle.accentbarorder)do toggle.accentbars[entry.id]=entry.id=="menu"or entry.id=="hud"or entry.id=="keybinds"end
+    toggle.containergrouping="stacked";toggle.containerorientation="horizontal";setesp(true,true);sethud(true,true);toggle.applyvisualstyles({visual_style="modern"});toggle.espbackgroundalpha=0.6;toggle.hudbackgroundalpha=0.9;toggle.setnotificationstyle("modern",true);toggle.setnotificationopacity(0.8,true);toggle.espicons={rake=true,players=true,crates=false,flare=true,traps=false,scraps=false,distance=true,health=true,locations={},locationgroup=false};toggle.watermarkelements={title=true,avatar=true,displayname=true,uptime=true};for _,id in ipairs({"timer","target","scrap","power"})do toggle.sethudelement(id,true,true)end;toggle.watermark=true;toggle.hybridfeatures=false;toggle.hybridmode=true;toggle.unsafeluau=true;toggle.hudlabels=true;toggle.setcontainerstyle("modern",true);toggle.distanceminimum=true;toggle.distancemin=0;toggle.setpoweractivity(false,true);toggle.setpoweractivitymode("activity",true);toggle.cooldownuntil=0;toggle.cooldownremaining=0;toggle.setteleportcooldown(false,true);toggle.setcooldownseconds(10,true);toggle.setnotificationposition("bottom right",true);toggle.setkeybindpanel(false,true);toggle.setworldpanel(false,true);for _,entry in ipairs(toggle.worldorder)do toggle.worldpanelitems[entry.id]=true end;toggle.setnotificationduration(4,true);toggle.setrakenotifydistance(30,true);for _,id in ipairs(toggle.notifyorder)do toggle.notifysettings.types[id]=true end;toggle.setroof(true,true);toggle.setrakename(true,true);toggle.setrakehealth(true,true);toggle.setrakedistance(true,true);toggle.rakenamevalue="rake";toggle.rakedraw.name.Text="rake";toggle.setrakenamey(0,true);setbarrgb(false,true);toggle.setchromaaccent(false,true);toggle.setrgbdirection("right",true);toggle.setrgbspeed(0.6,true);toggle.setchromaspeed(0.6,true);setdistance(false,true);toggle.distancefade=false;toggle.setunit("meters",true);toggle.setdistanceposition("below",true);toggle.setscrapstyle("tiers",true);toggle.setscrapteleport("value",true);toggle.sethighlightscrap(true,true);toggle.setsupplylabel(true,true);toggle.setsupplyitems(true,true);toggle.setringenabled(true,true);toggle.setringshape("circle",true);toggle.setringfade(40,true);toggle.setringopacity(0.6,true);toggle.setringsize(1,true);toggle.setringspin(false,true);toggle.setringspinspeed(1,true);
+    for _,id in ipairs({"noJumpCooldown","infiniteStamina","noFall","towerBarriers","antiCollide","doorNoCollide","preventIdle"})do toggle.setclient(id,false,true)end;toggle.setautoradio(false,true);toggle.setautoclaimnightvision(false,true);toggle.setautorecover(false,true);toggle.setautosellscrap(false,true);toggle.tracers.selected={["safe spot"]=true};toggle.tracers.opacity=0.8;toggle.tracers.speed=1;toggle.tracers.curve=1;toggle.tracers.drawcurve=1;toggle.autobuyitems.selected={};toggle.autobuyitems.next=0;toggle.autosellitems.selected={};toggle.autosellitems.next=0;toggle.sellenabled=true;toggle.scrapteleportenabled=true;toggle.flareteleportenabled=true;toggle.shop.selected="RakeTrap";toggle.setkillaura(false,true);toggle.setkillaurarange(16,true);toggle.setkillauradelay(0.05,true);toggle.setautoheal(false,true);toggle.setautohealth(50,true);toggle.setrakeshield(false,true);toggle.setrakeshieldrange(30,true);toggle.setautopower(false,true);toggle.setautopowertoolbox(true,true);toggle.playeresp.selected={};toggle.playeresp.stacking=false;toggle.playeresp.nextlayout=0;toggle.playerbackpackstyle="Image";toggle.crateinventorystyle="Image";toggle.playeresp.showusername=false;toggle.playeresp.showhealth=false;toggle.playeresp.showdistance=false;toggle.playeresp.showscrap=false;toggle.playeresp.background=true;toggle.playeresp.style="modern";toggle.rakeespstyle="modern";toggle.rakestatus=true;toggle.rakerenderdistance=200;toggle.rakehealthcoloring=false;toggle.playeresp.healthcoloring=false;toggle.setplayerdistance(25,true);toggle.setplayersesp(true,true);toggle.setzoomamount(8,true);toggle.setthirdperson(false,true);toggle.setshiftlock(false,true);toggle.setinstacrate(false,true);toggle.autocollect.selected={};for i=1,#toggle.promptoptionorder do toggle.promptsettings[toggle.promptoptionorder[i].id]=true end;toggle.setpromptmaster(false,true);for _,entry in ipairs(toggle.accentbarorder)do toggle.accentbars[entry.id]=entry.id=="menu"or entry.id=="hud"or entry.id=="keybinds"end
     for _,id in ipairs({"locations","scraps","traps","flares","crates"})do setgroup(id,true,true)end;espgroups.rake=true;for id in pairs(espgroups.items)do toggle.setitem(id,true,true)end
     menuupdate();if not quiet then bindlog("reset toggles")end
 end
 toggle.resetbinds=function(quiet)
-    keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,aura=defaultbinds.aura,sell=defaultbinds.sell,thirdperson=defaultbinds.thirdperson,crate=defaultbinds.crate,prompt=defaultbinds.prompt,collide=defaultbinds.collide,door=defaultbinds.door,safespot=defaultbinds.safespot,evadetrap=defaultbinds.evadetrap};capture=nil;menuupdate();if not quiet then bindlog("reset binds")end
+    keybinds={menu=defaultbinds.menu,esp=defaultbinds.esp,hud=defaultbinds.hud,scrap=defaultbinds.scrap,flare=defaultbinds.flare,aura=defaultbinds.aura,sell=defaultbinds.sell,thirdperson=defaultbinds.thirdperson,crate=defaultbinds.crate,prompt=defaultbinds.prompt,collide=defaultbinds.collide,door=defaultbinds.door,safespot=defaultbinds.safespot,evadetrap=defaultbinds.evadetrap,quickbuy=defaultbinds.quickbuy,quicksell=defaultbinds.quicksell};capture=nil;menuupdate();if not quiet then bindlog("reset binds")end
 end
 toggle.resetpositions=function(quiet)
     local v=cam.ViewportSize;menustate.resizeheighttarget=nil;menustate.h=math.min(toggle.visualstyle=="compact"and 480 or 660,math.max(340,v.Y-36));menustate.x=24;menustate.y=math.floor((v.Y-menustate.h)/2);menustate.widgetclosed={};menustate.widgetanim={};menustate.itemsdirty=true;toggle.containerpositions={};toggle.widgetgroup.centerx=nil;toggle.widgetgroup.x=nil;toggle.widgetgroup.y=nil;toggle.widgetgroup.dragged=false;toggle.powerpanel.dragged=false;toggle.powerpanel.x=math.max(2,v.X-toggle.powerpanel.w-18);toggle.powerpanel.y=math.floor(v.Y/2-(toggle.powerpanel.h+16+toggle.keybindpanelstate.h)/2);toggle.keybindpanelstate.dragged=false;toggle.keybindpanelstate.x=math.max(2,v.X-toggle.keybindpanelstate.w-18);toggle.keybindpanelstate.y=toggle.powerpanel.y+toggle.powerpanel.h+16;toggle.worldpanelstate.dragged=false;toggle.worldpanelstate.x=18;toggle.worldpanelstate.y=math.max(2,v.Y-toggle.worldpanelstate.h-18);menupos();hudpos();showhud();powerpos();toggle.keybindpos();worldpos();menuupdate();if not quiet then bindlog("reset positions")end
@@ -4528,6 +5222,7 @@ local function runaction(id)
     elseif id=="safespot"then toggle.startsafespot()
     elseif id=="evadetrap"then toggle.setautoevadetrap(not toggle.autoevadetrap)
     elseif id=="aura"then toggle.setkillaura(not toggle.killaura)
+    elseif id=="quickbuy"or id=="quicksell"then toggle.queueshopaction(id=="quickbuy"and"PurchaseItem"or"SellItem")
     elseif id=="sell"then
         if not toggle.sellenabled then return end;toggle.queueshopaction("SellScraps")
     elseif id=="scrap"or id=="flare"then
@@ -4536,7 +5231,7 @@ local function runaction(id)
         local ok,reason;if id=="scrap"then ok,reason=tpscrap()else ok,reason=tpflare()end;if ok then toggle.startcooldown()end
         bindlog(ok and"teleported to "..id or id.." not found","teleports")
     elseif id=="crate"then
-        local ok,result=toggle.collectcrate();if not ok and result then bindlog(result,"supply")end
+        if not toggle.instacrate then return end;local ok,result=toggle.collectcrate();if not ok and result and result~="disabled"then bindlog(result,"supply")end
     end
 end
 local inputstate={dragging=false,sliding=nil,scrolling=nil,dropdownscrolling=false,powerdragging=false,worlddragging=false,keybinddragging=false,groupdragging=false,widgetpending=nil,mouseheld=false,rightheld=false,dragx=0,dragy=0,powerdragx=0,powerdragy=0,worlddragx=0,worlddragy=0,keybinddragx=0,keybinddragy=0,groupdragx=0,groupdragy=0,scrolly=0,scrollstart=0,dropdownscrolly=0,dropdownscrollstart=0,wheel=0}
@@ -4558,6 +5253,9 @@ local function sliderapply(mx,my,quiet)
     elseif toggle.visuals.effectfields[inputstate.sliding]then local entry=toggle.visuals.effectfields[inputstate.sliding];entry.effect.values[entry.field.key]=toggle.effectrawvalue(entry.field,value);entry.effect.edited[entry.field.key]=true;toggle.visualchanged();menuupdate()
     elseif inputstate.sliding=="distancemin"then toggle.distancemin=math.floor(clamp(value,0,100)+0.5);menuupdate()
     elseif inputstate.sliding=="traceropacity"then toggle.tracers.opacity=math.floor(clamp(value,0.1,1)*100+0.5)/100;menuupdate()
+    elseif inputstate.sliding=="oofradius"then toggle.extra.radius=math.floor(value);menuupdate()
+    elseif inputstate.sliding=="oofopacity"then toggle.extra.arrowopacity=value;menuupdate()
+    elseif inputstate.sliding=="oofsize"then toggle.extra.size=math.floor(value+0.5);menuupdate()
     elseif inputstate.sliding=="tracercurve"then toggle.tracers.curve=math.floor(clamp(value,0,2)*100+0.5)/100;menuupdate()
     elseif inputstate.sliding=="tracerspeed"then toggle.tracers.speed=math.floor(clamp(value,0.5,2)*100+0.5)/100;menuupdate()
     elseif inputstate.sliding=="zoomamount"then toggle.setzoomamount(value,quiet)
@@ -4608,17 +5306,18 @@ local function clickmenu(mx,my)
     end
     if dropdownkind then
         local bar=dropdown.layout
-        if bar and bar.scrollable and inside(mx,my,bar.trackx,bar.tracky,bar.trackw,bar.trackh)then
+        if bar and bar.scrollable and inside(mx,my,bar.hitx,bar.tracky,bar.hitw,bar.trackh)then
             if not inside(mx,my,bar.thumbx,bar.thumby,bar.thumbw,bar.thumbh)then dropdown.offset=clamp((my-bar.tracky-bar.thumbh/2)/math.max(1,bar.travel)*dropdown.scrollmax,0,dropdown.scrollmax);dropdownupdate(true);bar=dropdown.layout end
             inputstate.dropdownscrolling=true;inputstate.dropdownscrolly=my;inputstate.dropdownscrollstart=dropdown.offset;return
         end
         for i=1,#dropdownlayouts do
             local layout=dropdownlayouts[i]
             if inside(mx,my,layout.x,layout.y,layout.w,layout.h)then
-                local kind=dropdownkind;if kind~="safespotelements"and kind~="espicons"and kind~="watermarkelements"and kind~="crateelements"and kind~="flareelements"and kind~="trapelements"and kind~="locationelements"and kind~="scrapstyle"and kind~="tracers"and kind~="hudelements"and kind~="playerelements"and kind~="rakeelements"and kind~="autocollect"and kind~="playeritems"and kind~="autobuyitems"and kind~="autosellitems"and kind~="notificationtypes"and kind~="worldstats"and kind~="locations"and kind~="scraptiers"and kind~="prompts"and kind~="resets"then dropdownkind=nil end
-                if kind=="fonttarget"then toggle.fontedit=toggle.fonttargetroles[layout.value]or layout.value;menuupdate()
+                local kind=dropdownkind;if kind~="oofelements"and kind~="oof"and kind~="safespotelements"and kind~="espicons"and kind~="watermarkelements"and kind~="crateelements"and kind~="flareelements"and kind~="trapelements"and kind~="locationelements"and kind~="scrapstyle"and kind~="tracers"and kind~="hudelements"and kind~="playerelements"and kind~="rakeelements"and kind~="autocollect"and kind~="playeritems"and kind~="autobuyitems"and kind~="autosellitems"and kind~="notificationtypes"and kind~="worldstats"and kind~="locations"and kind~="scraptiers"and kind~="prompts"and kind~="resets"then dropdownkind=nil end
+                if kind=="rosterview"then local p=toggle.playerbrowser;p.view=layout.value;p.pitch=p.view=="List"and 60 or nil;menustate.scroll[4]=0;menustate.scrolltarget[4]=0;menustate.itemsdirty=true;menustate.positionanimating=true;menuupdate()
+                elseif kind=="playerbackpack"then toggle.playerbackpackstyle=layout.value;menuupdate()elseif kind=="crateinventorystyle"then toggle.crateinventorystyle=layout.value;menuupdate()elseif kind=="fonttarget"then toggle.fontedit=toggle.fonttargetroles[layout.value]or layout.value;menuupdate()
                 elseif kind=="fontfamily"then toggle.setfontrole(toggle.fontedit,layout.index)
-                elseif kind=="safespotelements"then toggle.safespotelements[layout.value]=not toggle.safespotelements[layout.value];dropdownkind=kind;menuupdate()elseif kind=="espicons"then
+                elseif kind=="oofelements"then toggle.extra.elements[layout.value]=not toggle.extra.elements[layout.value];dropdownkind=kind;menuupdate()elseif kind=="oof"then toggle.extra.selected[layout.value]=not toggle.extra.selected[layout.value];dropdownkind=kind;menuupdate()elseif kind=="safespotelements"then toggle.safespotelements[layout.value]=not toggle.safespotelements[layout.value];dropdownkind=kind;menuupdate()elseif kind=="espicons"then
                     if layout.value=="locations"then toggle.espicons.locationgroup=not toggle.espicons.locationgroup;toggle.espicons.locations={}else toggle.espicons[layout.value]=not toggle.espicons[layout.value]end;dropdownkind=kind;menuupdate()
                 elseif kind=="watermarkelements"then toggle.watermarkelements[layout.value]=not toggle.watermarkelements[layout.value];toggle.syncwatermark();dropdownkind=kind;menupos();menuupdate()
                 elseif kind=="crateelements"or kind=="flareelements"or kind=="trapelements"or kind=="locationelements"then
@@ -4631,7 +5330,7 @@ local function clickmenu(mx,my)
                 elseif kind=="rakestyle"then toggle.rakeespstyle=layout.value;menuupdate()
                 elseif kind=="hudelements"then local entry=toggle.multientry(toggle.hudselectionorder,layout.value);if entry then toggle.sethudelement(entry.id,not toggle.hudelements[entry.id]);dropdownkind="hudelements";menuupdate()end
                 elseif kind=="rakeelements"then if layout.value=="name"then toggle.setrakename(not toggle.rakename)elseif layout.value=="icons"then toggle.espicons.rake=not toggle.espicons.rake elseif layout.value=="health"then toggle.setrakehealth(not toggle.rakehealth)elseif layout.value=="distance"then toggle.setrakedistance(not toggle.rakedistance)else toggle.rakestatus=not toggle.rakestatus end;dropdownkind="rakeelements";menuupdate()
-                elseif kind=="playerelements"then local state=toggle.playeresp;if layout.value=="icons"then toggle.espicons.players=not toggle.espicons.players else local key=(layout.value=="name"or layout.value=="username")and"showusername"or layout.value=="health"and"showhealth"or"showdistance";state[key]=not state[key]end;state.nextlayout=0;for _,rec in pairs(state.records)do rec.nexthealth=0 end;dropdownkind="playerelements";menuupdate()
+                elseif kind=="playerelements"then local state=toggle.playeresp;if layout.value=="icons"then toggle.espicons.players=not toggle.espicons.players else local key=(layout.value=="name"or layout.value=="username")and"showusername"or layout.value=="health"and"showhealth"or layout.value=="scrap"and"showscrap"or"showdistance";state[key]=not state[key]end;state.nextlayout=0;for _,rec in pairs(state.records)do rec.nexthealth=0 end;dropdownkind="playerelements";menuupdate()
                 elseif kind=="espfont"then setfontindex(layout.index)
                 elseif kind=="hudfont"then toggle.sethudfont(layout.index)
                 elseif kind=="preset"then setthemeindex(toggle.presetindices[layout.value]or layout.index)
@@ -4671,7 +5370,7 @@ local function clickmenu(mx,my)
     if toggle.headerhit("close",mx,my)then if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end;if toggle.watermark then menustate.minimized=not menustate.minimized else toggle.menu=false;menustate.minimized=false end;capture=nil;pickerentry=nil;picker.hexactive=false;dropdownkind=nil;menupos();menuupdate();return end
     if menustate.minimized then return end
     local tab=toggle.tabat(mx,my)
-    if tab then if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end;if tab~=menustate.tab then menustate.tabslide=tab>menustate.tab and 2 or-2;menustate.tabfade=0.94 end;menustate.tab=tab;capture=nil;pickerentry=nil;picker.hexactive=false;dropdownkind=nil;menuupdate();return end
+    if tab then toggle.playerbrowser.viewopen=false;toggle.playerbrowser.detailopen=false;toggle.playerbrowser.returnhit=nil;if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end;if tab~=menustate.tab then menustate.tabslide=tab>menustate.tab and 2 or-2;menustate.tabfade=0.94 end;menustate.tab=tab;if tab==4 then toggle.playeresp.nextroster=0;toggle.playerbrowser.next=0;pcall(toggle.playerbrowserstep)end;capture=nil;pickerentry=nil;picker.hexactive=false;dropdownkind=nil;menuupdate();return end
     for i=1,#itemlayouts do
         local layout=itemlayouts[i];local item=layout.item
         if item.kind~="section"and toggle.controlhit(layout,mx,my)then
@@ -4683,7 +5382,7 @@ local function clickmenu(mx,my)
             if toggle.rakenamecapture and item.id~="rakenameinput"then toggle.finishrakename(false)end
             if item.kind=="toggle"then
                 if not inside(mx,my,layout.togglex,layout.toggley,layout.togglew,layout.toggleh)then return end
-                if item.terrainenable then toggle.setterrainenabled(item.terrainenable,not toggle.visuals.terrainenabled[item.terrainenable]);menuupdate();bindlog(item.terrainenable..(toggle.visuals.terrainenabled[item.terrainenable]and" enabled"or" disabled"))elseif item.effectclass then toggle.seteffect(item.effectclass,not toggle.visuals.effects[item.effectclass]);menuupdate();bindlog((toggle.visuals.effects[item.effectclass]and"enabled "or"disabled ")..toggle.visuals.effectdefs[item.effectclass].label)elseif item.id=="highlightscrap"then toggle.sethighlightscrap(not toggle.highlightscrap)elseif item.id=="presetespcolors"then toggle.setpresetespcolors(not toggle.presetespcolors)elseif item.id=="backgroundshine"then toggle.setbackgroundshine(not toggle.shinesettings.enabled)elseif item.id=="hybridfeatures"then toggle.hybridfeatures=not toggle.hybridfeatures;menustate.itemsdirty=true;dropdownkind=nil;menustate.scroll={};menustate.scrolltarget={};toggle.rebuildsearch();menuupdate();bindlog(toggle.hybridfeatures and"showing hybrid features"or"hiding hybrid features")elseif item.id=="sell"then toggle.sellenabled=not toggle.sellenabled;menuupdate();bindlog(toggle.sellenabled and"armed tp sell scrap bind"or"disabled tp sell scrap bind")elseif item.id=="scrap"then toggle.scrapteleportenabled=not toggle.scrapteleportenabled;menuupdate();bindlog(toggle.scrapteleportenabled and"armed teleport to scrap bind"or"disabled teleport to scrap bind")elseif item.id=="flare"then toggle.flareteleportenabled=not toggle.flareteleportenabled;menuupdate();bindlog(toggle.flareteleportenabled and"armed teleport to flare bind"or"disabled teleport to flare bind")elseif item.id=="autocollect"then toggle.autocollect.enabled=not toggle.autocollect.enabled;menuupdate();bindlog(toggle.autocollect.enabled and"enabled auto collect"or"disabled auto collect")elseif item.id=="autorecover"then toggle.setautorecover(not toggle.autorecover)elseif item.id=="autosellscrap"then toggle.setautosellscrap(not toggle.autosellscrap)elseif item.id=="autoclaimnightvision"then toggle.setautoclaimnightvision(not toggle.autoclaimnightvision)elseif item.id=="autoradio"then toggle.setautoradio(not toggle.autoradio)elseif item.id=="playerstacking"then toggle.playeresp.stacking=not toggle.playeresp.stacking;toggle.playeresp.nextlayout=0;menuupdate()elseif item.id=="playersesp"then toggle.setplayersesp(not toggle.playeresp.enabled)elseif item.id=="playerbackground"then toggle.playeresp.background=not toggle.playeresp.background;menuupdate()elseif item.id=="playershowdistance"then toggle.playeresp.showdistance=not toggle.playeresp.showdistance;menuupdate()elseif item.id=="rakehealthcoloring"then toggle.rakehealthcoloring=not toggle.rakehealthcoloring;menuupdate()elseif item.id=="playerhealthcoloring"then toggle.playeresp.healthcoloring=not toggle.playeresp.healthcoloring;menuupdate()elseif item.id=="playershowusername"then toggle.playeresp.showusername=not toggle.playeresp.showusername;toggle.playeresp.nextlayout=0;menuupdate()elseif item.id=="playershowhealth"then toggle.playeresp.showhealth=not toggle.playeresp.showhealth;for _,rec in pairs(toggle.playeresp.records)do rec.nexthealth=0 end;menuupdate()elseif item.itemkey then toggle.setitem(item.itemkey,not espgroups.items[item.itemkey])elseif item.id=="esp"then setesp(not toggle.esp)elseif item.id=="hud"then sethud(not toggle.hud)elseif item.id=="hudtimer"then toggle.sethudelement("timer",not toggle.hudelements.timer)elseif item.id=="hudtarget"then toggle.sethudelement("target",not toggle.hudelements.target)elseif item.id=="hudscrap"then toggle.sethudelement("scrap",not toggle.hudelements.scrap)elseif item.id=="hudpower"then toggle.sethudelement("power",not toggle.hudelements.power)elseif item.id=="roof"then toggle.setroof(not toggle.roof)elseif item.id=="rakename"then toggle.setrakename(not toggle.rakename)elseif item.id=="rakehealth"then toggle.setrakehealth(not toggle.rakehealth)elseif item.id=="rakedistance"then toggle.setrakedistance(not toggle.rakedistance)elseif item.id=="thirdperson"then toggle.setthirdperson(not toggle.zoom.thirdperson)elseif item.id=="shiftlock"then toggle.setshiftlock(not toggle.shiftlockstate.active)elseif item.id=="safespothud"then toggle.safespothud=not toggle.safespothud;menuupdate()elseif item.id=="autoevadetrap"then toggle.setautoevadetrap(not toggle.autoevadetrap)elseif item.id=="killaura"then toggle.setkillaura(not toggle.killaura)elseif item.id=="autoheal"then toggle.setautoheal(not toggle.autoheal)elseif item.id=="rakeshield"then toggle.setrakeshield(not toggle.rakeshield)elseif item.id=="autopower"then toggle.setautopower(not toggle.autopower)elseif item.id=="autopowertoolbox"then toggle.setautopowertoolbox(not toggle.autopowerrequiretoolbox)elseif item.id=="promptmaster"then toggle.setpromptmaster(not toggle.prompts)elseif item.id=="instacrate"then toggle.setinstacrate(not toggle.instacrate)elseif item.id=="keybindpanel"then toggle.setkeybindpanel(not toggle.keybindpanel)elseif item.id=="worldpanel"then toggle.setworldpanel(not toggle.worldpanel)elseif item.id=="poweractivity"then toggle.setpoweractivity(not toggle.poweractivity)elseif item.id=="teleportcooldown"then toggle.setteleportcooldown(not toggle.teleportcooldown)elseif item.id=="watermark"then toggle.watermark=not toggle.watermark;if not toggle.watermark then menustate.minimized=false end;menuupdate();bindlog(toggle.watermark and"enabled watermark state"or"disabled watermark state")elseif item.id=="chromaaccent"then toggle.setchromaaccent(not themes.accentstyle.rgb)elseif item.id=="barrgb"then setbarrgb(not toggle.barrgb)elseif item.id=="distance"then setdistance(not toggle.distance)elseif item.id=="supplylabel"then toggle.setsupplylabel(not toggle.supplylabel)elseif item.id=="supplyitems"then toggle.setsupplyitems(not toggle.supplyitems)elseif item.id=="ringenabled"then toggle.setringenabled(not toggle.ringenabled)elseif item.id=="ringspin"then toggle.setringspin(not toggle.ringspin)elseif toggle.client[item.id]~=nil then toggle.setclient(item.id,not toggle.client[item.id])else setgroup(item.id,not espgroups[item.id])end
+                if item.id=="ooffade"then toggle.extra.distancefade=not toggle.extra.distancefade;menuupdate()elseif item.terrainenable then toggle.setterrainenabled(item.terrainenable,not toggle.visuals.terrainenabled[item.terrainenable]);menuupdate();bindlog(item.terrainenable..(toggle.visuals.terrainenabled[item.terrainenable]and" enabled"or" disabled"))elseif item.effectclass then toggle.seteffect(item.effectclass,not toggle.visuals.effects[item.effectclass]);menuupdate();bindlog((toggle.visuals.effects[item.effectclass]and"enabled "or"disabled ")..toggle.visuals.effectdefs[item.effectclass].label)elseif item.id=="highlightscrap"then toggle.sethighlightscrap(not toggle.highlightscrap)elseif item.id=="presetespcolors"then toggle.setpresetespcolors(not toggle.presetespcolors)elseif item.id=="backgroundshine"then toggle.setbackgroundshine(not toggle.shinesettings.enabled)elseif item.id=="hybridfeatures"then toggle.hybridfeatures=not toggle.hybridfeatures;menustate.itemsdirty=true;dropdownkind=nil;menustate.scroll={};menustate.scrolltarget={};toggle.rebuildsearch();menuupdate();bindlog(toggle.hybridfeatures and"showing hybrid features"or"hiding hybrid features")elseif item.id=="sell"then toggle.sellenabled=not toggle.sellenabled;menuupdate();bindlog(toggle.sellenabled and"armed tp sell scrap bind"or"disabled tp sell scrap bind")elseif item.id=="scrap"then toggle.scrapteleportenabled=not toggle.scrapteleportenabled;menuupdate();bindlog(toggle.scrapteleportenabled and"armed teleport to scrap bind"or"disabled teleport to scrap bind")elseif item.id=="flare"then toggle.flareteleportenabled=not toggle.flareteleportenabled;menuupdate();bindlog(toggle.flareteleportenabled and"armed teleport to flare bind"or"disabled teleport to flare bind")elseif item.id=="autocollect"then toggle.autocollect.enabled=not toggle.autocollect.enabled;menuupdate();bindlog(toggle.autocollect.enabled and"enabled auto collect"or"disabled auto collect")elseif item.id=="autorecover"then toggle.setautorecover(not toggle.autorecover)elseif item.id=="autosellscrap"then toggle.setautosellscrap(not toggle.autosellscrap)elseif item.id=="autoclaimnightvision"then toggle.setautoclaimnightvision(not toggle.autoclaimnightvision)elseif item.id=="autoradio"then toggle.setautoradio(not toggle.autoradio)elseif item.id=="playerstacking"then toggle.playeresp.stacking=not toggle.playeresp.stacking;toggle.playeresp.nextlayout=0;menuupdate()elseif item.id=="playersesp"then toggle.setplayersesp(not toggle.playeresp.enabled)elseif item.id=="playerbackground"then toggle.playeresp.background=not toggle.playeresp.background;menuupdate()elseif item.id=="playershowdistance"then toggle.playeresp.showdistance=not toggle.playeresp.showdistance;menuupdate()elseif item.id=="rakehealthcoloring"then toggle.rakehealthcoloring=not toggle.rakehealthcoloring;menuupdate()elseif item.id=="playerhealthcoloring"then toggle.playeresp.healthcoloring=not toggle.playeresp.healthcoloring;menuupdate()elseif item.id=="playershowusername"then toggle.playeresp.showusername=not toggle.playeresp.showusername;toggle.playeresp.nextlayout=0;menuupdate()elseif item.id=="playershowhealth"then toggle.playeresp.showhealth=not toggle.playeresp.showhealth;for _,rec in pairs(toggle.playeresp.records)do rec.nexthealth=0 end;menuupdate()elseif item.itemkey then toggle.setitem(item.itemkey,not espgroups.items[item.itemkey])elseif item.id=="esp"then setesp(not toggle.esp)elseif item.id=="hud"then sethud(not toggle.hud)elseif item.id=="hudtimer"then toggle.sethudelement("timer",not toggle.hudelements.timer)elseif item.id=="hudtarget"then toggle.sethudelement("target",not toggle.hudelements.target)elseif item.id=="hudscrap"then toggle.sethudelement("scrap",not toggle.hudelements.scrap)elseif item.id=="hudpower"then toggle.sethudelement("power",not toggle.hudelements.power)elseif item.id=="roof"then toggle.setroof(not toggle.roof)elseif item.id=="rakename"then toggle.setrakename(not toggle.rakename)elseif item.id=="rakehealth"then toggle.setrakehealth(not toggle.rakehealth)elseif item.id=="rakedistance"then toggle.setrakedistance(not toggle.rakedistance)elseif item.id=="thirdperson"then toggle.setthirdperson(not toggle.zoom.thirdperson)elseif item.id=="shiftlock"then toggle.setshiftlock(not toggle.shiftlockstate.active)elseif item.id=="safespothud"then toggle.safespothud=not toggle.safespothud;menuupdate()elseif item.id=="autoevadetrap"then toggle.setautoevadetrap(not toggle.autoevadetrap)elseif item.id=="killaura"then toggle.setkillaura(not toggle.killaura)elseif item.id=="autoheal"then toggle.setautoheal(not toggle.autoheal)elseif item.id=="rakeshield"then toggle.setrakeshield(not toggle.rakeshield)elseif item.id=="autopower"then toggle.setautopower(not toggle.autopower)elseif item.id=="autopowertoolbox"then toggle.setautopowertoolbox(not toggle.autopowerrequiretoolbox)elseif item.id=="promptmaster"then toggle.setpromptmaster(not toggle.prompts)elseif item.id=="instacrate"then toggle.setinstacrate(not toggle.instacrate)elseif item.id=="keybindpanel"then toggle.setkeybindpanel(not toggle.keybindpanel)elseif item.id=="worldpanel"then toggle.setworldpanel(not toggle.worldpanel)elseif item.id=="poweractivity"then toggle.setpoweractivity(not toggle.poweractivity)elseif item.id=="teleportcooldown"then toggle.setteleportcooldown(not toggle.teleportcooldown)elseif item.id=="watermark"then toggle.watermark=not toggle.watermark;if not toggle.watermark then menustate.minimized=false end;menuupdate();bindlog(toggle.watermark and"enabled watermark state"or"disabled watermark state")elseif item.id=="chromaaccent"then toggle.setchromaaccent(not themes.accentstyle.rgb)elseif item.id=="barrgb"then setbarrgb(not toggle.barrgb)elseif item.id=="distance"then setdistance(not toggle.distance)elseif item.id=="supplylabel"then toggle.setsupplylabel(not toggle.supplylabel)elseif item.id=="supplyitems"then toggle.setsupplyitems(not toggle.supplyitems)elseif item.id=="ringenabled"then toggle.setringenabled(not toggle.ringenabled)elseif item.id=="ringspin"then toggle.setringspin(not toggle.ringspin)elseif toggle.client[item.id]~=nil then toggle.setclient(item.id,not toggle.client[item.id])else setgroup(item.id,not espgroups[item.id])end
             elseif item.kind=="action"then
                 if item.id=="tpsafespot"then toggle.startsafespot()elseif item.id=="tpsellscrap"then toggle.queueshopaction("SellScraps")elseif item.id=="tpclaimnightvision"then toggle.queueshopaction("ClaimNightvision")elseif item.id=="quickbuy"or item.id=="quicksell"then local action=item.id=="quickbuy"and"PurchaseItem"or"SellItem";toggle.queueshopaction(action)elseif item.id=="savepreset"then toggle.savecustompreset()elseif item.id=="deletepreset"then toggle.deletecustompreset()elseif item.id=="save"then saveconfig()elseif item.id=="load"then loadconfig(false)elseif item.id=="deleteconfig"then toggle.deleteconfig()elseif item.id=="startreset"then toggle.startreset()end
             elseif item.kind=="dropdown"then
@@ -4698,8 +5397,12 @@ local function clickmenu(mx,my)
     if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end
 end
 local function mouseinput()
+    if not toggle.gameactive()then
+        inputstate.mouseheld=ismouse1pressed();inputstate.rightheld=ismouse2pressed();inputstate.dragging=nil;inputstate.scrolling=nil;inputstate.sliding=nil;inputstate.resizing=nil;inputstate.widgetpending=nil;inputstate.wheel=0;menustate.pointerdown=false;return
+    end
     if toggle.bootpanel and not toggle.bootpanel.closed then return end
     local down=ismouse1pressed();local rightdown=ismouse2pressed();local pressed=down and not inputstate.mouseheld;local rightpressed=rightdown and not inputstate.rightheld;local mx,my=mouse.X,mouse.Y;menustate.pointerdown=down
+    toggle.scrollgrabbing=down and inputstate.scrolling~=nil and inputstate.scrolling~=false
     if toggle.menu then
         local widgethit=nil;if not menustate.minimized and not pickerentry and not dropdownkind then for i=1,#itemlayouts do local layout=itemlayouts[i];if layout.textvisible and layout.item.kind=="section"and layout.collapsex and inside(mx,my,layout.collapsex,layout.collapsey,layout.collapsew,layout.collapseh or 24)then widgethit=layout;break end end end
         if inputstate.wheel~=0 then if dropdownkind and dropdown.layout and inside(mx,my,dropdown.layout.x,dropdown.layout.y,dropdown.layout.w,dropdown.layout.h)and dropdown.scrollmax>0 then dropdown.offset=clamp(dropdown.offset+inputstate.wheel,0,dropdown.scrollmax);menuupdate(true)elseif not menustate.minimized and inside(mx,my,menustate.x+12,menustate.y+(menustate.bodytop or 100),menustate.w-24,menustate.h-(menustate.bodytop or 100)-(menustate.footerheight or 52)-8)then menustate.scrolltarget[menustate.tab]=clamp((menustate.scrolltarget[menustate.tab]or 0)+inputstate.wheel*58,0,menustate.scrollmax[menustate.tab]or 0);dropdownkind=nil end;inputstate.wheel=0 end
@@ -4709,6 +5412,7 @@ local function mouseinput()
             elseif toggle.searchclick(mx,my)then
             elseif pickerentry or dropdownkind then clickmenu(mx,my)
             elseif toggle.tabat(mx,my)then clickmenu(mx,my)
+            elseif toggle.playerbrowserhit(mx,my)then
             elseif toggle.headerdraghit(mx,my)then if toggle.presetcapture then toggle.finishpresetinput(false)end;if configcapture then toggle.finishconfiginput(false)end;if toggle.rakenamecapture then toggle.finishrakename(false)end;inputstate.dragging=true;inputstate.dragx=mx-menustate.x;inputstate.dragy=my-menustate.y
             elseif widgethit then inputstate.widgetpending={id=widgethit.item.widgetid,tab=menustate.tab,x=widgethit.collapsex,y=widgethit.collapsey,w=widgethit.collapsew,h=widgethit.collapseh or 24}
             elseif not menustate.minimized and(menustate.scrollmax[menustate.tab]or 0)>0 and menustate.scrollthumb and inside(mx,my,menustate.scrollthumb.x,menustate.scrollthumb.y,menustate.scrollthumb.w,menustate.scrollthumb.h)then inputstate.scrolling="thumb";inputstate.scrolly=my;inputstate.scrollstart=menustate.scrolltarget[menustate.tab]or 0
@@ -4730,23 +5434,25 @@ local function mouseinput()
     if not panelblocked and toggle.promptstate.active and not inputstate.groupdragging and not inputstate.worlddragging and not inputstate.keybinddragging and not inputstate.powerdragging then if pressed then toggle.promptselect(1)elseif rightpressed then toggle.promptselect(-1)end
     elseif not panelblocked and toggle.instacrate and not inputstate.groupdragging and not inputstate.worlddragging and not inputstate.keybinddragging and not inputstate.powerdragging then if pressed then toggle.crateselect(1)elseif rightpressed then toggle.crateselect(-1)end end
     if down and inputstate.groupdragging then
-        if inputstate.containeritem then local p=toggle.containerpositions[inputstate.containeritem.id];p.dragged=true;p.x=mx-inputstate.groupdragx;p.y=my-inputstate.groupdragy
-        else local g=toggle.widgetgroup;g.dragged=true;g.x=mx-inputstate.groupdragx;g.centerx=g.x+g.w/2;g.y=my-inputstate.groupdragy end
-        hudpos()
+        local item=inputstate.containeritem;local p=item and toggle.containerpositions[item.id]or toggle.widgetgroup;local x,y=mx-inputstate.groupdragx,my-inputstate.groupdragy
+        if inputstate.lasthudtarget~=p or x~=inputstate.lasthudx or y~=inputstate.lasthudy then
+            inputstate.lasthudtarget=p;inputstate.lasthudx=x;inputstate.lasthudy=y;p.dragged=true;p.x=x;p.y=y;if not item then p.centerx=x+p.w/2 end;hudpos()
+        end
     end
-    if down and inputstate.worlddragging then wp.dragged=true;wp.x=mx-inputstate.worlddragx;wp.y=my-inputstate.worlddragy;worldpos()end
-    if down and inputstate.keybinddragging then kp.dragged=true;kp.x=mx-inputstate.keybinddragx;kp.y=my-inputstate.keybinddragy;toggle.keybindpos()end
-    if down and inputstate.powerdragging then p.dragged=true;p.x=mx-inputstate.powerdragx;p.y=my-inputstate.powerdragy;powerpos()end
+    if down and inputstate.worlddragging then local x,y=mx-inputstate.worlddragx,my-inputstate.worlddragy;wp.dragged=true;if wp.x~=x or wp.y~=y then wp.x=x;wp.y=y;worldpos()end end
+    if down and inputstate.keybinddragging then local x,y=mx-inputstate.keybinddragx,my-inputstate.keybinddragy;kp.dragged=true;if kp.x~=x or kp.y~=y then kp.x=x;kp.y=y;toggle.keybindpos()end end
+    if down and inputstate.powerdragging then local x,y=mx-inputstate.powerdragx,my-inputstate.powerdragy;p.dragged=true;if p.x~=x or p.y~=y then p.x=x;p.y=y;powerpos()end end
     if not down then
         if inputstate.widgetpending then local pending=inputstate.widgetpending;inputstate.widgetpending=nil;if toggle.menu and pending.tab==menustate.tab and inside(mx,my,pending.x,pending.y,pending.w,pending.h or 24)then local closed=menustate.widgetclosed[pending.tab]or{};menustate.widgetclosed[pending.tab]=closed;closed[pending.id]=not closed[pending.id];menustate.itemsdirty=true;menuupdate()end end
-        if inputstate.sliding=="windstrength"then bindlog("wind strength updated")elseif inputstate.sliding=="winddirection"then bindlog("wind direction updated")elseif inputstate.sliding=="grasslength"then bindlog("grass length updated")elseif toggle.visuals.effectfields[inputstate.sliding]then local entry=toggle.visuals.effectfields[inputstate.sliding];bindlog("updated "..entry.effect.label.." "..entry.field.label)elseif inputstate.sliding=="chromasaturation"then bindlog("chroma saturation updated")elseif inputstate.sliding=="traceropacity"then bindlog("tracer opacity updated")elseif inputstate.sliding=="tracercurve"then bindlog("tracer curve updated")elseif inputstate.sliding=="tracerspeed"then bindlog("tracer speed updated")elseif inputstate.sliding=="zoomamount"then bindlog("zoom amount set to "..string.format("%.1f",toggle.zoom.amount).." studs")elseif inputstate.sliding=="fonteditsize"then bindlog((toggle.fonttargetlabels[toggle.fontedit]or"Menu").." font size updated")elseif inputstate.sliding=="fontsize"then bindlog("font size set to "..tostring(espfontsize))elseif inputstate.sliding=="killaurarange"then bindlog("stun aura range set to "..tostring(toggle.killaurarange).." studs")elseif inputstate.sliding=="killauradelay"then bindlog("stun aura delay set to "..string.format("%.2fs",toggle.killauradelay))elseif inputstate.sliding=="rakeshieldrange"then bindlog("rake shield range set to "..tostring(toggle.rakeshieldrange).."m")elseif inputstate.sliding=="ringfade"then bindlog("ring distance updated")elseif inputstate.sliding=="crateinventorydistance"then bindlog("crate inventory distance set to "..tostring(toggle.crateinventorydistance).."m")elseif inputstate.sliding=="playerdistance"then bindlog("player ESP distance set to "..tostring(toggle.playeresp.distance).."m")elseif inputstate.sliding=="ringsize"then bindlog("ring size set to "..string.format("%.1fx",toggle.ringsize))elseif inputstate.sliding=="ringspinspeed"then bindlog("ring spin speed updated")elseif inputstate.sliding=="rgbspeed"then bindlog("accent bar speed updated")elseif inputstate.sliding=="cooldownseconds"then bindlog("tp safe cooldown set to "..tostring(toggle.cooldownseconds).."s")elseif inputstate.sliding=="notificationopacity"then bindlog("notification background opacity updated")elseif inputstate.sliding=="hudbackgroundalpha"then bindlog("HUD background opacity updated")elseif inputstate.sliding=="espbackgroundalpha"then bindlog("ESP background opacity updated")elseif inputstate.sliding=="notificationduration"then bindlog("notification time set to "..string.format("%.1fs",toggle.notifysettings.duration))elseif inputstate.sliding=="rakenotifydistance"then bindlog("rake warning distance set to "..tostring(toggle.notifysettings.rakedistance).."m")elseif inputstate.sliding=="rakenamey"then bindlog("rake name Y offset set to "..tostring(toggle.rakenamey).."px")elseif inputstate.sliding=="opacity"then bindlog("menu opacity set to "..tostring(math.floor(menuopacity*100+0.5)).."%")elseif inputstate.sliding=="borderradius"then bindlog("border radius set to "..tostring(toggle.borderradius).."px")elseif(inputstate.sliding=="pickersquare"or inputstate.sliding=="pickerhue")and pickerentry then bindlog("updated "..toggle.coloractionname(pickerentry))end
-        inputstate.dragging=false;inputstate.resizing=false;inputstate.sliding=nil;picker.dragkey=nil;inputstate.scrolling=nil;inputstate.dropdownscrolling=false;inputstate.powerdragging=false;inputstate.worlddragging=false;inputstate.keybinddragging=false;inputstate.groupdragging=false;inputstate.containeritem=nil
+        if inputstate.sliding=="windstrength"then bindlog("wind strength updated")elseif inputstate.sliding=="winddirection"then bindlog("wind direction updated")elseif inputstate.sliding=="grasslength"then bindlog("grass length updated")elseif toggle.visuals.effectfields[inputstate.sliding]then local entry=toggle.visuals.effectfields[inputstate.sliding];bindlog("updated "..entry.effect.label.." "..entry.field.label)elseif inputstate.sliding=="chromasaturation"then bindlog("chroma saturation updated")elseif inputstate.sliding=="traceropacity"then bindlog("tracer opacity updated")elseif inputstate.sliding=="tracercurve"then bindlog("tracer curve updated")elseif inputstate.sliding=="tracerspeed"then bindlog("tracer speed updated")elseif inputstate.sliding=="zoomamount"then bindlog("zoom amount set to "..string.format("%.1f",toggle.zoom.amount).." studs")elseif inputstate.sliding=="fonteditsize"then bindlog((toggle.fonttargetlabels[toggle.fontedit]or"Menu").." font size updated")elseif inputstate.sliding=="fontsize"then bindlog("font size set to "..tostring(espfontsize))elseif inputstate.sliding=="killaurarange"then bindlog("stun aura range set to "..tostring(toggle.killaurarange).." studs")elseif inputstate.sliding=="killauradelay"then bindlog("stun aura delay set to "..string.format("%.2fs",toggle.killauradelay))elseif inputstate.sliding=="rakeshieldrange"then bindlog("rake shield range set to "..tostring(toggle.rakeshieldrange).."m")elseif inputstate.sliding=="ringfade"then bindlog("ring distance updated")elseif inputstate.sliding=="crateinventorydistance"then bindlog("crate inventory distance set to "..tostring(toggle.crateinventorydistance).."m")elseif inputstate.sliding=="playerdistance"then bindlog("detailed render distance set to "..tostring(toggle.playeresp.detaildistance).."m")elseif inputstate.sliding=="ringsize"then bindlog("ring size set to "..string.format("%.1fx",toggle.ringsize))elseif inputstate.sliding=="ringspinspeed"then bindlog("ring spin speed updated")elseif inputstate.sliding=="rgbspeed"then bindlog("accent bar speed updated")elseif inputstate.sliding=="cooldownseconds"then bindlog("tp safe cooldown set to "..tostring(toggle.cooldownseconds).."s")elseif inputstate.sliding=="notificationopacity"then bindlog("notification background opacity updated")elseif inputstate.sliding=="hudbackgroundalpha"then bindlog("HUD background opacity updated")elseif inputstate.sliding=="espbackgroundalpha"then bindlog("ESP background opacity updated")elseif inputstate.sliding=="notificationduration"then bindlog("notification time set to "..string.format("%.1fs",toggle.notifysettings.duration))elseif inputstate.sliding=="rakenotifydistance"then bindlog("rake warning distance set to "..tostring(toggle.notifysettings.rakedistance).."m")elseif inputstate.sliding=="rakenamey"then bindlog("rake name Y offset set to "..tostring(toggle.rakenamey).."px")elseif inputstate.sliding=="opacity"then bindlog("menu opacity set to "..tostring(math.floor(menuopacity*100+0.5)).."%")elseif inputstate.sliding=="borderradius"then bindlog("border radius set to "..tostring(toggle.borderradius).."px")elseif(inputstate.sliding=="pickersquare"or inputstate.sliding=="pickerhue")and pickerentry then bindlog("updated "..toggle.coloractionname(pickerentry))end
+        inputstate.dragging=false;inputstate.resizing=false;inputstate.sliding=nil;picker.dragkey=nil;inputstate.scrolling=nil;inputstate.dropdownscrolling=false;inputstate.powerdragging=false;inputstate.worlddragging=false;inputstate.keybinddragging=false;inputstate.groupdragging=false;inputstate.containeritem=nil;inputstate.lasthudtarget=nil
     end
     inputstate.mouseheld=down;inputstate.rightheld=rightdown
 end
 toggle.cleanup=function()
     if toggle.cleanupdone then return end;toggle.cleanupdone=true
-    toggle.running=false;toggle.replacing=true;toggle.cancelsafespot();toggle.bootcleanup()
+    toggle.running=false;toggle.replacing=true;if toggle.renderconnection then pcall(function()toggle.renderconnection:Disconnect()end);toggle.renderconnection=nil end;toggle.backpackbatch.cache={};toggle.backpackbatch.order={};toggle.backpackbatch.bytes=0;toggle.backpackbatch.queue={head=1,count=0};toggle.backpackbatch.pending={};toggle.backpackbatch.active=nil;toggle.backpackbatch.owners=setmetatable({},{__mode="k"});toggle.cancelsafespot();toggle.bootcleanup()
+    for _,rec in pairs(toggle.playeresp.records)do toggle.removeplayerrecord(rec,true)end;toggle.playeresp.records={};toggle.playeresp.scanlist={};toggle.playeresp.visible={};toggle.playeresp.renderorder={};toggle.playeresp.stacklist={};toggle.playeresp.stackobstacles={};toggle.playernativequeue={head=1,count=0};toggle.avataruploads={head=1,count=0};toggle.avatarpending=setmetatable({},{__mode="k"});toggle.avatarimages=setmetatable({},{__mode="k"})
     toggle.promptstate.queue={};toggle.promptstate.holding=false;toggle.promptstate.holdid=nil;toggle.promptstate.busy=false
     local state=toggle.instacratestate;state.collectid=(state.collectid or 0)+1;state.request=nil;state.worker=false;state.collecting=false
     toggle.eventstates=setmetatable({},{__mode="k"});toggle.aurastate.parts={};toggle.aurastate.stick=nil;toggle.aurastate.remote=nil;toggle.aurastate.character=nil;toggle.aurastate.rake=nil
@@ -4762,6 +5468,10 @@ toggle.backspaceheld=function(edge)
     local down=iskeypressed(0x08);local now=tick();if not down then toggle.backspacenext=0;return false end;if edge then toggle.backspacenext=now+0.32;return true end;if now>=(toggle.backspacenext or 0)then toggle.backspacenext=now+0.045;return true end;return false
 end
 local function keys()
+    if not toggle.gameactive()then
+        for _,option in ipairs(keyoptions)do keywas[option.code]=iskeypressed(option.code)end
+        if toggle.promptstate.holdid then toggle.holdprompt(false)end;return
+    end
     if toggle.bootpanel and not toggle.bootpanel.closed then return end
     local edges={}
     if toggle.search.active and toggle.menu and not menustate.minimized then
@@ -4843,14 +5553,219 @@ toggle.orderworlddepth=function()
         if rec.inventoryvisible then crates=crates+1;local cz=2460+math.min(30,crates-1)*3;if rec.cratez~=cz then toggle.depthcrate(rec,cz);rec.cratez=cz end end
     end
 end
+ 
+
+ 
+toggle.arrowink=function(ink)
+    local function linear(v)return v<=0.04045 and v/12.92 or((v+0.055)/1.055)^2.4 end
+    local light=0.2126*linear(ink.R)+0.7152*linear(ink.G)+0.0722*linear(ink.B)
+    return light>0.179 and ink or Color3.fromRGB(191+ink.R*64,191+ink.G*64,191+ink.B*64)
+end
+toggle.arrowbackground=function()return Color3.fromRGB(15,15,18)end
+ 
+toggle.arrowiconcenter=function(name)
+    toggle.arrowiconcenters=toggle.arrowiconcenters or{};local asset=toggle.iconaliases[name]or name;local cached=toggle.arrowiconcenters[asset];if cached then return cached[1],cached[2]end
+    local mask=toggle.iconmasks[asset];if not mask then mask=toggle.iconbase64(toggle.iconart[asset]or"");toggle.iconmasks[asset]=mask end
+    local weight,x,y=0,0,0;for i=1,math.min(576,#mask)do local a=string.byte(mask,i);weight=weight+a;x=x+((i-1)%24+0.5)*a;y=y+(math.floor((i-1)/24)+0.5)*a end
+    cached=weight>0 and{x/weight/24,y/weight/24}or{0.5,0.5};toggle.arrowiconcenters[asset]=cached;return cached[1],cached[2]
+end
+ 
+toggle.avatarimages=setmetatable({},{__mode="k"})
+toggle.setplayeravatar=function(image,owner,x,y,size,a,on,rounding,height)
+    if not image or not owner or owner.departed or not owner.avatarbytes or not on then return false end
+    local state=toggle.iconstates[image];if state then state.wantedkey=nil;state.wantedname=nil;state.wantedcolor=nil end
+    if toggle.avatarimages[image]~=owner.avatarbytes then
+        local queue=toggle.avataruploads
+        if not toggle.avatarpending[image]and queue.count<128 then local slot=(queue.head+queue.count-1)%128+1;queue[slot]={image=image,owner=owner};queue.count=queue.count+1;toggle.avatarpending[image]=true end
+        toggle.setvisible(image,false);return true
+    end
+    toggle.setprop(image,"Color",toggle.white);toggle.setprop(image,"Position",Vector2.new(x,y));toggle.setprop(image,"Size",Vector2.new(size,height or size));toggle.setprop(image,"Transparency",a);toggle.setprop(image,"Rounding",rounding~=nil and rounding or size/2);toggle.setvisible(image,true);return true
+end
+toggle.flushavataruploads=function()
+    local now=tick();if now<(toggle.nextavatarupload or 0)then return end
+    local queue=toggle.avataruploads;local visited=0
+    while queue.count>0 and visited<16 do
+        local item=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%128+1;queue.count=queue.count-1;visited=visited+1
+        if item then local image,owner=item.image,item.owner;toggle.avatarpending[image]=nil
+            if toggle.running and not toggle.replacing and not toggle.removeddraw[image]and not owner.departed and owner.avatarbytes and toggle.avatarimages[image]~=owner.avatarbytes then
+                toggle.nextavatarupload=now+0.125;toggle.health.nativecall="avatar decode"
+                local ok,err=pcall(function()image.Data=owner.avatarbytes;local state=toggle.drawingstates[image];if state and not state.removed and not state.native then state.backgroundprime=true;local loaded,native=pcall(state.prime);state.backgroundprime=nil;if not loaded then assert(false,tostring(native))end;if not native then assert(false,"avatar drawing not ready")end end end)
+                toggle.health.nativecall="waiting";if ok then toggle.avatarimages[image]=owner.avatarbytes;toggle.iconstates[image]=nil else toggle.health.profileerror=tostring(err);toggle.nextavatarupload=now+1 end
+                return
+            end
+        end
+    end
+end
+toggle.releaseplayerarrows=function(owner)
+    local state=toggle.extra;if not state.arrowlookup then return end;local rec=state.arrowlookup[owner];if not rec then return end
+    for _,key in ipairs({"arrow","icon","iconbg","iconborder","namebg","nameborder","name","distance","skull"})do remove(rec[key])end
+    state.arrowlookup[owner]=nil;for i=#state.arrows,1,-1 do if state.arrows[i]==rec then table.remove(state.arrows,i);break end end
+end
+ 
+toggle.profileidentitystep=function(now)
+    local state=toggle.playeresp;local list=state.scanlist;if #list==0 then return end
+    local count=math.min(#list,128);local cursor=state.identitycursor or 1
+    for _=1,count do if cursor>#list then cursor=1 end;local player=list[cursor];cursor=cursor+1;local rec=player and state.records[toggle.playerkey(player)]
+        if rec and not rec.departed and(now>=(rec.nextidentity or 0)or rec.identityoffset~=toggle.displaynameoffset)then state.identitycursor=cursor;toggle.refreshplayeridentity(rec,now);return end
+    end
+    state.identitycursor=cursor
+end
+toggle.profileassetwanted=function()
+    return toggle.running and not toggle.replacing
+end
+toggle.profilehttp=function(url)
+    if not toggle.running or toggle.replacing then return end
+    local ok,reply=pcall(function()return httpget and httpget(url)or game:HttpGet(url)end)
+    return ok and toggle.running and not toggle.replacing and type(reply)=="string"and reply or nil
+end
+toggle.validavatar=function(image)
+    if type(image)~="string"or #image<33 or #image>262144 or image:sub(1,8)~="\137PNG\r\n\26\n"or image:sub(13,16)~="IHDR"then return false end
+    local function u32(at)local a,b,c,d=image:byte(at,at+3);return((a*256+b)*256+c)*256+d end
+    local w,h=u32(17),u32(21);return w>=1 and h>=1 and w<=150 and h<=150
+end
+toggle.arrowavatarstep=function(preload,targetoverride)
+    local state=toggle.extra;local nameswanted=preload or state.selected.players or toggle.esp and toggle.playeresp.showusername or toggle.hud and toggle.hudelements.target
+    local now=tick()
+    if nameswanted and not state.nameoffsetready and now>=(state.nextnameoffset or 0)then
+        state.nextnameoffset=now+120;local source=toggle.profilehttp("https://offsets.ntgetwritewatch.workers.dev/offsets.hpp")
+        if source and #source>=100 and #source<=1048576 then local offset=toggle.offsetstructvalue("Player","DisplayName",source);if type(offset)=="number"and offset>0 and offset<0x10000 and offset%8==0 then toggle.displaynameoffset=offset;state.nameoffsetready=true end end
+        return
+    end
+    if not preload and(not toggle.profileassetwanted()or now<(state.nextavatar or 0))then return end;state.nextavatar=now+1
+    local target=targetoverride;for _,rec in pairs(toggle.playeresp.records)do if target then break end; if not rec.departed and not rec.avatarbytes and(rec.avatarattempts or 0)<3 and now>=(rec.avatarretry or 0)and now>=(rec.createdat or now)+1 then target=rec;break end end;if not target or target.avatarbytes or target.departed then return end
+    target.avatarattempts=(target.avatarattempts or 0)+1;target.avatarretry=now+60*target.avatarattempts
+    local ok,bytes=pcall(function()
+        local id=target.userid;if not id then local good,value=pcall(function()return target.player.UserId end);if good and type(value)=="number"and value>0 and value%1==0 then id=value end end
+        if not id and httppost then
+            local body=http:JSONEncode({usernames={target.username},excludeBannedUsers=false})
+            local sent,reply=pcall(httppost,"https://users.roblox.com/v1/usernames/users",body,"application/json");if sent and type(reply)=="string"and #reply<32768 then id=tonumber(reply:match('"id"%s*:%s*(%d+)'))end
+        end
+        if not id or not toggle.running or toggle.replacing or target.departed then return end;target.userid=id
+        local host=target.avatarattempts==2 and"thumbnails.roproxy.com"or"thumbnails.roblox.com"
+        local reply=toggle.profilehttp("https://"..host.."/v1/users/avatar-headshot?userIds="..tostring(id).."&size=150x150&format=Png&isCircular=false")
+        local url=reply and #reply<32768 and reply:match('"imageUrl"%s*:%s*"([^"]+)"')
+        if not url or target.departed or not(preload or toggle.profileassetwanted())then return end
+        local image=toggle.profilehttp(url:gsub("\\/","/"));if toggle.validavatar(image)then return image end
+    end)
+    if ok and bytes and toggle.running and not toggle.replacing and not target.departed then target.avatarbytes=bytes;toggle.prepareprofileimages(target,preload==true)end
+end
+ 
+toggle.profileworkstep=function()
+    local now=tick();local state=toggle.playeresp;local active=toggle.esp and(state.selectedcount>0 or state.showusername or state.showdistance or state.showhealth or state.showscrap)or toggle.extra.selected.players
+    toggle.playerbrowserstep();toggle.health.profilestage="player native";toggle.flushplayernative();toggle.health.profilestage="avatar uploads";toggle.flushavataruploads();toggle.health.profilestage="item images";toggle.serviceitemimages();toggle.servicebackpackbatches()
+    local viewer=active and viewpos()or nil;toggle.refreshplayers(now,viewer,active)
+    if now>=(state.nextidentitystep or 0)then state.nextidentitystep=now+0.1;toggle.profileidentitystep(now)end;toggle.health.profilestage="waiting"
+end
+
+toggle.extratriangle=function(z)
+    local d=toggle.newdrawing("Triangle");d.Filled=true;d.Thickness=1;d.ZIndex=z;d.Visible=false;return d
+end
+ 
+ 
+toggle.extracamera=function()
+    local p=toggle.projection
+    if p and p.frame==toggle.frametime then
+        local c=toggle.oofcamera or{p={},r={},u={},l={}};toggle.oofcamera=c
+        c.p.X=p.x;c.p.Y=p.y;c.p.Z=p.z;c.r.X=p.rx;c.r.Y=p.ry;c.r.Z=p.rz;c.u.X=p.ux;c.u.Y=p.uy;c.u.Z=p.uz;c.l.X=p.lx;c.l.Y=p.ly;c.l.Z=p.lz;c.w=p.width;c.h=p.height;c.cx=p.cx;c.cy=p.cy;c.f=p.focal;return c
+    end
+    local ok,p,r,u,l,v,f=pcall(function()local c=ws.CurrentCamera;local cf=c.CFrame;return cf.Position,cf.RightVector,cf.UpVector,cf.LookVector,c.ViewportSize,c.FieldOfView end)
+    if not ok or not p or not r or not u or not l or not v or not f then return end
+    return {p=p,r=r,u=u,l=l,w=v.X,h=v.Y,cx=v.X/2,cy=v.Y/2,f=v.Y/2/math.tan(math.rad(f)/2)}
+end
+toggle.extralocal=function(c,w)
+    local x,y,z=w.X-c.p.X,w.Y-c.p.Y,w.Z-c.p.Z
+    return {x=x*c.r.X+y*c.r.Y+z*c.r.Z,y=x*c.u.X+y*c.u.Y+z*c.u.Z,z=x*c.l.X+y*c.l.Y+z*c.l.Z}
+end
+toggle.extraproject=function(c,v)
+    return Vector2.new(clamp(c.cx+c.f*v.x/v.z,-32768,32768),clamp(c.cy-c.f*v.y/v.z,-32768,32768))
+end
+toggle.drawextra=function()
+    local state=toggle.extra;local c=toggle.hud and next(state.selected)and toggle.extracamera()or nil;local n=0;local now=toggle.frametime or tick();state.arrowlookup=state.arrowlookup or{};state.arrowframe=(state.arrowframe or 0)+1;local frame=state.arrowframe
+    local function hidearrow(rec)
+        for _,key in ipairs({"arrow","icon","iconbg","iconborder","namebg","nameborder","name","distance","skull"})do toggle.setvisible(rec[key],false)end
+    end
+    local function arrow(world,cfg,label,icon,key)
+        if n>=64 or not world or not cfg then return end
+        local v=toggle.extralocal(c,world)
+        if not state.preloading and v.z>0.1 then local q=toggle.extraproject(c,v);if q.X>=0 and q.X<=c.w and q.Y>=0 and q.Y<=c.h then return end end
+        local length=math.sqrt(v.x*v.x+v.z*v.z);if length<0.001 then if not state.preloading then return end;v.x=0;v.z=-1;length=1 end
+        local x,y=v.x/length,-v.z/length;local s=state.size;local radius=math.min(state.radius,c.w/2-80,c.h/2-65);local cx,cy=c.cx+x*radius,c.cy+y*radius
+        local meters=math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z)*stud2m
+        local a=state.arrowopacity*(state.distancefade and clamp(1-meters/300,0.15,1)or 1);local tint=toggle.arrowink(cfg.rgb and rgb(0)or cfg.labelcolor);local back=toggle.colormix(toggle.arrowbackground(),tint,0.08)
+        local rec=state.arrowlookup[key]
+        if not rec then if #state.arrows>=96 then return end;rec={arrow=toggle.extratriangle(900),key=key,skull=type(key)=="table"and key.profileimages and key.profileimages.oofskull or nil};state.arrows[#state.arrows+1]=rec;state.arrowlookup[key]=rec end
+        if state.preloading then rec.keepwarm=true end;n=n+1;rec.frame=frame;rec.lastseen=now;rec.health=type(key)=="table"and key.player and key.health or nil
+        local d=rec.arrow;toggle.setprop(d,"PointA",Vector2.new(cx+x*s,cy+y*s));toggle.setprop(d,"PointB",Vector2.new(cx-x*s*0.5-y*s*0.8660254,cy-y*s*0.5+x*s*0.8660254));toggle.setprop(d,"PointC",Vector2.new(cx-x*s*0.5+y*s*0.8660254,cy-y*s*0.5-x*s*0.8660254));toggle.setprop(d,"Color",tint);toggle.setprop(d,"Transparency",a);toggle.setvisible(d,true)
+        if state.elements.Icon then
+            if not rec.icon then rec.icon=type(key)=="table"and key.profileimages and key.profileimages.oof and not toggle.removeddraw[key.profileimages.oof]and key.profileimages.oof or toggle.newicon(0);rec.icon.ZIndex=903;rec.iconbg=toggle.newdrawing("Circle");rec.iconbg.Filled=true;rec.iconbg.NumSides=24;rec.iconbg.ZIndex=901;rec.iconborder=toggle.newdrawing("Circle");rec.iconborder.Filled=false;rec.iconborder.NumSides=24;rec.iconborder.Thickness=1;rec.iconborder.ZIndex=902 end
+            local iconsize=s*1.15;local ir=s*0.88;local offset=s*0.5+ir+5;local ix,iy=cx-x*offset,cy-y*offset
+            for _,d in ipairs({rec.iconbg,rec.iconborder})do toggle.setprop(d,"Position",Vector2.new(ix,iy));toggle.setprop(d,"Radius",ir);toggle.setprop(d,"Color",d==rec.iconbg and back or tint);toggle.setprop(d,"Transparency",a*(d==rec.iconbg and 0.8 or 0.65));toggle.setvisible(d,true)end
+            local avatarsize=math.max(1,ir*2-2)
+            if not(type(key)=="table"and key.player and toggle.setplayeravatar(rec.icon,key,ix-avatarsize/2,iy-avatarsize/2,avatarsize,a,true))then
+                local ox,oy=toggle.arrowiconcenter(icon or"target");toggle.seticon(rec.icon,icon or"target",ix-iconsize*ox,iy-iconsize*oy,iconsize,tint,a,true)
+            end
+            toggle.paintdeadplayer(rec,"skull",ix-iconsize/2,iy-iconsize/2,iconsize,tint,a,904,type(key)=="table"and key.player~=nil and key.health~=nil and key.health<=0)
+        else for _,key in ipairs({"icon","iconbg","iconborder","skull"})do toggle.setvisible(rec[key],false)end end
+        local ty=cy+s+10
+        if rec.namebg then toggle.setvisible(rec.namebg,false);toggle.setvisible(rec.nameborder,false)end
+        for _,key in ipairs({"Name","Distance"})do
+            local field=key=="Name"and"name"or"distance";local text=key=="Name"and label or tostring(math.floor(meters)).."m"
+            if state.elements[key]then if not rec[field]then rec[field]=toggle.esptext("",tint,true,false);rec[field].ZIndex=902 end;local t=rec[field];toggle.setprop(t,"Text",text);toggle.setprop(t,"Color",key=="Distance"and toggle.arrowink(toggle.distancestyle.rgb and rgb(0)or toggle.distancestyle.labelcolor)or tint);toggle.setprop(t,"Transparency",a);toggle.centertext(t,cx,ty);
+                if key=="Name"then if not rec.namebg then rec.namebg=toggle.newdrawing("Square");rec.namebg.Filled=true;rec.namebg.ZIndex=900;rec.namebg.Corner=4;rec.nameborder=toggle.newdrawing("Square");rec.nameborder.Filled=false;rec.nameborder.Thickness=1;rec.nameborder.ZIndex=901 end;local w=toggle.espwidth(text)+10;toggle.setprop(rec.namebg,"Position",Vector2.new(cx-w/2,ty-toggle.esplineheight/2-3));toggle.setprop(rec.namebg,"Size",Vector2.new(w,toggle.esplineheight+6));toggle.setprop(rec.namebg,"Color",back);toggle.setprop(rec.namebg,"Transparency",a*toggle.espbackgroundopacity(toggle.espvisualstyle));toggle.setprop(rec.namebg,"Corner",math.max(0,toggle.borderradius-1));toggle.setvisible(rec.namebg,true);toggle.setprop(rec.nameborder,"Position",rec.namebg.Position);toggle.setprop(rec.nameborder,"Size",rec.namebg.Size);toggle.setprop(rec.nameborder,"Corner",math.max(0,toggle.borderradius-1));toggle.setprop(rec.nameborder,"Color",tint);toggle.setprop(rec.nameborder,"Transparency",a*0.16);toggle.setvisible(rec.nameborder,true)end;toggle.setvisible(t,true);ty=ty+toggle.esplineheight+2 elseif rec[field]then toggle.setvisible(rec[field],false)end
+        end
+    end
+    local function submit(world,cfg,label,icon,key)
+        local ok,err=pcall(toggle.playerdrawcall,arrow,world,cfg,label,icon,key)
+        if not ok then state.lasterror=tostring(err);local rec=state.arrowlookup[key];if rec then hidearrow(rec)end end
+    end
+    if c and toggle.hud and next(state.selected)then
+        for _,rec in ipairs(tracked)do local cfg=rec.cfg;local key=cfg and(cfg.crate and"crates"or cfg.group=="flares"and"flare"or cfg.group)
+            if state.selected[key]and rec.active~=false then submit(toggle.safetyreadvector(rec.object,"Position"),cfg,toggle.uititle(cfg.text or key),toggle.worldlabelicon(rec),rec)end
+        end
+        if state.selected.rake and(state.preloading or not toggle.notifications.raketeleporting) then local rw=toggle.safetyreadvector(toggle.rakepart,"Position")or(state.preloading and c.p);if rw then local dx,dy,dz=rw.X-c.p.X,rw.Y-c.p.Y,rw.Z-c.p.Z;if state.preloading or(dx*dx+dy*dy+dz*dz)*stud2m*stud2m<640000 then submit(rw,toggle.rakestyle,"Rake","skull","rake")end end end
+        if state.selected.players then
+            for _,rec in pairs(toggle.playeresp.records)do submit(toggle.safetyreadvector(rec.root,"Position")or(state.preloading and c.p),{labelcolor=color("text")},rec.displayname or rec.username or"Player","person",rec)end
+        end
+    end
+    for i=#state.arrows,1,-1 do local rec=state.arrows[i]
+        if rec.frame~=frame then hidearrow(rec)
+            local alive=type(rec.key)~="table"or not rec.key.departed and rec.key.active~=false
+            if not alive or #state.arrows>=96 and not rec.keepwarm and now-(rec.lastseen or now)>2 then
+                for _,field in ipairs({"arrow","icon","iconbg","iconborder","namebg","nameborder","name","distance","skull"})do
+                    local kept=(field=="icon"or field=="skull")and type(rec.key)=="table"and rec.key.profileimages and rec.key.profileimages[field=="icon"and"oof"or"oofskull"]==rec[field]and not rec.key.departed
+                    if kept then toggle.setvisible(rec[field],false)else remove(rec[field])end
+                end
+                state.arrowlookup[rec.key]=nil;table.remove(state.arrows,i)
+            end
+        end
+    end
+
+end
+
+toggle.preloadoofarrows=function()
+    local state=toggle.extra;local saved={selected=state.selected,elements=state.elements,hud=toggle.hud,preloading=state.preloading}
+    local ok,err=pcall(function()
+        local viewer=viewpos()
+        for _,player in ipairs(toggle.playeresp.scanlist)do local rec=toggle.playeresp.records[toggle.playerkey(player)];if rec then pcall(toggle.scanplayer,player,rec,viewer);toggle.wait()end end
+        state.selected={flare=true,rake=true,crates=true,scraps=true,traps=true,players=true};state.elements={Icon=true,Name=true,Distance=true};state.preloading=true;toggle.hud=true
+        toggle.drawextra()
+        for _,rec in ipairs(state.arrows)do
+            rec.keepwarm=true
+            for _,key in ipairs({"arrow","icon","iconbg","iconborder","namebg","nameborder","name","distance","skull"})do local d=rec[key]
+                if d then toggle.setvisible(d,false);local draw=toggle.drawingstates[d];if draw and not draw.removed and not draw.native then draw.backgroundprime=true;local loaded,result=pcall(draw.prime);draw.backgroundprime=nil;if not loaded then error(result)end end;toggle.wait()end
+            end
+        end
+    end)
+    state.selected=saved.selected;state.elements=saved.elements;state.preloading=saved.preloading;toggle.hud=saved.hud
+    if not ok then toggle.health.profileerror=tostring(err)end
+end
 toggle.drawesp=function()
     if toggle.viewportvalid==false then return end
-    toggle.captureprojection()
+    toggle.captureprojection();toggle.rendercall(toggle.drawextra)
     toggle.hudbackgroundanim=toggle.ease(toggle.hudbackgroundanim or toggle.hudbackgroundalpha,toggle.hudbackgroundalpha,0.24);toggle.espbackgroundalphaanim=toggle.ease(toggle.espbackgroundalphaanim or toggle.espbackgroundalpha,toggle.espbackgroundalpha,0.24);toggle.tracers.frame=toggle.tracers.frame+1
     local viewer=viewpos();local state=toggle.instacratestate;local cratebypass=toggle.instacrate and toggle.supplyitems;state.active=nil;state.distance=math.huge
     if toggle.esp or cratebypass then pcall(toggle.layoutcrates,viewer)end
     if not toggle.rendercall(toggle.drawprompts,viewer)then toggle.promptstate.active=nil;for _,rec in pairs(toggle.promptstate.records)do pcall(toggle.hideprompt,rec)end end
-    pcall(keys);pcall(mouseinput)
     local i=#tracked
     while i>=1 do local rec=tracked[i];local remove=not toggle.scanning and rec.active==false and(rec.ringanim or 0)<=0.01 and(rec.labelanim or 0)<=0.01
         if not remove then local ok,alive=pcall(drawrec,rec,viewer);if ok then rec.drawfail=0;remove=not toggle.scanning and not alive else rec.drawfail=(rec.drawfail or 0)+1;pcall(hiderec,rec);remove=not toggle.scanning and rec.drawfail>=3 end end
@@ -4923,24 +5838,40 @@ toggle.worker(function()
         toggle.wait(math.max(0.001,0.05-(tick()-started)))
     end
 end)
+toggle.renderframe=function(delta)
+        local now=tick();local lastframe=toggle.renderlast or now;toggle.renderlast=now;toggle.health.renderat=now;toggle.health.frames=toggle.health.frames+1;if now-lastframe>0.75 then toggle.viewportvalid=false end;toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);if toggle.viewportvalid==false and now>=toggle.viewportretry then toggle.viewportretry=now+0.25;pcall(toggle.updateviewport)end;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1;toggle.chromaphase=(now*toggle.chromaspeed)%1
+        if toggle.viewportvalid~=false then if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;pcall(keys);pcall(mouseinput);toggle.health.renderstage="terrain";pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);toggle.health.renderstage="ESP";pcall(toggle.drawesp);pcall(toggle.drawsafetyhud);if not toggle.running or toggle.replacing then return end;toggle.health.renderstage="interface";if now>=(toggle.nextinterfacepaint or 0)then toggle.nextinterfacepaint=now+1/60;pcall(drawrgb)end;toggle.health.renderstage="icons";pcall(toggle.flushicons)end;toggle.health.renderstage="waiting"
+end
+toggle.dispatchrender=function(delta)
+    if not toggle.running or toggle.replacing or toggle.starting or toggle.loading or toggle.inrenderframe then return end
+    toggle.inrenderframe=true;local ok,err=pcall(toggle.renderframe,delta);toggle.inrenderframe=false
+    if not ok then toggle.health.rendererror=tostring(err)end
+end
 toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;if not toggle.running then return end
-    local lastframe=tick()
-    while toggle.running do
-        local now=tick();local renderstart=now;toggle.health.renderat=now;toggle.health.frames=toggle.health.frames+1;if now-lastframe>0.75 then toggle.viewportvalid=false end;toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);lastframe=now;if toggle.viewportvalid==false and now>=toggle.viewportretry then toggle.viewportretry=now+0.25;pcall(toggle.updateviewport)end;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1;toggle.chromaphase=(now*toggle.chromaspeed)%1
-        if toggle.viewportvalid~=false then if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;toggle.health.renderstage="terrain";pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);toggle.health.renderstage="ESP";pcall(toggle.drawesp);pcall(toggle.drawsafetyhud);if not toggle.running or toggle.replacing then break end;toggle.health.renderstage="interface";pcall(drawrgb);toggle.health.renderstage="icons";pcall(toggle.flushicons)end;toggle.health.renderstage="waiting"
-        local elapsed=math.max(0,tick()-renderstart);local interval=1/144
-        toggle.wait(math.max(0.001,interval-elapsed))
+    toggle.renderlast=tick();toggle.renderdriver="event";local frames=toggle.health.frames
+    local ok,connection=pcall(function()
+        return game:GetService("RunService").RenderStepped:Connect(function(delta)if toggle.renderdriver=="event"then toggle.dispatchrender(delta)end end)
+    end)
+    if ok then
+        toggle.renderconnection=connection;local deadline=tick()+1
+        repeat toggle.wait(0.05)until not toggle.running or toggle.health.frames>frames or tick()>=deadline
+        if not toggle.running or toggle.replacing then return end
+        if toggle.health.frames>frames then return end
     end
+    toggle.renderdriver="wait";if toggle.renderconnection then pcall(function()toggle.renderconnection:Disconnect()end);toggle.renderconnection=nil end
+    while toggle.running and not toggle.replacing do toggle.dispatchrender();toggle.wait()end
 end)
--- Safety runs separately from slower shop/combat jobs so they cannot queue
--- conflicting shield/evasion movements or add their polling delay to protection.
+ 
+ 
 toggle.worker(function()
     while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.02)end
     while toggle.running do
         local ok,err=pcall(toggle.applysafety)
-        if not ok then toggle.safetystate.route=nil;toggle.safetystate.planat=0;toggle.safetystate.next=tick()+0.5;toggle.safetynotice("safety update failed: "..tostring(err))end
-        toggle.wait(0.01)
+        if not ok then toggle.safetystate.next=tick()+0.5;toggle.safetynotice("safety update failed: "..tostring(err))end
+        local state=toggle.safetystate;local pause=toggle.rakeshield and state.shieldinterval or 0.01
+        if toggle.rakeshield and toggle.shieldstate.retreating then pause=math.max(0.001,math.min(pause,(state.nextshield or 0)-tick()))end
+        toggle.wait(pause)
     end
 end)
 
@@ -4959,22 +5890,32 @@ end
 
 toggle.preparestartup=function()
     toggle.preparing=true
-    toggle.startupstep(toggle.prefetchcamera)
-    toggle.startupstep(toggle.loadshiftlockoffset,false)
+    if toggle.zoom.thirdperson then toggle.startupstep(toggle.prefetchcamera)end
+    if toggle.shiftlockstate.active then toggle.startupstep(toggle.loadshiftlockoffset,false)end
     if toggle.zoom.thirdperson and not toggle.offsetloaded then toggle.startupstep(toggle.loadoffsets,false)end
     toggle.startupstep(toggle.avatarload)
-    toggle.startupstep(toggle.loadvisualoffsets,true)
-    if not startupconfigloaded then startupconfigdata=toggle.configsnapshot(configdata())end
+    toggle.startupstep(toggle.preloadserverprofiles)
+    toggle.startupstep(toggle.preloaditemimages)
+    toggle.worker(function()while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;while toggle.running and not toggle.replacing do pcall(toggle.arrowavatarstep);toggle.wait(0.5)end end)
+    toggle.worker(function()while(toggle.starting or toggle.loading)and toggle.running do toggle.wait(0.05)end;while toggle.running and not toggle.replacing do local ok,err=pcall(toggle.profileworkstep);if not ok then toggle.health.profileerror=tostring(err)end;toggle.wait(0.016)end end)
+    toggle.startupstep(toggle.applyvisuals,false)
+    if not startupconfigloaded then toggle.resetpositions(true);startupconfigdata=toggle.configsnapshot(configdata())end
     if startupconfigdata and not toggle.readconfigdata(startupconfigpath)then toggle.startupstep(toggle.writeconfigdata,startupconfigpath,startupconfigdata)end
     if startupconfigloaded and configname==startupconfigname then toggle.startupstep(toggle.writelastconfig,startupconfigname)end
     toggle.startupstep(toggle.refreshconfigs,configname)
     toggle.scanning=true;toggle.startupstep(scan);toggle.scanning=false
     toggle.startupstep(rakeinfo);toggle.startupstep(scraphud);toggle.startupstep(powerhud);toggle.startupstep(targethud)
-    toggle.warmmenu(false);toggle.wait()
+    toggle.startupstep(toggle.preloadoofarrows)
+    toggle.startupstep(toggle.preloadplayerbrowser)
+     
+     
+    toggle.startupstep(menuupdate)
     for pass=1,2 do
         toggle.frametime=tick();toggle.framedt=1/60
         toggle.startupstep(toggle.drawesp);toggle.startupstep(drawrgb)
     end
+    local batchdeadline=tick()+2
+    while tick()<batchdeadline and(toggle.backpackbatch.active or toggle.backpackbatch.queue.count>0 or next(toggle.backpackbatch.owners))do toggle.servicebackpackbatches();toggle.wait()end
     menustate.itemsdirty=true;toggle.startupstep(menuupdate);toggle.startupstep(showhud)
     local visited=0;for d in pairs(toggle.drawregistry)do local state=toggle.drawingstates[d];if state and not state.removed and state.properties.Visible and not state.native then pcall(toggle.primedrawing,d)end;visited=visited+1;if visited>=128 then visited=0;toggle.wait()end end
 end
@@ -4984,5 +5925,4 @@ toggle.spawn(function()
     toggle.preparing=false;toggle.preparebudget=nil;toggle.scanning=false;toggle.starting=false;toggle.bootfinish()
 end)
 
-toggle.spawn(toggle.warmdrawings)
-print("The Rake by Saint\nLeave a star if you liked it!")
+toggle.worker(toggle.warmdrawings)
