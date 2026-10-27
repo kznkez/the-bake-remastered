@@ -918,7 +918,7 @@ toggle.newdrawing=function(kind)
         if state.removed or not toggle.running or toggle.replacing then return nil end;if state.native then return state.native end
         if tick()<(state.primenext or 0)then return nil end
         if state.deferred and not state.backgroundprime then toggle.queueplayernative(state);return nil end
-        if toggle.preparing then toggle.preloadyield();if state.native then return state.native end;if state.removed then return nil end end
+        if toggle.preparing then toggle.wait(0.005);if state.native then return state.native end;if state.removed then return nil end end
         toggle.health.nativecall="drawing allocation";local created,native=pcall(Drawing.new,kind);toggle.health.nativecall="waiting";if not created or not native then state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));return nil end
         toggle.health.nativecreated=toggle.health.nativecreated+1;state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
             assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=false
@@ -1000,8 +1000,7 @@ local function newborder(color,thickness)
     d.Color=color;d.Transparency=1;d.Filled=false;d.Thickness=thickness or 1;d.Visible=false;toggle.setpos(d,0,0);d.Size=Vector2.new(1,1)
     return d
 end
-toggle.menudraws=setmetatable({},{__mode="k"})
-function setz(d,z)if d then if z>=100 and z<300 then toggle.menudraws[d]=true end; pcall(function()d.ZIndex=math.floor(z*256+0.5)end);local meta=toggle.textroles[d];if meta and meta.role~="esp"and z>=100 and z<300 then toggle.settextrole(d,"menu")end end;return d end
+function setz(d,z)if d then pcall(function()d.ZIndex=math.floor(z*256+0.5)end);local meta=toggle.textroles[d];if meta and meta.role~="esp"and z>=100 and z<300 then toggle.settextrole(d,"menu")end end;return d end
 toggle.iconart={
     ["house"]="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAACAAAAAAAAAAAAAAAAAAAAAAAEAAZ7fggABAAAAAAAAAAAAAAAAAAAAQMAL8v//88zAAICAAAAAAAAAAAAAAADAABq9f/6+v/3bwAAAwAAAAAAAAAAAQQAF6v///z///z//68ZAAQBAAAAAAACAQBJ4f/7/v/////++//kTQAAAwAAAAAABIn///v///////////z//40GAAAAAAAwxf/9/f/////////////9/f/INAAAAADn//v///////////////////v/7QAAAAAmpv/8/////////////////P+rJwAAAAAAmP/7/////fv7+/v9////+/+eAAAAAAACnP/7////////////////+/+iAgAAAAAAm//7//3/zI2Pj43J//3/+/+hAAAAAAAAm//7//v/WAAAAABQ//z/+/+hAAAAAAAAm//7//v/YAUJCQVZ//z/+/+hAAAAAAAAmv36//v/XgAEBABX//z/+v2gAAAAAAAAoP/8/fj7WQAAAABS+/n9/P+nAAAAAAAASuP7////9+fo6Of2/////ORPAAAAAAAAAAklP1RmeYWJiYV5ZlU/JgoAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     ["gear"]="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAgECCMPv7roEAgECAwAAAAAAAAAAAAEAAAUAR/////86AAUAAAEAAAAAAAABAQBKHwAOu/37+/6xCgAjSQABAAAAAAACAI3/9L7e//7///7/2sD2/4EAAwAAAAAAW//6/////v37+/3+////+/9QAAAAAAAAtv77/vz9/P/////9/fz++/+pAAAAAAAAN/z9///9/9iWmNv//f/+/vgtAAAAAAADAKv//P3/kQcAAAma//37/54ABAAAAAADALb/+f/IAAAFBQAA0v/5/6kABAAAAAAAb/n9+v9wAQUAAAUAff/6/fZoAAAAAAC5////+/9lAgQAAAQCcv/7////rwAAAAD//P7//P+qAAYDBAUAt//8//78/AAAAADc/vr8//39VgAAAABg//3//Pr+0AAAAACQ/////v7+/5xRU6D//v7+////ggAAAAAJNlay//3///////////3/qVM0BwAAAAAAAAAG1v79/vv7+/v//f/NAQAAAAAAAAABAgYAu/78//3///3//P6uAAYCAQAAAAAAAAAB4v/6/f/3+P/9+v/XAQEAAAAAAAAAAAIBg/f//6gbHrH///V7AAIAAAAAAAAAAAABADGjnAAAAAOjoC0AAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -1644,18 +1643,23 @@ toggle.inputcursor=function(active)return active and((tick()%0.65)<0.34 and"|"or
 toggle.fitmenutext=function(text,width)
     if toggle.uiwidth(text)<=width then return text end;while #text>1 and toggle.uiwidth(text.."..")>width do text=text:sub(1,-2)end;return text..".."
 end
-toggle.avatarbackgroundcolor=function()return toggle.colormix(toggle.colormix(color("bg"),color("text"),0.035),color("text"),0.04)end
+toggle.avatarbackgroundcolor=function()
+    local bg,ink=color("bg"),color("text");local state=toggle.avatarbackgroundpalette
+    if state and state.br==bg.R and state.bg==bg.G and state.bb==bg.B and state.ir==ink.R and state.ig==ink.G and state.ib==ink.B then return state.value end
+    local value=toggle.colormix(toggle.colormix(bg,ink,0.035),ink,0.04)
+    toggle.avatarbackgroundpalette={br=bg.R,bg=bg.G,bb=bg.B,ir=ink.R,ig=ink.G,ib=ink.B,value=value};return value
+end
 toggle.paintnametagavatarbackground=function(rec,x,y,size,alpha,on)
     local d=rec.avatarbg
     if on and(not d or toggle.removeddraw[d])then d=toggle.playerdrawcall(toggle.newdrawing,"Circle");rec.avatarbg=d;d.Filled=true;d.NumSides=48;d.Thickness=1;rec.draws[#rec.draws+1]=d end
     if not d then return end
     toggle.setprop(d,"Position",Vector2.new(x+size/2,y+size/2));toggle.setprop(d,"Radius",size/2+2);toggle.setprop(d,"Color",toggle.avatarbackgroundcolor());toggle.setprop(d,"Transparency",alpha*toggle.espbackgroundopacity(rec.style));toggle.setprop(d,"ZIndex",(rec.person.ZIndex or 0)-1);toggle.setvisible(d,on and alpha>0.01 and toggle.espbackgroundopacity(rec.style)>0.01)
 end
-toggle.itemdisplayname=function(key)
-    return ({FlareGun="Flare Gun",StunStick="Stun Stick",UV_Lamp="UV Lamp",Vest="Vest",Monitor="Monitor",RakeTrap="Trap",Tracker="Tracker",Toolbox="Toolbox",Vitamins="Vitamins",FirstAidKit="Medkit",Voltmeter="Voltmeter",Watch="Watch",Compass="Compass",Map="Map"})[key]or key
-end
+toggle.itemdisplaynames={FlareGun="Flare Gun",StunStick="Stun Stick",UV_Lamp="UV Lamp",Vest="Vest",Monitor="Monitor",RakeTrap="Trap",Tracker="Tracker",Toolbox="Toolbox",Vitamins="Vitamins",FirstAidKit="Medkit",Voltmeter="Voltmeter",Watch="Watch",Compass="Compass",Map="Map"}
+toggle.itemdisplayname=function(key)return toggle.itemdisplaynames[key]or key end
+toggle.itemdropdownkinds={playeritemsselect="playeritems",autobuyitemsselect="autobuyitems",autosellitemsselect="autosellitems",shopitemselect="shopitem",autocollectselect="autocollect"}
 toggle.itemdropdownlabel=function(item)
-    local kind=({playeritemsselect="playeritems",autobuyitemsselect="autobuyitems",autosellitemsselect="autosellitems",shopitemselect="shopitem",autocollectselect="autocollect"})[item.id]
+    local kind=toggle.itemdropdownkinds[item.id]
     if not kind then return nil end
     local values={}
     if kind=="shopitem"then return toggle.itemdisplayname(toggle.shopitem().name)end
@@ -1806,7 +1810,7 @@ toggle.preparebackpacksprites=function()
     local state=toggle.backpackbatch
     for key,encoded in pairs(toggle.backpackraster)do
         local pixels=toggle.iconbase64(encoded);local rows={};if #pixels==2704 then for y=0,25 do rows[y+1]=pixels:sub(y*104+1,(y+1)*104)end;state.sprites[key]=rows end
-        toggle.backpackraster[key]=nil;toggle.preloadyield()
+        toggle.backpackraster[key]=nil;toggle.wait()
     end
 end
 toggle.requestbackpackbatch=function(rec)
@@ -1903,10 +1907,6 @@ toggle.paintbackpackbatch=function(rec,x,y,w,alpha)
     return true
 end
 
-toggle.preloadyield=function()
-    local now=tick();toggle.preloadcount=(toggle.preloadcount or 0)+1
-    if toggle.preloadcount>=8 or now-(toggle.preloadat or now)>=0.004 then toggle.preloadcount=0;toggle.wait();toggle.preloadat=tick()elseif not toggle.preloadat then toggle.preloadat=now end
-end
 toggle.preloaditemimages=function()
     toggle.preparebackpacksprites()
     local copies={};for key in pairs(toggle.itemart)do copies[key]=2 end
@@ -1915,9 +1915,9 @@ toggle.preloaditemimages=function()
             for _,parent in pairs({backpack=player:FindFirstChild("Backpack"),character=player.Character})do
                 local children=parent:GetChildren();for _,child in ipairs(children)do local key=toggle.itemkey(child.Name);if copies[key]and not seen[key]then copies[key]=copies[key]+1;seen[key]=true end end
             end
-        end);toggle.preloadyield()
+        end);toggle.wait()
     end
-    for key,count in pairs(copies)do for i=1,math.min(24,count)do toggle.makeitemimage(key);toggle.preloadyield()end end
+    for key,count in pairs(copies)do for i=1,math.min(24,count)do toggle.makeitemimage(key);toggle.wait()end end
     toggle.icondata("skull",toggle.white)
 end
 toggle.serviceitemimages=function()
@@ -1942,7 +1942,7 @@ toggle.preloadserverprofiles=function()
     for _,player in ipairs(toggle.playeresp.scanlist)do local rec=toggle.playeresp.records[toggle.playerkey(player)];if rec then
         toggle.refreshplayeridentity(rec,tick());toggle.arrowavatarstep(true,rec);toggle.prepareprofileimages(rec,true)
         if not rec.skull then rec.skull=toggle.newicon(3);rec.skull.Data=toggle.icondata("skull",toggle.white);toggle.primedrawing(rec.skull)end
-        toggle.preloadyield()
+        toggle.wait()
     end end
 end
 toggle.paintdeadplayer=function(rec,imagekey,x,y,size,c,a,z,on)
@@ -2182,23 +2182,12 @@ local function clampmenu()
     local v=cam.ViewportSize;local w,h=displaysize()
     menustate.x=clamp(menustate.x,0,math.max(0,v.X-w));menustate.y=clamp(menustate.y,0,math.max(0,v.Y-h))
 end
-toggle.translatemenu=function(dx,dy)
-    for d in pairs(toggle.menudraws)do if not toggle.removeddraw[d]and d.Visible then
-        for _,key in ipairs({"Position","From","To","PointA","PointB","PointC"})do local p=d[key];if p and typeof(p)=="Vector2"then d[key]=Vector2.new(p.X+dx,p.Y+dy)end end
-    end end
-    local seen={};local function move(t)if type(t)~="table"or seen[t]then return end;seen[t]=true;for k,v in pairs(t)do if type(k)=="string"and type(v)=="number"then if k:sub(-1)=="x"and k~="index"and k~="max"and not k:match("index$")then t[k]=v+dx elseif k:sub(-1)=="y"or k=="hittop"or k=="hitbottom"or k=="cliptop"or k=="clipbottom"then t[k]=v+dy end end end end
-    for _,l in pairs(itemlayouts)do move(l)end;for _,l in pairs(toggle.menuinfo.layouts)do move(l)end;for _,l in pairs(toggle.menuinfo.bindlayouts)do move(l)end
-    move(menustate.nav);move(menustate.scrollthumb);move(menustate.resizehit)
-    menurgb._x=menurgb._x and menurgb._x+dx;menurgb._y=menurgb._y and menurgb._y+dy
-end
 local function menupos()
     if toggle.uibatch then menustate.itemsdirty=true;return end
     local compact=toggle.visualstyle=="compact";menustate.watermarkh=compact and 36 or 40;menustate.footerheight=compact and 16 or 26
     toggle.watermarkmetrics()
     menustate.w=math.max(180,math.min(compact and 304 or 600,cam.ViewportSize.X-36));menustate.h=clamp(menustate.h or(compact and 480 or 660),math.min(toggle.visualstyle=="compact"and 260 or 340,cam.ViewportSize.Y-36),math.max(1,cam.ViewportSize.Y-36))
-    clampmenu()
-    if menustate.layoutx and menustate.layouth==menustate.h and menubg.Size.X==displaysize() and menustate.layouttab==menustate.tab and menustate.tab~=4 and menustate.layoutminimized==menustate.minimized and not menustate.itemsdirty and not menustate.positionanimating and not pickerentry and not dropdownkind and not toggle.search.open and menustate.menuanim>0.999 and menustate.minimizeanim<0.001 and (menustate.x~=menustate.layoutx or menustate.y~=menustate.layouty)then toggle.translatemenu(menustate.x-menustate.layoutx,menustate.y-menustate.layouty);return end
-    menustate.tabfade=toggle.ease(menustate.tabfade,1,0.25);menustate.tabslide=toggle.ease(menustate.tabslide,0,0.25)
+    clampmenu();menustate.tabfade=toggle.ease(menustate.tabfade,1,0.25);menustate.tabslide=toggle.ease(menustate.tabslide,0,0.25)
     menustate.positionanimating=math.abs(menustate.tabfade-1)>0.001 or math.abs(menustate.tabslide)>0.001
     local displayw,displayh=displaysize()
     toggle.setpos(menubg,menustate.x,menustate.y);menubg.Size=Vector2.new(displayw,displayh)
@@ -2781,7 +2770,7 @@ toggle.preloadplayerbrowser=function()
         end
         for _,d in ipairs(p.draws)do
             toggle.setvisible(d,false);local owner=p.avatarowners[d];if owner and owner.avatarbytes and toggle.avatarimages[d]~=owner.avatarbytes then d.Data=owner.avatarbytes;toggle.avatarimages[d]=owner.avatarbytes end
-            local state=toggle.drawingstates[d];if state and not state.native and not state.removed then state.backgroundprime=true;pcall(state.prime);state.backgroundprime=nil end;toggle.preloadyield()
+            local state=toggle.drawingstates[d];if state and not state.native and not state.removed then state.backgroundprime=true;pcall(state.prime);state.backgroundprime=nil end;toggle.wait()
         end
     end)
     p.preloading=nil;p.detailopen=saved.detailopen;p.selected=saved.selected;menustate.tab=saved.tab;toggle.menu=saved.menu;menustate.minimized=saved.minimized;toggle.visualstyle=saved.style;menustate.w=saved.w;menustate.h=saved.h;menustate.bodytop=saved.bodytop
@@ -5938,13 +5927,13 @@ toggle.preloadoofarrows=function()
     local state=toggle.extra;local saved={selected=state.selected,elements=state.elements,hud=toggle.hud,preloading=state.preloading}
     local ok,err=pcall(function()
         local viewer=viewpos()
-        for _,player in ipairs(toggle.playeresp.scanlist)do local rec=toggle.playeresp.records[toggle.playerkey(player)];if rec then pcall(toggle.scanplayer,player,rec,viewer);toggle.preloadyield()end end
+        for _,player in ipairs(toggle.playeresp.scanlist)do local rec=toggle.playeresp.records[toggle.playerkey(player)];if rec then pcall(toggle.scanplayer,player,rec,viewer);toggle.wait()end end
         state.selected={flare=true,rake=true,crates=true,scraps=true,traps=true,players=true};state.elements={Icon=true,Name=true,Distance=true};state.preloading=true;toggle.hud=true
         toggle.drawextra()
         for _,rec in ipairs(state.arrows)do
             rec.keepwarm=true
             for _,key in ipairs({"arrow","icon","iconbg","iconborder","namebg","nameborder","name","distance","skull"})do local d=rec[key]
-                if d then toggle.setvisible(d,false);local draw=toggle.drawingstates[d];if draw and not draw.removed and not draw.native then draw.backgroundprime=true;local loaded,result=pcall(draw.prime);draw.backgroundprime=nil;if not loaded then error(result)end end;toggle.preloadyield()end
+                if d then toggle.setvisible(d,false);local draw=toggle.drawingstates[d];if draw and not draw.removed and not draw.native then draw.backgroundprime=true;local loaded,result=pcall(draw.prime);draw.backgroundprime=nil;if not loaded then error(result)end end;toggle.wait()end
             end
         end
     end)
