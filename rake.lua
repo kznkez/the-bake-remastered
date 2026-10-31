@@ -859,7 +859,7 @@ toggle.applyclient=function(rescan)
     return true
 end
 toggle.drawingstates=setmetatable({},{__mode="k"});toggle.drawingqueue={};toggle.drawingcursor=1
-toggle.drawingowners={};toggle.drawingreapcursor=1;toggle.drawingreapnext=0;toggle.nativereleases={head=1,count=0}
+toggle.drawingowners={};toggle.drawingreapcursor=1;toggle.drawingreapnext=0;toggle.nativereleases={head=1,count=0};toggle.nativereleasestates=setmetatable({},{__mode="k"})
 toggle.drawingfinite=function(value,limit)local bound=limit or 2147483647;return type(value)=="number"and value>=-bound and value<=bound end
 toggle.validdrawing=function(key,value)
     if type(value)=="number"then return toggle.drawingfinite(value)end
@@ -896,14 +896,14 @@ toggle.flushnativereleases=function(all)
         local native=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%512+1;queue.count=queue.count-1;count=count+1
         if native then
             toggle.health.nativecall="drawing release";local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting"
-            if ok then toggle.health.nativeremoved=toggle.health.nativeremoved+1
+            if ok then toggle.nativereleasestates[native]="removed";toggle.health.nativeremoved=toggle.health.nativeremoved+1
             else local slot=(queue.head+queue.count-1)%512+1;queue[slot]=native;queue.count=queue.count+1 end
         end
         if not all and tick()-started>=0.001 then break end
     end
 end
 toggle.releasenative=function(native)
-    if not native then return true end;pcall(function()native.Visible=false end)
+    if not native or toggle.nativereleasestates[native]then return true end;toggle.nativereleasestates[native]="queued";pcall(function()native.Visible=false end)
     local queue=toggle.nativereleases
     if toggle.running and not toggle.replacing and queue.count<512 then local slot=(queue.head+queue.count-1)%512+1;queue[slot]=native;queue.count=queue.count+1;return true end
     toggle.health.nativecall="drawing release";local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting";toggle.health.nativeremoved=toggle.health.nativeremoved+1;return ok
@@ -4017,13 +4017,40 @@ toggle.discardprompt=function(rec)
     if not rec then return end;toggle.hideprompt(rec);for _,d in pairs({rec.bg,rec.shutterdraw,rec.outer,rec.middle,rec.inner,rec.action,rec.actionkey})do remove(d)end;for i=1,#rec.texts do remove(rec.texts[i])end;toggle.promptstate.records[rec.id]=nil;toggle.promptstate.nextresolve=0
 end
 toggle.drawprompts=function(viewer)
-    local state=toggle.promptstate;if not toggle.prompts then state.active=nil;state.distance=math.huge;local fading=false;for _,rec in pairs(state.records)do if(rec.anim or 0)>0.01 then fading=true;break end end;if not fading then return end end;if toggle.prompts and not pcall(toggle.resolveprompts,false)then state.nextresolve=0 end;state.active=nil;state.distance=math.huge;state.priority=math.huge
-    for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then rec.target=false
-        local ok=pcall(function()local part=rec.part;local rangeobject=rec.rangepart or part;if toggle.prompts and(toggle.worldinfo.power or rec.id=="trapdoor"or rec.id=="release")and #rec.options>0 and part and part.Parent and part:IsA("BasePart")and rangeobject and rangeobject.Parent and rangeobject:IsA("BasePart")and rec.remote and rec.remote.Parent and rec.remote:IsA("RemoteEvent")then local meters=dist(viewer,rangeobject.Position);local screen,on=toggle.projectworld(part.Position);rec.meters=meters;rec.target=on and meters<=toggle.promptrange(rec);if rec.target then rec.screen=screen;local dx,dy=screen.X-cam.ViewportSize.X/2,screen.Y-cam.ViewportSize.Y/2;local priority=dx*dx+dy*dy;if priority<state.priority then state.active=rec;state.distance=meters;state.priority=priority end end end end)
-        if not ok then rec.part=nil;rec.remote=nil;state.nextresolve=0 end
+    local state=toggle.promptstate;local now=toggle.frametime or tick();local previous=state.active
+    if toggle.prompts and now>=(state.resolveretry or 0)then local ok=pcall(toggle.resolveprompts,false);if not ok then state.nextresolve=0;state.resolveretry=now+0.5 else state.resolveretry=nil end end
+    state.active=nil;state.distance=math.huge;state.priority=math.huge
+    local previouspriority
+    for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then
+        local was=rec.target==true;rec.target=false;local projected=false
+        local ok=pcall(function()
+            local part=rec.part;local rangeobject=rec.rangepart or part
+            if toggle.prompts and(toggle.worldinfo.power or rec.id=="trapdoor"or rec.id=="release")and #rec.options>0 and part and part.Parent and part:IsA("BasePart")and rangeobject and rangeobject.Parent and rangeobject:IsA("BasePart")and rec.remote and rec.remote.Parent and rec.remote:IsA("RemoteEvent")then
+                local position=part.Position;local meters=dist(viewer,rangeobject.Position);local screen,on=toggle.projectworld(position)
+                rec.meters=meters;projected=on and screen~=nil
+                if projected then
+                    rec.screen=screen;rec.target=meters<=toggle.promptrange(rec)+(was and 0.18 or 0)
+                    if rec.target and now>=(rec.drawretry or 0)then
+                        local dx,dy=screen.X-cam.ViewportSize.X/2,screen.Y-cam.ViewportSize.Y/2;local priority=math.sqrt(dx*dx+dy*dy)
+                        if rec==previous then previouspriority=priority end
+                        if priority<state.priority then state.active=rec;state.distance=meters;state.priority=priority end
+                    end
+                end
+            end
+        end)
+        if not ok then rec.part=nil;rec.remote=nil;state.nextresolve=0;state.resolveretry=now+0.5 end
+        if not projected then rec.screen=nil;rec.anim=0;toggle.hideprompt(rec)end
     end end
-    for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then local ok,err=pcall(toggle.paintprompt,rec);if not ok then rec.drawerror=err;if state.active==rec then state.active=nil end;pcall(toggle.discardprompt,rec)end end end
+    if previouspriority and previous and previous.target and previouspriority<=state.priority+8 then state.active=previous;state.distance=previous.meters;state.priority=previouspriority end
+    for i=1,#toggle.promptorder do local rec=state.records[toggle.promptorder[i].id];if rec then
+        if now>=(rec.drawretry or 0)then
+            local ok,err=pcall(toggle.paintprompt,rec)
+            if ok then rec.drawfailures=0;rec.drawretry=nil;rec.drawerror=nil
+            else rec.drawerror=tostring(err);rec.drawfailures=math.min(5,(rec.drawfailures or 0)+1);rec.drawretry=now+math.min(4,0.25*2^(rec.drawfailures-1));if state.active==rec then state.active=nil end;pcall(toggle.hideprompt,rec)end
+        else pcall(toggle.hideprompt,rec)end
+    end end
 end
+
 toggle.promptselect=function(step)
     local rec=toggle.promptstate.active;if not rec or #rec.options<2 then return false end;rec.selected=((rec.selected-1+step)%#rec.options)+1;return true
 end
