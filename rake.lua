@@ -96,7 +96,7 @@ local scanrate,hudrate,statusrate=0.25,0.033,0.05
 local ringfade,ringseg,cratedist,maxtrack=40,64,30,256
 for key,value in pairs({esp=true,hud=true,distance=false,distancefade=false,menu=false,watermark=true,hybridmode=true,unsafeluau=true,barrgb=false,roof=true,distanceunit="meters",distanceposition="below",poweractivity=false,poweractivitymode="activity",autopower=false,autopowerrequiretoolbox=true,autopowernext=0,hudstyle="fluent",containerstyle="fluent",containerorientation="horizontal",containergrouping="stacked",containerpositions={},scrapstyle="default",scrapteleport="value",highlightscrap=true,supplylabel=true,supplyitems=true,crateinventorydistance=10,ringenabled=true,ringshape="circle",ringsize=1,ringspin=false,ringspinspeed=1,rgbdirection="right",powerformat="percent",powerdecimal=true,timerformat="clock",hudfontindex=1,teleportcooldown=false,cooldownseconds=10,cooldownuntil=0,cooldownremaining=0,rakename=true,rakehealth=true,rakedistance=true,rakenamevalue="rake",rakenamey=0,rakenamecapture=false,killaura=false,killaurarange=16,killauradelay=0.05,killauranext=0,killpartnames={"Head","Torso","UpperTorso","LowerTorso","HumanoidRootPart"},sellenabled=true,scrapteleportenabled=true,flareteleportenabled=true,hudelements={timer=true,target=true,scrap=true,power=true}})do toggle[key]=value end
 toggle.rakehealthcoloring=false;toggle.ringopacity=0.6;toggle.autoheal=false;toggle.autohealth=50;toggle.autohealnext=0
-toggle.trail={enabled=false,kind="Solid Line",secondary=false,fade=1.2,width=1.4,maxpoints=300,targets={Self=true,Others=false,Rake=false},color1={labelcolor=Color3.fromRGB(255,255,255),defaultcolor=Color3.fromRGB(255,255,255),rgb=false},color2={labelcolor=Color3.fromRGB(255,60,220),defaultcolor=Color3.fromRGB(255,60,220),rgb=false},actors={},pool={},nextroster=0,nextsample=0,limit=512}
+toggle.trail={enabled=false,kind="Solid Line",secondary=false,fade=1.2,width=1.4,maxpoints=300,targets={Self=true,Others=false,Rake=false},color1={labelcolor=Color3.fromRGB(255,255,255),defaultcolor=Color3.fromRGB(255,255,255),rgb=false},color2={labelcolor=Color3.fromRGB(255,60,220),defaultcolor=Color3.fromRGB(255,60,220),rgb=false},actors={},pool={},nextroster=0,nextsample=0,limit=8192}
 toggle.safespotelements={Label=true,Distance=true};toggle.safespothud=true;toggle.safespotstyle={labelcolor=Color3.fromRGB(175,255,67),defaultcolor=Color3.fromRGB(175,255,67),rgb=false,defaultrgb=false};toggle.extra={order={"flare","rake","crates","scraps","traps","players"},selected={},size=18,radius=330,arrowopacity=0.9,distancefade=true,elements={Icon=true,Name=true,Distance=true},arrows={}}
 toggle.autoevadetrap=false;toggle.safetystate={active=false,target=Vector3.new(-283.3,33.5,-220.0),safestepmeters=2,safeinterval=0.35,shieldstepmeters=15/42,shieldinterval=0.01,trapstepmeters=1,interval=0.01,nextsafe=0,nextshield=0,next=0,nexttraps=0,traps={}}
 toggle.rakeshield=false;toggle.rakeshieldrange=30;toggle.shieldstate={nextapply=0,nextresolve=0,retreating=false}
@@ -322,7 +322,7 @@ toggle.instanceaddress=function(object)
     local ok,address=pcall(function()return object and object.Address end);return ok and toggle.memoryaddress(address)and address or nil
 end
 toggle.visuals={url="https://offsets.imtheo.lol/Offsets.json",retry=0,loading=false,nextapply=0,nextscan=0,nextfooter=0,effects={},records={},grasslength=0.5,lengthedited=false,wind={strength=0,direction=0,edited=false},terrainselect="grass",terrainenabled={grass=false,wind=false,water=false},
-    water={labelcolor=Color3.fromRGB(12,84,91),rgb=false,edited=false},editclass="DepthOfFieldEffect"}
+    water={labelcolor=Color3.fromRGB(12,84,91),rgb=false,edited=false},editclass="Fog"}
 toggle.visualfinite=function(value,low,high)return type(value)=="number"and value==value and value>=low and value<=high end
 toggle.visualpointer=function(value)return toggle.visualfinite(value,10000,281474976710655)and value%8==0 end
 toggle.visualoffset=function(group,key)
@@ -450,12 +450,16 @@ toggle.applywaterchroma=function(now)
     rec.touched.water=true;if toggle.visualwritecolor("float",rec.address+rec.wateroffset,{c.R,c.G,c.B})then state.waterblend=c;state.wateraddress=rec.address;state.waterlast=now end
 end
 toggle.posteffectorder={
+    {id="postfog",class="Fog",label="Fog",propertyeffect=true,fields={{key="FogStart",id="fogdistance",label="Distance",min=5,max=750,default=5},{key="FogEnd",id="fogend",label="Fog End",min=25,max=3750,default=25,hidden=true}},color="FogColor",colorcfg="fog",colorid="fogcolor",colorlabel="Color"},
+    {id="postambience",class="Ambience",label="Ambience",propertyeffect=true,fields={},color="OutdoorAmbient",colorcfg="ambience",colorid="ambiencecolor",colorlabel="Color"},
+    {id="postbrightness",class="LightingBrightness",label="Brightness",propertyeffect=true,fields={{key="Brightness",id="lightingbrightness",label="Brightness",min=0,max=10,default=2}}},
     {id="postdepth",class="DepthOfFieldEffect",label="Depth Of Field",fields={{key="FocusDistance",id="depthfocus",label="Focus Distance",min=0,max=500,default=10},{key="FarIntensity",id="depthfar",label="Far Intensity",min=0,max=1,default=0.75},{key="NearIntensity",id="depthnear",label="Near Intensity",min=0,max=1,default=0.75},{key="InFocusRadius",id="depthradius",label="In-Focus Radius",min=0,max=500,default=10}}},
     {id="postbloom",class="BloomEffect",label="Bloom",fields={{key="Intensity",id="bloomintensity",label="Intensity",min=0,max=10,default=1},{key="Size",id="bloomsize",label="Size",min=0,max=56,default=24},{key="Threshold",id="bloomthreshold",label="Threshold",min=0,max=1,default=0.95}}},
     {id="postcorrection",class="ColorCorrectionEffect",label="Color Correction",fields={{key="Brightness",id="correctionbrightness",label="Brightness",min=-0.04,max=0.13,uimin=1,uimax=10,default=0},{key="Contrast",id="correctioncontrast",label="Contrast",min=-1,max=1,default=0}},color="TintColor"}
 }
 toggle.posteffectnames={};for _,entry in ipairs(toggle.posteffectorder)do toggle.posteffectnames[#toggle.posteffectnames+1]=entry.label end
 toggle.visuals.effectdefs={};toggle.visuals.effectfields={};toggle.visuals.revision=0
+toggle.visuals.fog={labelcolor=Color3.fromRGB(128,128,128),rgb=false,edited=false};toggle.visuals.ambience={labelcolor=Color3.fromRGB(128,128,128),rgb=false,edited=false}
 toggle.visuals.correction={labelcolor=Color3.new(1,1,1),rgb=false,edited=false}
 for _,entry in ipairs(toggle.posteffectorder)do
     toggle.visuals.effectdefs[entry.class]=entry;toggle.visuals.effects[entry.class]=false;entry.values={};entry.edited={}
@@ -464,58 +468,248 @@ end
 toggle.visualchanged=function()
     toggle.visuals.revision=toggle.visuals.revision+1;toggle.visuals.nextapply=0
 end
+toggle.postoffset=function(class,key)
+    local state=toggle.visuals;local cache=state.postoffsetcache
+    if not cache or cache.source~=toggle.offsettext or cache.offsets~=state.offsets then cache={source=toggle.offsettext,offsets=state.offsets,values={}};state.postoffsetcache=cache end
+    local id=class..":"..key;local cached=cache.values[id];if cached then return cached.offset,cached.kind end
+    local layouts={Color3Value={Value={0xA0,"color"}},NumberValue={Value={0xA0,"double"}},Lighting={FogColor={0xDC,"color"},OutdoorAmbient={0xE8,"color"},FogStart={0x118,"float"},FogEnd={0x114,"float"},Brightness={0x100,"float"}},Atmosphere={Density={0xB8,"float"}},PostEffect={Enabled={0x98,"byte"}},BloomEffect={Intensity={0xA0,"float"},Size={0xA4,"float"},Threshold={0xA8,"float"}},DepthOfFieldEffect={FarIntensity={0xA0,"float"},FocusDistance={0xA4,"float"},InFocusRadius={0xA8,"float"},NearIntensity={0xAC,"float"}},ColorCorrectionEffect={TintColor={0xA0,"color"},Brightness={0xAC,"float"},Contrast={0xB0,"float"}}}
+    local group=key=="Enabled"and"PostEffect"or class;local spec=layouts[group]and layouts[group][key];if not spec then return end
+    local offset=toggle.offsetstructvalue and toggle.offsetstructvalue(group,key)or nil;offset=offset or toggle.visualoffset(group,key)or toggle.visualoffset(class,key)or spec[1]
+    local alignment=spec[2]=="byte"and 1 or spec[2]=="double"and 8 or 4
+    if not toggle.visualfinite(offset,4,8191)or offset%alignment~=0 then return end
+    cache.values[id]={offset=offset,kind=spec[2]};return offset,spec[2]
+end
+
+toggle.seedpostblend=function(entry,key,value)
+    if not entry.blends then entry.blends={}end;if not entry.blends[key]then entry.blends[key]={value=value,at=tick()}end
+end
+
+toggle.postvalue=function(entry,key,current,iscolor,now)
+    local state=toggle.visuals;local target=entry.values[key]
+    if iscolor then local cfg=state[entry.colorcfg or"correction"];target=cfg.rgb and Color3.fromHSV(toggle.chromaphase or 0,toggle.chromasaturation,1)or cfg.labelcolor end
+    if iscolor then if not toggle.lightingpropertyvalid(target,true)then return current end elseif not toggle.visualfinite(target,-10000,1000000)then return current end
+    if not entry.blends then entry.blends={}end;local blend=entry.blends[key]
+    if not blend then blend={value=current,at=now-1/60};entry.blends[key]=blend end
+    if blend.frame==now then return blend.value end;blend.frame=now
+    local previous=blend.value;local dt=clamp(now-(blend.at or now-1/60),0,0.05);blend.at=now;local amount=1-math.exp(-dt*30);local result,remaining
+    if iscolor then
+        remaining=math.max(math.abs(previous.R-target.R),math.abs(previous.G-target.G),math.abs(previous.B-target.B))
+        result=remaining<0.0002 and target or Color3.new(previous.R+(target.R-previous.R)*amount,previous.G+(target.G-previous.G)*amount,previous.B+(target.B-previous.B)*amount)
+    else remaining=math.abs(previous-target);result=remaining<0.0002 and target or previous+(target-previous)*amount end
+    blend.moving=remaining>=0.0002;blend.value=result;return result
+end
+
+toggle.postmoving=function(entry)
+    local cfg=entry.color and toggle.visuals[entry.colorcfg or"correction"];if cfg and cfg.rgb then return true end
+    for _,blend in pairs(entry.blends or{})do if blend.moving then return true end end;return false
+end
+
+toggle.setpostvalue=function(entry,field,value)
+    if entry.class=="Fog"then
+        local distance=math.floor(clamp(field.key=="FogEnd"and value/5 or value,5,750)*100+0.5)/100
+        entry.values.FogStart=distance;entry.values.FogEnd=distance*5;entry.edited.FogStart=true;entry.edited.FogEnd=true
+    else entry.values[field.key]=toggle.effectrawvalue(field,value);entry.edited[field.key]=true end
+    toggle.visualchanged()
+end
+
+toggle.writepostnumber=function(rec,key,value,kind,offset)
+    if not toggle.visuallive(rec.object,rec.address,rec.class)or offset~=toggle.postoffset(rec.class,key)then return false end
+    local current=toggle.memoryread(kind,rec.address+offset);if not toggle.visualfinite(current,-10000,1000000)or kind=="byte"and current~=0 and current~=1 then return false end
+    if math.abs(current-value)<0.0001 then return true end
+    if not toggle.memorywrite(kind,rec.address+offset,value)then return false end
+    local actual=toggle.memoryread(kind,rec.address+offset);return type(actual)=="number"and math.abs(actual-value)<0.0001
+end
+
+toggle.smoothpostframe=function(now)
+    if not toggle.running or toggle.replacing then return end;local state=toggle.visuals
+    if state.inpostframe or now<(state.nextpostframe or 0)then return end;state.nextpostframe=now+1/60;state.inpostframe=true
+    local ok=pcall(function()toggle.applylightingproperties(false,true,now);toggle.applyposteffects(false,now)end);state.inpostframe=false
+    return ok
+end
+
 toggle.captureeffect=function(object,address,definition)
     local state=toggle.visuals;local rec=state.records[address]
-    if not toggle.visuallive(object,address,definition.class)then return nil end
+    if definition.propertyeffect or not toggle.visuallive(object,address,definition.class)then return nil end
     if rec and rec.class==definition.class and toggle.visuallive(rec.object,rec.address,rec.class)then rec.object=object;return rec end
     if rec then state.records[address]=nil end
-    local offset=toggle.visualoffset(definition.class,"Enabled");if not offset then return nil end
+    local offset=toggle.postoffset(definition.class,"Enabled");if not offset then return nil end
     local enabled=toggle.memoryread("byte",address+offset);if enabled~=0 and enabled~=1 then return nil end
     rec={object=object,address=address,class=definition.class,definition=definition,offset=offset,original=enabled,values={},offsets={},touched={},nextcheck=0}
-    for _,field in ipairs(definition.fields)do local relative=toggle.visualoffset(definition.class,field.key)
-        if relative and relative%4==0 then local value=toggle.memoryread("float",address+relative);if toggle.visualfinite(value,math.min(field.min,-10000),math.max(field.max,10000))then rec.values[field.key]=value;rec.offsets[field.key]=relative
+    for _,field in ipairs(definition.fields)do local relative=toggle.postoffset(definition.class,field.key)
+        if relative then local value=toggle.memoryread("float",address+relative);if toggle.visualfinite(value,math.min(field.min,-10000),math.max(field.max,10000))then rec.values[field.key]=value;rec.offsets[field.key]=relative;toggle.seedpostblend(definition,field.key,value)
             if not definition.captured and not definition.edited[field.key]then definition.values[field.key]=clamp(value,field.min,field.max)end
         end end
     end
-    if definition.color then local relative=toggle.visualoffset(definition.class,definition.color);if relative and relative%4==0 then rec.originalcolor=toggle.visualreadcolor("float",address+relative);rec.coloroffset=relative;if rec.originalcolor and not definition.captured and not state.correction.edited then local c=rec.originalcolor;state.correction.labelcolor=Color3.new(c[1],c[2],c[3])end end end
+    if definition.color then local relative=toggle.postoffset(definition.class,definition.color);if relative then rec.originalcolor=toggle.visualreadcolor("float",address+relative);rec.coloroffset=relative;if rec.originalcolor then local c=Color3.new(rec.originalcolor[1],rec.originalcolor[2],rec.originalcolor[3]);toggle.seedpostblend(definition,definition.color,c);if not definition.captured and not state.correction.edited then state.correction.labelcolor=c end end end end
     definition.captured=true;state.records[address]=rec;return rec
 end
-toggle.restoreeffect=function(rec)
-    if not next(rec.touched)then return true end;if not toggle.visuallive(rec.object,rec.address,rec.class)then rec.touched={};return true end
+toggle.restoreeffect=function(rec,disabled)
+    if not next(rec.touched)and not disabled then return true end
+    if not toggle.visuallive(rec.object,rec.address,rec.class)then rec.touched={};return true end
     local restored=true
-    for key in pairs(rec.touched)do local ok
-        if key=="Enabled"then ok=toggle.memorywrite("byte",rec.address+rec.offset,rec.original)
-        elseif key=="TintColor"then ok=toggle.visualwritecolor("float",rec.address+rec.coloroffset,rec.originalcolor)
-        else ok=toggle.memorywrite("float",rec.address+rec.offsets[key],rec.values[key])end
+    for key in pairs(rec.touched)do if key~="Enabled"then local ok
+        if key=="TintColor"then ok=rec.coloroffset==toggle.postoffset(rec.class,key)and toggle.visualwritecolor("float",rec.address+rec.coloroffset,rec.originalcolor)
+        else ok=toggle.writepostnumber(rec,key,rec.values[key],"float",rec.offsets[key])end
         if ok then rec.touched[key]=nil else restored=false end
-    end;return restored
+    end end
+    if disabled or rec.touched.Enabled then local ok=toggle.writepostnumber(rec,"Enabled",disabled and 0 or rec.original,"byte",rec.offset);if ok then rec.touched.Enabled=disabled and true or nil else restored=false end end
+    return restored
 end
 toggle.scanposteffects=function()
     local state=toggle.visuals;local found={};local roots={}
     if not state.lighting then local ok,lighting=pcall(function()return game:GetService("Lighting")end);if ok then state.lighting=lighting end end
-    if state.lighting then roots[#roots+1]=state.lighting end;local camera=ws.CurrentCamera or ws:FindFirstChildOfClass("Camera");if camera then roots[#roots+1]=camera end
-    local function inspect(object)
-        local class=object.ClassName;local definition=state.effectdefs[class];if not definition then return end;local address=toggle.instanceaddress(object);if not toggle.visualpointer(address)then return end
-        if toggle.captureeffect(object,address,definition)then found[address]=true end
+    if state.lighting then roots[#roots+1]=state.lighting end;local ok,camera=pcall(function()return ws.CurrentCamera or ws:FindFirstChildOfClass("Camera")end);if ok and camera then roots[#roots+1]=camera end
+    for _,root in ipairs(roots)do local ok,children=pcall(function()return root:GetChildren()end)
+        if ok and type(children)=="table"then for i=1,math.min(#children,128)do local object=children[i];local valid,class,address=pcall(function()return object.ClassName,toggle.instanceaddress(object)end)
+            local definition=valid and state.effectdefs[class];if definition and not definition.propertyeffect and toggle.visualpointer(address)and toggle.captureeffect(object,address,definition)then found[address]=true end
+        end end
     end
-    for _,root in ipairs(roots)do local children=root:GetChildren();for i=1,math.min(#children,128)do inspect(children[i])end end
     for address,rec in pairs(state.records)do if not found[address]then toggle.restoreeffect(rec);state.records[address]=nil end end
 end
-toggle.applyposteffects=function(force)
-    local state=toggle.visuals;local now=tick()
-    for _,rec in pairs(state.records)do
-        if not state.effects[rec.class]then if next(rec.touched)then toggle.restoreeffect(rec)end
-        elseif toggle.visuallive(rec.object,rec.address,rec.class)and(force or rec.revision~=state.revision or now>=rec.nextcheck or rec.class=="ColorCorrectionEffect"and state.correction.rgb)then
-            rec.nextcheck=now+0.5;rec.revision=state.revision;local enabled=toggle.memoryread("byte",rec.address+rec.offset);rec.touched.Enabled=true;if enabled==0 then toggle.memorywrite("byte",rec.address+rec.offset,1)end
-            for _,field in ipairs(rec.definition.fields)do local relative=rec.offsets[field.key];if relative then local current=toggle.memoryread("float",rec.address+relative);local wanted=rec.definition.values[field.key];rec.touched[field.key]=true;if toggle.visualfinite(current,-10000,10000)and toggle.visualfinite(wanted,field.min,field.max)and math.abs(current-wanted)>0.0001 then rec.touched[field.key]=true;toggle.memorywrite("float",rec.address+relative,wanted)end end end
-            if rec.originalcolor then local cfg=state.correction;local c=cfg.rgb and Color3.fromHSV(toggle.chromaphase or 0,toggle.chromasaturation,1)or cfg.labelcolor;rec.touched.TintColor=true;toggle.visualwritecolor("float",rec.address+rec.coloroffset,{c.R,c.G,c.B})end
+toggle.applyposteffects=function(force,now)
+    local state=toggle.visuals;now=now or tick()
+    for _,rec in pairs(state.records)do local definition=rec.definition
+        if force or rec.revision~=state.revision or now>=rec.nextcheck then
+            rec.revision=state.revision;rec.nextcheck=now+0.1
+            if not state.effects[rec.class]then toggle.restoreeffect(rec,definition.managed==true)
+            elseif toggle.visuallive(rec.object,rec.address,rec.class)then
+                local enabled=toggle.memoryread("byte",rec.address+rec.offset)
+                if enabled==0 or enabled==1 then rec.touched.Enabled=true;toggle.writepostnumber(rec,"Enabled",1,"byte",rec.offset)
+                    for _,field in ipairs(definition.fields)do local relative=rec.offsets[field.key];if relative then local current=toggle.memoryread("float",rec.address+relative)
+                        if toggle.visualfinite(current,-10000,1000000)then local wanted=toggle.postvalue(definition,field.key,current,false,now);if toggle.visualfinite(wanted,-10000,1000000)and math.abs(current-wanted)>0.0001 then rec.touched[field.key]=true;toggle.writepostnumber(rec,field.key,wanted,"float",relative)end end
+                    end end
+                    if rec.originalcolor and rec.coloroffset==toggle.postoffset(rec.class,"TintColor")then local rgb=toggle.visualreadcolor("float",rec.address+rec.coloroffset);if rgb then local current=Color3.new(rgb[1],rgb[2],rgb[3]);local c=toggle.postvalue(definition,"TintColor",current,true,now);rec.touched.TintColor=true;toggle.visualwritecolor("float",rec.address+rec.coloroffset,{c.R,c.G,c.B})end end
+                    if toggle.postmoving(definition)then rec.nextcheck=now+1/60 end
+                end
+            end
         end
     end
 end
 toggle.seteffect=function(class,on)
-    local state=toggle.visuals;if not state.effectdefs[class]then return end;state.effects[class]=on==true;toggle.visualchanged()
-    if not on then for _,rec in pairs(state.records)do if rec.class==class then toggle.restoreeffect(rec)end end end
+    local state=toggle.visuals;local entry=state.effectdefs[class];if not entry then return end
+    on=on==true;if state.effects[class]~=on then entry.blends={}end;entry.managed=true;state.effects[class]=on;state.nextscan=0;toggle.visualchanged()
+    if entry.propertyeffect then
+        if state.lightingprops then state.lightingprops.nextscan=0 end
+        if on then toggle.applylightingproperties(true)else toggle.restorelightingproperties(class,true)end
+    else
+        if on then toggle.scanposteffects()end
+        for _,rec in pairs(state.records)do if rec.class==class then rec.nextcheck=0;if not on then toggle.restoreeffect(rec,true)end end end
+        toggle.applyposteffects(true)
+    end
 end
+toggle.lightingpropertyvalid=function(value,iscolor)
+    if iscolor then local ok,valid=pcall(function()return toggle.visualfinite(value.R,0,1)and toggle.visualfinite(value.G,0,1)and toggle.visualfinite(value.B,0,1)end);return ok and valid end
+    return toggle.visualfinite(value,0,1000000)
+end
+
+toggle.lightingpropertylive=function(rec)
+    local ok,live=pcall(function()return rec.object.Parent~=nil and rec.object:IsA(rec.class)and(not rec.address or toggle.instanceaddress(rec.object)==rec.address)end)
+    if not ok or not live then return false end
+    if rec.memoryoffset then local offset,kind=toggle.postoffset(rec.class,rec.property);if offset~=rec.memoryoffset or kind~=rec.memorykind then return false end end
+    return true
+end
+
+
+toggle.readlightingproperty=function(object,property,iscolor,class,address)
+    if toggle.visualpointer(address)then
+        local offset,kind=toggle.postoffset(class,property)
+        if offset then
+            if iscolor and kind=="color"then local values=toggle.visualreadcolor("float",address+offset);if values then return Color3.new(values[1],values[2],values[3]),offset,kind end
+            elseif not iscolor and(kind=="float"or kind=="double")then local value=toggle.memoryread(kind,address+offset);if toggle.lightingpropertyvalid(value,false)then return value,offset,kind end end
+        end
+    end
+    local ok,value=pcall(function()return object[property]end);if ok and toggle.lightingpropertyvalid(value,iscolor)then return value end
+end
+
+toggle.writelightingproperty=function(rec,value)
+    if not toggle.lightingpropertylive(rec)or not toggle.lightingpropertyvalid(value,rec.iscolor)then return false end
+    if rec.memoryoffset then
+        local address=rec.address+rec.memoryoffset;if not toggle.visualpointer(rec.address)then return false end
+        if rec.iscolor then
+            if not toggle.visualwritecolor("float",address,{value.R,value.G,value.B})then return false end
+            local actual=toggle.visualreadcolor("float",address);return actual~=nil and math.abs(actual[1]-value.R)<0.0001 and math.abs(actual[2]-value.G)<0.0001 and math.abs(actual[3]-value.B)<0.0001
+        end
+        local current=toggle.memoryread(rec.memorykind,address);if not toggle.lightingpropertyvalid(current,false)then return false end
+        if math.abs(current-value)<0.0001 then return true end
+        if not toggle.memorywrite(rec.memorykind,address,value)then return false end
+        local actual=toggle.memoryread(rec.memorykind,address);return type(actual)=="number"and math.abs(actual-value)<0.0001
+    end
+    local ok=pcall(function()rec.object[rec.property]=value end);if not ok then return false end
+    local current=toggle.readlightingproperty(rec.object,rec.property,rec.iscolor,rec.class,rec.address)
+    if not toggle.lightingpropertyvalid(current,rec.iscolor)then return false end
+    if rec.iscolor then return math.abs(current.R-value.R)<0.0001 and math.abs(current.G-value.G)<0.0001 and math.abs(current.B-value.B)<0.0001 end
+    return math.abs(current-value)<0.0001
+end
+
+toggle.restorelightingproperty=function(rec)
+    if not rec.touched then return true end
+    if not toggle.lightingpropertylive(rec)then rec.touched=false;return true end
+    local ok=toggle.writelightingproperty(rec,rec.original);if ok then rec.touched=false end;return ok
+end
+
+toggle.restorelightingproperties=function(effect,release)
+    local state=toggle.visuals.lightingprops;if not state then return end
+    for id,rec in pairs(state.records)do if not effect or rec.effect==effect then if toggle.restorelightingproperty(rec)and release then state.records[id]=nil end end end
+end
+
+toggle.scanlightingproperties=function(now)
+    local state=toggle.visuals;local cache=state.lightingprops;local seen={}
+    local function capture(object,property,effect,key,iscolor,fixed)
+        if not object then return end
+        local ok,class,address=pcall(function()return object.ClassName,toggle.instanceaddress(object)end);if not ok then return end
+        local value,offset,kind=toggle.readlightingproperty(object,property,iscolor,class,address);if not toggle.lightingpropertyvalid(value,iscolor)then return end
+        local identity=address or object;local id=tostring(identity)..":"..property;local rec=cache.records[id]
+        if rec and not toggle.lightingpropertylive(rec)then cache.records[id]=nil;rec=nil end
+        if not rec then
+            rec={object=object,address=address,class=class,property=property,effect=effect,key=key,iscolor=iscolor,memoryoffset=offset,memorykind=kind,fixed=fixed,original=value};cache.records[id]=rec
+            local entry=state.effectdefs[effect];if not fixed then toggle.seedpostblend(entry,key,value)end
+            local cfg=key=="FogColor"and state.fog or key=="OutdoorAmbient"and state.ambience
+            if cfg and not cfg.edited and not cfg.captured then cfg.labelcolor=value;cfg.captured=true end
+            if effect=="LightingBrightness"then if not entry.captured and not entry.edited.Brightness then entry.values.Brightness=clamp(value,0,10)end;entry.captured=true end
+        else rec.object=object end;seen[id]=true
+    end
+    local specs={{"FogStart","Fog",false},{"FogEnd","Fog",false},{"FogColor","Fog",true},{"OutdoorAmbient","Ambience",true},{"Brightness","LightingBrightness",false}}
+    for _,name in ipairs({"CurrentLightingProperties","CurrentLightingProperties2","DayProperties","NightProperties"})do
+        local ok,folder=pcall(function()return rs:FindFirstChild(name)end)
+        if ok and folder then for _,spec in ipairs(specs)do if state.effects[spec[2]]then local found,object=pcall(function()return folder:FindFirstChild(spec[1])end)
+            if found and object then local valid,isvalue=pcall(function()return object:IsA(spec[3]and"Color3Value"or"NumberValue")end);if valid and isvalue then capture(object,"Value",spec[2],spec[1],spec[3])end end
+        end end end
+    end
+    if not state.lighting then local ok,lighting=pcall(function()return game:GetService("Lighting")end);if ok then state.lighting=lighting end end
+    local lighting=state.lighting
+    if lighting then
+        for _,spec in ipairs(specs)do if state.effects[spec[2]]then capture(lighting,spec[1],spec[2],spec[1],spec[3])end end
+        if state.effects.Fog then local ok,children=pcall(function()return lighting:GetChildren()end);if ok and type(children)=="table"then for i=1,math.min(#children,128)do local object=children[i];local valid,atmosphere=pcall(function()return object:IsA("Atmosphere")end);if valid and atmosphere then capture(object,"Density","Fog","Density",false,0)end end end end
+    end
+    for id,rec in pairs(cache.records)do if not seen[id]and toggle.restorelightingproperty(rec)then cache.records[id]=nil end end
+end
+
+toggle.applylightingproperties=function(force,frame,now)
+    local state=toggle.visuals;now=now or tick();local cache=state.lightingprops
+    if not cache then if frame then return end;cache={records={},nextscan=0,nextapply=0};state.lightingprops=cache end
+    local active=state.effects.Fog or state.effects.Ambience or state.effects.LightingBrightness
+    if not frame and active and(force or now>=cache.nextscan)then cache.nextscan=now+0.5;toggle.scanlightingproperties(now)end
+    if not force and now<cache.nextapply and cache.revision==state.revision then return end;cache.nextapply=now+0.1;cache.revision=state.revision
+    if not active then toggle.restorelightingproperties(nil,true);return end
+    local moving=false
+    for id,rec in pairs(cache.records)do
+        if not state.effects[rec.effect]then if toggle.restorelightingproperty(rec)then cache.records[id]=nil end
+        elseif toggle.lightingpropertylive(rec)then
+            local current=toggle.readlightingproperty(rec.object,rec.property,rec.iscolor,rec.class,rec.address)
+            if toggle.lightingpropertyvalid(current,rec.iscolor)then
+                local entry=state.effectdefs[rec.effect];local wanted=rec.fixed
+                if wanted==nil then wanted=toggle.postvalue(entry,rec.key,current,rec.iscolor,now)end
+                if toggle.lightingpropertyvalid(wanted,rec.iscolor)then
+                    local same=rec.iscolor and math.max(math.abs(current.R-wanted.R),math.abs(current.G-wanted.G),math.abs(current.B-wanted.B))<0.0001 or not rec.iscolor and math.abs(current-wanted)<0.0001
+                    if not same then rec.touched=true;toggle.writelightingproperty(rec,wanted)end
+                end
+                if toggle.postmoving(entry)then moving=true end
+            end
+        else cache.records[id]=nil;cache.nextscan=0 end
+    end
+    if moving then cache.nextapply=now+1/60 end
+end
+
 toggle.namecache=setmetatable({},{__mode="k"})
 toggle.validdisplayname=function(name)
     if type(name)~="string"or #name==0 or #name>128 then return false end
@@ -561,23 +755,22 @@ toggle.readfootername=function()
 end
 toggle.applyvisuals=function(force)
     if not toggle.running or toggle.replacing then return end;local state=toggle.visuals;local now=tick();if not force and now<state.nextapply then return end;state.nextapply=now+0.1
-    local needed=force or state.wind.edited or state.water.edited or state.lengthedited 
-    if not needed then for _,enabled in pairs(state.effects)do if enabled then needed=true;break end end end
+    local needed=force or state.wind.edited or state.water.edited or state.lengthedited
+    local effectactive=false;for class,enabled in pairs(state.effects)do if not state.effectdefs[class].propertyeffect and(enabled or state.effectdefs[class].managed)then effectactive=true;break end end
+    toggle.applylightingproperties(force)
     if needed then toggle.loadvisualoffsets()end
     if now>=state.nextfooter then state.nextfooter=now+1;local name=toggle.readfootername();toggle.playerdisplayname=name;if toggle.footer then toggle.setprop(toggle.footer.username,"Text",name)end end
-    if not state.offsets then return end
-    if state.terrainenabled.grass or state.terrainenabled.water then toggle.applyterrain()end
-    if state.terrainenabled.wind then toggle.applywind()end
-    local effectactive=false;for _,enabled in pairs(state.effects)do if enabled then effectactive=true;break end end
-    if(force or not state.discovered or effectactive)and(force or now>=state.nextscan)then state.nextscan=now+1;local first=not state.discovered;toggle.scanposteffects();state.discovered=true;if first and toggle.refreshvisualui then toggle.refreshvisualui()end end;toggle.applyposteffects(force)
+    if state.offsets then if state.terrainenabled.grass or state.terrainenabled.water then toggle.applyterrain()end;if state.terrainenabled.wind then toggle.applywind()end end
+    if(force or effectactive)and(force or now>=state.nextscan)then state.nextscan=now+0.5;local first=not state.discovered;toggle.scanposteffects();state.discovered=true;if first and toggle.refreshvisualui then toggle.refreshvisualui()end end
+    toggle.applyposteffects(force)
 end
 toggle.restorevisuals=function()
-    toggle.restorewind();toggle.restoreterrain();for _,rec in pairs(toggle.visuals.records)do toggle.restoreeffect(rec)end;toggle.visuals.records={}
+    toggle.restorelightingproperties();toggle.restorewind();toggle.restoreterrain();for _,rec in pairs(toggle.visuals.records)do toggle.restoreeffect(rec)end;toggle.visuals.records={}
 end
 toggle.visualconfig=function()
     local state=toggle.visuals;local out={schema=2,terrain_editor=state.terrainselect,terrain_enabled=state.terrainenabled,effect_editor=state.editclass,effect_controls={}}
-    for _,entry in ipairs(toggle.posteffectorder)do local saved={enabled=state.effects[entry.class],values={}};for _,field in ipairs(entry.fields)do if entry.edited[field.key]then saved.values[field.key]=entry.values[field.key]end end;out.effect_controls[entry.class]=saved end
-    for _,id in ipairs({"water","correction"})do local cfg=state[id];if cfg.edited then local c=cfg.labelcolor;out[id]={r=math.floor(c.R*255+0.5),g=math.floor(c.G*255+0.5),b=math.floor(c.B*255+0.5),rgb=cfg.rgb==true}end end;if state.lengthedited then out.grass_length=state.grasslength end;if state.wind.edited then out.wind={strength=state.wind.strength,direction=state.wind.direction}end;return out
+    for _,entry in ipairs(toggle.posteffectorder)do local saved={enabled=state.effects[entry.class],controlled=entry.managed==true,values={}};for _,field in ipairs(entry.fields)do if entry.edited[field.key]then saved.values[field.key]=entry.values[field.key]end end;out.effect_controls[entry.class]=saved end
+    for _,id in ipairs({"water","correction","fog","ambience"})do local cfg=state[id];if cfg.edited then local c=cfg.labelcolor;out[id]={r=math.floor(c.R*255+0.5),g=math.floor(c.G*255+0.5),b=math.floor(c.B*255+0.5),rgb=cfg.rgb==true}end end;if state.lengthedited then out.grass_length=state.grasslength end;if state.wind.edited then out.wind={strength=state.wind.strength,direction=state.wind.direction}end;return out
 end
 toggle.effectuivalue=function(field,value)
     if field.uimin then return field.uimin+(clamp(value,field.min,field.max)-field.min)/(field.max-field.min)*(field.uimax-field.uimin)end;return value
@@ -644,6 +837,12 @@ toggle.capturezoom=function()
     toggle.zoom.memoryvalid=address~=nil and toggle.validzoom(memorymin,memorymax)
     local minimum,maximum=toggle.zoom.memoryvalid and memorymin or directmin,toggle.zoom.memoryvalid and memorymax or directmax
     if toggle.validzoom(minimum,maximum)then toggle.zoom.originalmin=minimum;toggle.zoom.originalmax=maximum end;toggle.zoom.min=toggle.zoom.thirdperson and toggle.zoom.amount or 0;toggle.zoom.max=toggle.zoom.thirdperson and 10000 or 0
+end
+toggle.preloadthirdperson=function()
+    if not toggle.running or toggle.replacing then return false end
+    local state=toggle.zoom;if not toggle.offsetloaded and not toggle.loadoffsets(false)then return false end
+    if not state.memoryvalid then toggle.capturezoom()end
+    state.preloaded=state.offsetverified and(state.memoryvalid or state.directvalid);return state.preloaded==true
 end
 toggle.applyzoom=function(force)
     local state=toggle.zoom;local now=tick();if not force and now<(state.nextapply or 0)then return true end;state.nextapply=now+(state.thirdperson and 0.2 or 0.5)
@@ -859,7 +1058,7 @@ toggle.applyclient=function(rescan)
     return true
 end
 toggle.drawingstates=setmetatable({},{__mode="k"});toggle.drawingqueue={};toggle.drawingcursor=1
-toggle.drawingowners={};toggle.drawingreapcursor=1;toggle.drawingreapnext=0;toggle.nativereleases={head=1,count=0};toggle.nativereleasestates=setmetatable({},{__mode="k"})
+toggle.drawingowners={};toggle.drawingreapcursor=1;toggle.drawingreapnext=0;toggle.nativereleases={head=1,count=0,capacity=16384};toggle.nativereleasestates=setmetatable({},{__mode="k"})
 toggle.drawingfinite=function(value,limit)local bound=limit or 2147483647;return type(value)=="number"and value>=-bound and value<=bound end
 toggle.validdrawing=function(key,value)
     if type(value)=="number"then return toggle.drawingfinite(value)end
@@ -891,22 +1090,23 @@ toggle.cleardrawingowners=function()
     for i=1,#owners do local state=owners[i];local ok=pcall(state.dispose);if not ok then local native=state.native;state.native=nil;state.removed=true;if native then pcall(function()native.Visible=false end);pcall(function()native:Remove()end)end end;owners[i]=nil end
 end
 toggle.flushnativereleases=function(all)
-    local queue=toggle.nativereleases;local started=tick();local count=0;local limit=all and queue.count or math.min(16,queue.count)
+    local queue=toggle.nativereleases;if queue.flushing then if all then queue.flushall=true end;return end;queue.flushing=true;local started=tick();local count=0;local limit=all and queue.count or math.min(16,queue.count)
     while queue.count>0 and count<limit do
-        local native=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%512+1;queue.count=queue.count-1;count=count+1
+        local native=queue[queue.head];queue[queue.head]=nil;queue.head=queue.head%(queue.capacity or 16384)+1;queue.count=queue.count-1;count=count+1
         if native then
             toggle.health.nativecall="drawing release";local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting"
             if ok then toggle.nativereleasestates[native]="removed";toggle.health.nativeremoved=toggle.health.nativeremoved+1
-            else local slot=(queue.head+queue.count-1)%512+1;queue[slot]=native;queue.count=queue.count+1 end
+            else local slot=(queue.head+queue.count-1)%(queue.capacity or 16384)+1;queue[slot]=native;queue.count=queue.count+1 end
         end
         if not all and tick()-started>=0.001 then break end
     end
+    queue.flushing=nil;if queue.flushall then queue.flushall=nil;toggle.flushnativereleases(true)end
 end
 toggle.releasenative=function(native)
     if not native or toggle.nativereleasestates[native]then return true end;toggle.nativereleasestates[native]="queued";pcall(function()native.Visible=false end)
     local queue=toggle.nativereleases
-    if toggle.running and not toggle.replacing and queue.count<512 then local slot=(queue.head+queue.count-1)%512+1;queue[slot]=native;queue.count=queue.count+1;return true end
-    toggle.health.nativecall="drawing release";local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting";toggle.health.nativeremoved=toggle.health.nativeremoved+1;return ok
+    if toggle.running and not toggle.replacing and queue.count<(queue.capacity or 16384) then local slot=(queue.head+queue.count-1)%(queue.capacity or 16384)+1;queue[slot]=native;queue.count=queue.count+1;return true end
+    toggle.health.nativecall="drawing release";local ok=pcall(function()native:Remove()end);toggle.health.nativecall="waiting";if ok then toggle.nativereleasestates[native]="removed";toggle.health.nativeremoved=toggle.health.nativeremoved+1 else toggle.nativereleasestates[native]=nil end;return ok
 end
 toggle.dropnative=function(state)
     if toggle.cleariconblend then toggle.cleariconblend(state)end;if toggle.inkstates then toggle.inkstates[state]=nil end
@@ -1018,15 +1218,16 @@ toggle.newdrawing=function(kind)
     local function allocate()
         if state.removed or not toggle.running or toggle.replacing then return nil end;if state.native then return state.native end
         if tick()<(state.primenext or 0)then return nil end
+        if toggle.nativereleases.count>=512 then state.primenext=tick()+0.1;return nil end
         if state.deferred and not state.backgroundprime then toggle.queueplayernative(state);return nil end
         toggle.health.nativecall="drawing allocation";local created,native=pcall(Drawing.new,kind);toggle.health.nativecall="waiting";if not created or not native then state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));return nil end
-        toggle.health.nativecreated=toggle.health.nativecreated+1;state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;local ok,err=pcall(function()
+        toggle.health.nativecreated=toggle.health.nativecreated+1;local ok,err=pcall(function()
             assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=false
             for key,value in pairs(props)do if key~="Visible"and key~="Font"and key~="Data"and key~="Size"and key~="Position"then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;native[key]=value end end
             for _,key in ipairs({"Data","Font","Size","Position"})do local value=props[key];if value~=nil then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");if not toggle.validdrawing(key,value)then assert(false,"invalid drawing property: "..key)end;if key=="Data"then toggle.health.nativecall="image decode"end;native[key]=value;if key=="Data"then toggle.health.nativecall="waiting"end end end
             if props.Visible and not toggle.loading then assert(toggle.running and not toggle.replacing and not state.removed,"drawing session retired");native.Visible=true end
         end)
-        if not ok then if state.native==native then toggle.dropnative(state)end;state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));assert(false,tostring(err))end;state.primefailures=0;state.primenext=0;if kind=="Text"then state.renderink=props.Color end;return state.native
+        if not ok or state.removed or not toggle.running or toggle.replacing then toggle.releasenative(native);state.primefailures=math.min(6,(state.primefailures or 0)+1);state.primenext=tick()+math.min(8,0.25*2^(state.primefailures-1));assert(false,tostring(err or "drawing session retired"))end;state.native=native;state.nativeindex=#toggle.drawingowners+1;toggle.drawingowners[state.nativeindex]=state;state.primefailures=0;state.primenext=0;if kind=="Text"then state.renderink=props.Color end;return state.native
     end
     local function prime()
         if state.priming then return nil end;state.priming=true
@@ -1996,13 +2197,14 @@ end
 local function entrycfg(index)
     if index=="trail1"then return toggle.trail.color1 elseif index=="trail2"then return toggle.trail.color2 end
     if index=="safespot"then return toggle.safespotstyle end
+    if index=="fogcolor"then return toggle.visuals.fog elseif index=="ambiencecolor"then return toggle.visuals.ambience end
     if index=="terrainwater"then return toggle.visuals.water elseif index=="correctiontint"then return toggle.visuals.correction end
     if index=="accent"then return themes.accentstyle elseif index=="themebg"then return toggle.themestyles.background elseif index=="themetop"then return toggle.themestyles.topbar elseif index=="themeborder"then return toggle.themestyles.border elseif index=="themeoutline"then return toggle.themestyles.outline elseif index=="themetext"then return toggle.themestyles.text elseif index=="distance"then return toggle.distancestyle elseif index=="rake"then return toggle.rakestyle elseif index=="rakehealth"then return toggle.rakehealthstyle elseif index=="roof"then return roofstyle elseif index=="hudtimer"then return toggle.hudstyles.timer elseif index=="hudtarget"then return toggle.hudstyles.target elseif index=="hudscrap"then return toggle.hudstyles.scrap elseif index=="hudpower"then return toggle.hudstyles.power elseif index=="cooldownlabel"then return toggle.cooldownstyle elseif index=="cooldownvalue"then return toggle.cooldownvaluestyle elseif index=="valuetimer"then return toggle.hudvalues.timer elseif index=="valuetarget"then return toggle.hudvalues.target elseif index=="valuescrap"then return toggle.hudvalues.scrap elseif index=="valuepower"then return toggle.hudvalues.power elseif type(index)=="string"and string.sub(index,1,6)=="crate_"then return toggle.cratestyles[string.sub(index,7)]end
     local entry=colorentries[index];return entry and espcfg[entry.cfgs[1]]or nil
 end
 toggle.colorname=function(index)
     if type(index)=="number"then return index==1 and"flare esp"or index==7 and"trap esp"or index==8 and"crate esp"or colorentries[index]and colorentries[index].name or"color" elseif type(index)=="string"and string.sub(index,1,6)=="crate_"then local cfg=toggle.cratestyles[string.sub(index,7)];return cfg and cfg.name or"supply item"end
-    local names={trail1="trail primary",trail2="trail secondary",safespot="safe spot",terrainwater="Water Color",correctiontint="tint color",accent="accent",themebg="background",themetop="top bar",themeborder="border",themeoutline="outline",themetext="text",distance="distance label",rake="rake name",rakehealth="rake health",roof="house roof hp",hudtimer="timer label",hudtarget="target label",hudscrap="scrap label",hudpower="power label",cooldownlabel="cooldown label",cooldownvalue="cooldown value",valuetimer="timer value",valuetarget="target value",valuescrap="scrap value",valuepower="power value"};return names[index]or"color"
+    local names={fogcolor="Fog Color",ambiencecolor="Ambience Color",trail1="trail primary",trail2="trail secondary",safespot="safe spot",terrainwater="Water Color",correctiontint="tint color",accent="accent",themebg="background",themetop="top bar",themeborder="border",themeoutline="outline",themetext="text",distance="distance label",rake="rake name",rakehealth="rake health",roof="house roof hp",hudtimer="timer label",hudtarget="target label",hudscrap="scrap label",hudpower="power label",cooldownlabel="cooldown label",cooldownvalue="cooldown value",valuetimer="timer value",valuetarget="target value",valuescrap="scrap value",valuepower="power value"};return names[index]or"color"
 end
 toggle.coloractionname=function(index)
     if index=="correctiontint"then return "color correction tint"end
@@ -2130,12 +2332,13 @@ toggle.featurecatalog=function(tab)
         items[#items+1]={id="windstrength",terraineditor="wind",kind="slider",label="Wind Strength",value=toggle.visuals.wind.strength,min=0,max=25,display=string.format("%.1f",toggle.visuals.wind.strength),col=1}
         items[#items+1]={id="winddirection",terraineditor="wind",kind="slider",label="Wind Direction",value=toggle.visuals.wind.direction,min=0,max=360,display=string.format("%.0f degrees",toggle.visuals.wind.direction),col=1}
         items[#items+1]={id="terrainwater",terraineditor="water",kind="color",label="Water Color",index="terrainwater",col=1}
-        items[#items+1]=section("post-processing",1,"customize the selected effect; switching it off restores its original settings",nil)
+        items[#items+1]=section("post-processing",2,"customize the selected effect; fog, ambience and brightness restore game values when disabled",nil)
         items[#items+1]={id="posteffectselect",kind="dropdown",label="Select Effect To Edit",value=toggle.visuals.effectdefs[toggle.visuals.editclass].label,col=2}
         for _,entry in ipairs(toggle.posteffectorder)do
             items[#items+1]={id=entry.id,kind="toggle",label="Enabled",on=toggle.visuals.effects[entry.class],effectclass=entry.class,effecteditor=entry.class,col=2}
-            for _,field in ipairs(entry.fields)do local value=toggle.effectuivalue(field,entry.values[field.key]);items[#items+1]={id=field.id,kind="slider",label=field.label,value=value,min=field.uimin or field.min,max=field.uimax or field.max,display=string.format("%.2f",value),effecteditor=entry.class,col=2}end
-            if entry.color then items[#items+1]={id="correctiontint",kind="color",label="Tint Color",index="correctiontint",effecteditor=entry.class,col=2}end
+            if entry.propertyeffect and entry.color then items[#items+1]={id=entry.colorid,kind="color",label=entry.colorlabel,index=entry.colorid,effecteditor=entry.class,col=2}end
+            for _,field in ipairs(entry.fields)do if not field.hidden then local value=toggle.effectuivalue(field,entry.values[field.key]);items[#items+1]={id=field.id,kind="slider",label=field.label,value=value,min=field.uimin or field.min,max=field.uimax or field.max,display=string.format("%.2f",value),effecteditor=entry.class,col=2}end end
+            if entry.color and not entry.propertyeffect then items[#items+1]={id=entry.colorid or"correctiontint",kind="color",label=entry.colorlabel or"Tint Color",index=entry.colorid or"correctiontint",effecteditor=entry.class,col=2}end
         end
         return items
     elseif tab==2 then
@@ -2370,7 +2573,7 @@ for tab=1,4 do
 end
 for _,group in ipairs({
     {"terrain",1,{"terrainelementselect","terrainenabled_grass","grasslength","terrainenabled_wind","windstrength","winddirection","terrainenabled_water","terrainwater"}},
-    {"post-processing",1,{"posteffectselect","postdepth","depthfocus","depthfar","depthnear","depthradius","postbloom","bloomintensity","bloomsize","bloomthreshold","postcorrection","correctionbrightness","correctioncontrast","correctiontint"}}
+    {"post-processing",2,{"posteffectselect","postfog","fogcolor","fogdistance","postambience","ambiencecolor","postbrightness","lightingbrightness","postdepth","depthfocus","depthfar","depthnear","depthradius","postbloom","bloomintensity","bloomsize","bloomthreshold","postcorrection","correctionbrightness","correctioncontrast","correctiontint"}}
 })do toggle.tabgroups[2][#toggle.tabgroups[2]+1]=group end
 toggle.tabgroups[4][1][3]={"bindmenu","panelstyleselect","watermarkelementsselect","opacity","borderradius"}
 for tab=1,4 do for _,group in ipairs(toggle.tabgroups[tab])do
@@ -2388,6 +2591,8 @@ table.insert(toggle.tabgroups[3],2,{"session stats",1,{"hudelementsselect","cont
 for i,group in ipairs(toggle.tabgroups[3])do if group[1]=="OOF Arrows"then table.remove(toggle.tabgroups[3],i);table.insert(toggle.tabgroups[3],1,group);break end end
 toggle.tabgroups[2][#toggle.tabgroups[2]+1]={"Trail",2,{"trailenabled","trailcolor2","trailtypeselect","trailfade","trailwidth","trailtargetsselect"}}
 toggle.tabgroups[2][#toggle.tabgroups[2]+1]={"safe spot",2,{"safespothud","safespotelementsselect"}}
+for index,group in ipairs(toggle.tabgroups[2])do if group[1]=="post-processing"then table.remove(toggle.tabgroups[2],index);table.insert(toggle.tabgroups[2],1,group);break end end
+
 toggle.espiconorder={"rake","locations","scraps","crates","flare","traps","distance","health"}
 toggle.watermarkorder={"title","avatar","displayname","uptime"}
 toggle.fonttargetnames={"Menu","HUD Interface","ESP Visuals"}
@@ -2768,7 +2973,7 @@ local function menupos()
     toggle.layoutgradient(menurgb,menustate.x+toggle.gradientinset(),menustate.y+3,math.max(1,displayw-toggle.gradientinset()*2));toggle.remembermenulayout()
 end
 local function dropdownvalues()
-    if dropdownkind=="trailtype"then return {"Solid Line","Neon Glow","Particle Line","Ribbon"}elseif dropdownkind=="trailtargets"then return {"Self","Others","Rake"}elseif dropdownkind=="pathfindertargets"then return {"Scraps","Flares"}elseif dropdownkind=="pathfindermethod"then return {"Legit","Simple"}elseif dropdownkind=="rosterview"then return {"List","Grid"}elseif dropdownkind=="playerbackpack"or dropdownkind=="crateinventorystyle"then return {"Image","Text"}elseif dropdownkind=="oofelements"then return {"Icon","Name","Distance"}elseif dropdownkind=="oof"then return toggle.extra.order elseif dropdownkind=="safespotelements"then return {"Label","Distance"}elseif dropdownkind=="espicons"then return toggle.espiconorder
+    if dropdownkind=="trailtype"then return {"Solid Line","Particle Line","Ribbon"}elseif dropdownkind=="trailtargets"then return {"Self","Others","Rake"}elseif dropdownkind=="pathfindertargets"then return {"Scraps","Flares"}elseif dropdownkind=="pathfindermethod"then return {"Legit","Simple"}elseif dropdownkind=="rosterview"then return {"List","Grid"}elseif dropdownkind=="playerbackpack"or dropdownkind=="crateinventorystyle"then return {"Image","Text"}elseif dropdownkind=="oofelements"then return {"Icon","Name","Distance"}elseif dropdownkind=="oof"then return toggle.extra.order elseif dropdownkind=="safespotelements"then return {"Label","Distance"}elseif dropdownkind=="espicons"then return toggle.espiconorder
     elseif dropdownkind=="fonttarget"then return toggle.fonttargetnames
     elseif dropdownkind=="fontfamily"then return fontnames
     elseif dropdownkind=="watermarkelements"then return toggle.watermarkorder
@@ -4931,7 +5136,7 @@ toggle.settrail=function(value)
 end
 toggle.trailsetting=function(key,value)
     local s=toggle.trail
-    if key=="kind"then s.kind=value=="Neon Glow"and value or value=="Particle Line"and value or value=="Ribbon"and value or"Solid Line";toggle.cleartrail(true)
+    if key=="kind"then s.kind=value=="Particle Line"and value or value=="Ribbon"and value or"Solid Line";toggle.cleartrail(true)
     elseif key=="secondary"then s.secondary=value==true
     elseif key=="fade"then s.fade=math.floor(clamp(tonumber(value)or s.fade,0.1,3)*10+0.5)/10
     elseif key=="width"then s.width=math.floor(clamp(tonumber(value)or s.width,0.5,4)*10+0.5)/10
@@ -4952,7 +5157,7 @@ toggle.trailpoint=function(actor,position,now)
         if d>3600 then actor.points={};actor.head=1;actor.count=0;last=nil elseif d<0.0064 then actor.live=last;return end
     end
     if actor.count>=s.maxpoints then actor.points[actor.head]=nil;actor.head=actor.head%300+1;actor.count=actor.count-1 end
-    actor.serial=(actor.serial or 0)+1;local point={X=x,Y=y,Z=z,t=now,serial=actor.serial};actor.points[(actor.head+actor.count-1)%300+1]=point;actor.count=actor.count+1;actor.live=point
+    actor.serial=(actor.serial or 0)+1;actor.travel=last and(actor.travel or 0)+math.sqrt((x-last.X)^2+(y-last.Y)^2+(z-last.Z)^2)or 0;local point={X=x,Y=y,Z=z,t=now,serial=actor.serial,travel=actor.travel};actor.points[(actor.head+actor.count-1)%300+1]=point;actor.count=actor.count+1;actor.live=point
 end
 toggle.sampletrails=function(now)
     local s=toggle.trail;if not s.enabled then return end
@@ -4990,14 +5195,14 @@ end
 toggle.traildraw=function(kind,index)
     local s=toggle.trail;local entry=s.pool[index];local created=false
     if not entry or entry.kind~=kind then
-        if s.allocations>=12 or index>s.limit or toggle.nativereleases.count>256 then if entry then toggle.setvisible(entry.draw,false)end;return end
+        if s.allocations>=32 or index>s.limit or not entry and index>#s.pool+1 or toggle.nativereleases.count>256 then if entry then toggle.setvisible(entry.draw,false)end;return end
         s.allocations=s.allocations+1;created=true;local d=toggle.newdrawing(kind);d.Visible=false;d.ZIndex=0.25
         if kind=="Circle"then d.Filled=true;d.NumSides=12 elseif kind=="Quad"then d.Filled=true end
         if entry then remove(entry.draw)end;entry={kind=kind,draw=d};s.pool[index]=entry
     end
     local state=toggle.drawingstates[entry.draw]
     if state and not state.native then
-        if not created then if s.allocations>=12 then return end;s.allocations=s.allocations+1 end
+        if not created then if s.allocations>=32 then return end;s.allocations=s.allocations+1 end
         if not toggle.primedrawing(entry.draw)then return end
     end
     return entry.draw
@@ -5012,6 +5217,7 @@ toggle.trailcurve=function(actor,allowance)
     local curve=actor.curve
     if not curve then curve={knots={},first={},second={},third={},count=0};actor.curve=curve end
     if curve.head==first.serial and curve.tail==last.serial and curve.stride==stride and curve.passes==passes then return curve end
+    local anchor=curve.points and curve.points[math.floor(curve.count/2)];local anchorserial=anchor and anchor.serial;local anchorx,anchory,anchorz=anchor and anchor.X,anchor and anchor.Y,anchor and anchor.Z;local anchordistance=anchor and(curve.offset or 0)+anchor.distance
     if not curve.tail or first.serial>curve.tail then curve.born=first.t end
     curve.head=first.serial;curve.tail=last.serial;curve.stride=stride;curve.passes=passes
     local knots=curve.knots;local n=1;knots[1]=first
@@ -5035,12 +5241,37 @@ toggle.trailcurve=function(actor,allowance)
     if passes==3 then count=round(points,count,curve.third);points=curve.third end
     local distance=0;points[1].distance=0
     for index=2,count do local a,b=points[index-1],points[index];local dx,dy,dz=b.X-a.X,b.Y-a.Y,b.Z-a.Z;distance=distance+math.sqrt(dx*dx+dy*dy+dz*dz);b.distance=distance end
-    curve.points=points;curve.count=count;curve.length=distance;return curve
+    local offset=first.travel or 0
+    if anchorserial then for index=2,count-1 do local p=points[index];if p.serial==anchorserial and p.X==anchorx and p.Y==anchory and p.Z==anchorz then offset=anchordistance-p.distance;break end end end
+    curve.offset=offset;curve.points=points;curve.count=count;curve.length=distance;return curve
 end
+toggle.trailparticles=function(actor,curve,allowance)
+    local points=actor.particlepoints;if not points then points={};actor.particlepoints=points end
+    local spacing=1.5
+    while math.ceil(curve.length/spacing)+2>allowance and spacing<100000 do spacing=spacing*2 end
+    local offset=curve.offset or 0;local first=math.ceil((offset+0.00001)/spacing)*spacing
+    local count=1;points[1]=curve.points[1];local segment=2
+    for distance=first-offset,curve.length-0.00001,spacing do
+        while segment<curve.count and curve.points[segment].distance<distance do segment=segment+1 end
+        local a,b=curve.points[segment-1],curve.points[segment];local span=b.distance-a.distance
+        if span>0.000001 then
+            local f=clamp((distance-a.distance)/span,0,1);local n=count+1;local cache=actor.particlecache
+            if not cache then cache={};actor.particlecache=cache end
+            local p=cache[n];if not p then p={};cache[n]=p end
+            local x,y,z=a.X+(b.X-a.X)*f,a.Y+(b.Y-a.Y)*f,a.Z+(b.Z-a.Z)*f
+            if p.X~=x or p.Y~=y or p.Z~=z then p.vector=nil end
+            p.X=x;p.Y=y;p.Z=z;p.t=a.t+(b.t-a.t)*f;p.serial=a.serial+(b.serial-a.serial)*f;p.distance=distance;p.screenframe=nil
+            points[n]=p;count=n
+        end
+    end
+    count=count+1;points[count]=curve.points[curve.count];for index=count+1,#points do points[index]=nil end
+    return points,count
+end
+
 toggle.drawtrails=function()
     local s=toggle.trail;if not toggle.esp then if next(s.actors)then toggle.cleartrail(false)end;for _,entry in ipairs(s.pool)do toggle.setvisible(entry.draw,false)end;return end;if not s.enabled then return end;local now=toggle.frametime or tick();toggle.sampletrails(now);s.allocations=0;s.drawframe=(s.drawframe or 0)+1
     local actors={};for _,actor in pairs(s.actors)do if actor.count>1 then actors[#actors+1]=actor end end
-    local layers=s.kind=="Neon Glow"and 3 or s.kind=="Particle Line"and 2 or 1;local allowance=math.max(1,math.floor(s.limit/math.max(1,#actors)/layers));local used=0
+    local layers=s.kind=="Particle Line"and 2 or 1;local allowance=math.max(1,math.floor(s.limit/math.max(1,#actors)/layers));local used=0
     local color1=s.color1.labelcolor;local color2=s.color2.labelcolor;local inks={}
     local function smooth(t)t=clamp(t,0,1);return t*t*(3-2*t)end
     local function ink(t)
@@ -5068,6 +5299,7 @@ toggle.drawtrails=function()
             local stride=math.max(1,math.ceil((math.min(300,math.ceil(s.fade*30)+2)-1)*8/math.max(1,allowance-2)));local bucket=math.floor(points[1].serial*8/stride)
             for index=2,curve.count-1 do local p=curve.points[index];local nextbucket=math.floor(p.serial*8/stride);if count<math.max(1,allowance-1)and(stride==1 or nextbucket~=bucket)then count=count+1;points[count]=p;bucket=nextbucket end end
             count=count+1;points[count]=curve.points[curve.count];for index=count+1,#points do points[index]=nil end
+            if s.kind=="Particle Line"then points,count=toggle.trailparticles(actor,curve,allowance)end
             local window=math.min(curve.length*0.4,math.max(0.6,curve.length*0.24))
             local grow=smooth((now-curve.born)/math.min(0.18,s.fade*0.25))
             for index=1,count do local p=points[index];local screen,on=project(p);p.visible=on and screen~=nil
@@ -5088,8 +5320,7 @@ toggle.drawtrails=function()
                     local pa,pb=a.screen,b.screen;local dx,dy=pb.X-pa.X,pb.Y-pa.Y;local length=math.sqrt(dx*dx+dy*dy)
                     if length>0.01 and length<2000 then
                         local c=ink((a.age+b.age)*0.5);local taper=(a.taper+b.taper)*0.5;local width=s.width*math.sqrt(taper)
-                        if s.kind=="Neon Glow"then line(pa,pb,c,alpha*0.12,width*5);line(pa,pb,c,alpha*0.26,width*2.5);line(pa,pb,c,alpha,width)
-                        elseif s.kind=="Particle Line"then
+                        if s.kind=="Particle Line"then
                             line(pa,pb,c,alpha*0.25,math.max(0.1,width*0.5));used=used+1;local d=toggle.traildraw("Circle",used)
                             if d then toggle.setprop(d,"Position",pb);toggle.setprop(d,"Radius",math.max(0.1,s.width*math.sqrt(b.taper)));toggle.setprop(d,"Color",c);toggle.setprop(d,"Transparency",b.alpha);toggle.setvisible(d,b.alpha>0.0005)end
                         elseif s.kind=="Ribbon"then
@@ -7127,16 +7358,25 @@ toggle.resetterrain=function()
     local state=toggle.visuals;local rec=state.terrain;if rec then if rec.originalwater then local c=rec.originalwater;state.water.labelcolor=Color3.new(c[1],c[2],c[3])end;if rec.originallength then state.grasslength=clamp(rec.originallength,-0.5,1.25)end end;toggle.restoreterrain();state.water.edited=false;state.water.rgb=false;state.lengthedited=false;state.nextapply=0
 end
 toggle.resetposteffects=function()
-    local state=toggle.visuals;for _,entry in ipairs(toggle.posteffectorder)do toggle.seteffect(entry.class,false);entry.captured=false;entry.edited={};for _,field in ipairs(entry.fields)do entry.values[field.key]=field.default end end
-    for _,rec in pairs(state.records)do toggle.restoreeffect(rec);for key,value in pairs(rec.values)do local field;for _,candidate in ipairs(rec.definition.fields)do if candidate.key==key then field=candidate;break end end;if field then rec.definition.values[key]=clamp(value,field.min,field.max)end end;if rec.originalcolor then local c=rec.originalcolor;state.correction.labelcolor=Color3.new(c[1],c[2],c[3])end end;state.records={};state.correction.edited=false;state.correction.rgb=false
-    state.nextscan=0;state.discovered=false;toggle.visualchanged()
+    local state=toggle.visuals
+    for _,entry in ipairs(toggle.posteffectorder)do state.effects[entry.class]=false;entry.managed=false;entry.captured=false;entry.edited={};entry.blends={};for _,field in ipairs(entry.fields)do entry.values[field.key]=field.default end end
+    for address,rec in pairs(state.records)do if toggle.restoreeffect(rec)then state.records[address]=nil end end
+    toggle.restorelightingproperties(nil,true)
+    for _,key in ipairs({"fog","ambience","correction"})do local cfg=state[key];cfg.edited=false;cfg.captured=false;cfg.rgb=false end
+    if state.lightingprops then state.lightingprops.nextscan=0 end;state.nextscan=0;state.discovered=false;toggle.visualchanged()
 end
 toggle.loadvisualconfig=function(data)
-    toggle.resetterrain();toggle.resetposteffects();toggle.visuals.editclass="DepthOfFieldEffect";toggle.visuals.terrainselect="grass";if type(data)~="table"then return end;local state=toggle.visuals;if data.terrain_editor=="grass"or data.terrain_editor=="wind"or data.terrain_editor=="water"then state.terrainselect=data.terrain_editor end;if type(data.terrain_enabled)=="table"then for _,element in ipairs({"grass","wind","water"})do state.terrainenabled[element]=data.terrain_enabled[element]==true end end;if state.effectdefs[data.effect_editor]then state.editclass=data.effect_editor end
-    for _,id in ipairs({"water","correction"})do local saved=data[id];if type(saved)=="table"and toggle.visualfinite(saved.r,0,255)and toggle.visualfinite(saved.g,0,255)and toggle.visualfinite(saved.b,0,255)then local cfg=state[id];cfg.labelcolor=Color3.fromRGB(saved.r,saved.g,saved.b);cfg.rgb=saved.rgb==true;cfg.edited=true end end
+    toggle.resetterrain();toggle.resetposteffects();toggle.visuals.editclass="Fog";toggle.visuals.terrainselect="grass";if type(data)~="table"then return end;local state=toggle.visuals;if data.terrain_editor=="grass"or data.terrain_editor=="wind"or data.terrain_editor=="water"then state.terrainselect=data.terrain_editor end;if type(data.terrain_enabled)=="table"then for _,element in ipairs({"grass","wind","water"})do state.terrainenabled[element]=data.terrain_enabled[element]==true end end;if state.effectdefs[data.effect_editor]then state.editclass=data.effect_editor end
+    for _,id in ipairs({"water","correction","fog","ambience"})do local saved=data[id];if type(saved)=="table"and toggle.visualfinite(saved.r,0,255)and toggle.visualfinite(saved.g,0,255)and toggle.visualfinite(saved.b,0,255)then local cfg=state[id];cfg.labelcolor=Color3.fromRGB(saved.r,saved.g,saved.b);cfg.rgb=saved.rgb==true;cfg.edited=true end end
     if toggle.visualfinite(data.grass_length,-0.5,2)then state.grasslength=clamp(data.grass_length,-0.5,1.25);state.lengthedited=true end
     if type(data.wind)=="table"and toggle.visualfinite(data.wind.strength,0,100)and toggle.visualfinite(data.wind.direction,0,360)then state.wind.strength=clamp(data.wind.strength,0,25);state.wind.direction=data.wind.direction;state.wind.edited=true end
-    if data.schema==2 and type(data.effect_controls)=="table"then for _,entry in ipairs(toggle.posteffectorder)do local saved=data.effect_controls[entry.class];if type(saved)=="table"then state.effects[entry.class]=saved.enabled==true;if type(saved.values)=="table"then for _,field in ipairs(entry.fields)do local value=saved.values[field.key];if toggle.visualfinite(value,field.min,field.max)or field.uimin and toggle.visualfinite(value,-10000,10000)then entry.values[field.key]=clamp(value,field.min,field.max);entry.edited[field.key]=true end end end end end end
+    if data.schema==2 and type(data.effect_controls)=="table"then for _,entry in ipairs(toggle.posteffectorder)do local saved=data.effect_controls[entry.class];if type(saved)=="table"then state.effects[entry.class]=saved.enabled==true;entry.managed=saved.controlled==true or saved.enabled==true;if type(saved.values)=="table"then for _,field in ipairs(entry.fields)do local value=saved.values[field.key];if toggle.visualfinite(value,field.min,field.max)or entry.class=="Fog"and toggle.visualfinite(value,0,1000000)or field.uimin and toggle.visualfinite(value,-10000,10000)then entry.values[field.key]=clamp(value,field.min,field.max);entry.edited[field.key]=true end end end end end end
+    local fog=state.effectdefs.Fog;local savedfog=data.schema==2 and type(data.effect_controls)=="table"and data.effect_controls.Fog;local values=type(savedfog)=="table"and savedfog.values
+    if type(values)=="table"then
+        local distance=toggle.visualfinite(values.FogStart,0,1000000)and values.FogStart or toggle.visualfinite(values.FogEnd,0,1000000)and values.FogEnd/5
+        if distance then fog.values.FogStart=clamp(distance,5,750);fog.edited.FogStart=true;fog.edited.FogEnd=true end
+    end
+    fog.values.FogEnd=fog.values.FogStart*5
     toggle.visualchanged()
 end
 toggle.applythemepicker=function(index,value)
@@ -7148,7 +7388,7 @@ end
 
 local function setlabelcolor(index,value,fast)
     toggle.bumpiconrevision()
-    if index=="terrainwater"or index=="correctiontint"then local cfg=entrycfg(index);cfg.edited=true;toggle.visualchanged()end
+    if index=="terrainwater"or index=="correctiontint"or index=="fogcolor"or index=="ambiencecolor"then local cfg=entrycfg(index);cfg.edited=true;toggle.visualchanged()end
     if type(index)=="string"then local cfg=entrycfg(index);if cfg then cfg.labelcolor=value;toggle.markespcolor(cfg)end;toggle.applythemepicker(index,value);if index=="themetext"then for _,style in pairs(toggle.hudstyles)do style.labelcolor=value end;for _,style in pairs(toggle.hudvalues)do style.labelcolor=value end;toggle.cooldownstyle.labelcolor=value;toggle.cooldownvaluestyle.labelcolor=value end;menuupdate(fast==true);return end
     local entry=colorentries[index];if not entry then return end
     for i=1,#entry.cfgs do local cfg=espcfg[entry.cfgs[i]];if cfg then cfg.labelcolor=value;cfg.color=value;toggle.markespcolor(cfg)end end
@@ -7158,7 +7398,7 @@ local function setlabelrgb(index,value,quiet)
     toggle.bumpiconrevision()
     if index=="trail2"then return end
     if index=="accent"then toggle.setchromaaccent(value,quiet);return end
-    if type(index)=="string"then local cfg=entrycfg(index);if cfg then cfg.rgb=value==true;toggle.markespcolor(cfg);if index=="terrainwater"or index=="correctiontint"then cfg.edited=true;toggle.visualchanged()end end;menuupdate();if not quiet then bindlog((value and"enabled "or"disabled ").."chroma for "..toggle.coloractionname(index))end;return end
+    if type(index)=="string"then local cfg=entrycfg(index);if cfg then cfg.rgb=value==true;toggle.markespcolor(cfg);if index=="terrainwater"or index=="correctiontint"or index=="fogcolor"or index=="ambiencecolor"then cfg.edited=true;toggle.visualchanged()end end;menuupdate();if not quiet then bindlog((value and"enabled "or"disabled ").."chroma for "..toggle.coloractionname(index))end;return end
     local entry=colorentries[index];if not entry then return end
     for i=1,#entry.cfgs do local cfg=espcfg[entry.cfgs[i]];if cfg then cfg.rgb=value==true;toggle.markespcolor(cfg)end end
     menuupdate();if not quiet then bindlog((value and"enabled "or"disabled ").."chroma for "..entry.name)end
@@ -7513,7 +7753,7 @@ local function sliderapply(mx,my,quiet)
     local item=layout.item;local minimum=toggle.visualstyle=="compact"and 0 or(layout.fillminimum or math.min(layout.trackw,layout.trackh));local ratio=clamp((mx-layout.trackx-minimum)/math.max(1,layout.trackw-minimum),0,1);local value=item.min+ratio*(item.max-item.min)
     if inputstate.sliding=="grasslength"then toggle.visuals.grasslength=clamp(value,-0.5,1.25);toggle.visuals.lengthedited=true;toggle.visualchanged();menuupdate()
     elseif inputstate.sliding=="windstrength"or inputstate.sliding=="winddirection"then local wind=toggle.visuals.wind;if inputstate.sliding=="windstrength"then wind.strength=clamp(value,0,25) else wind.direction=clamp(value,0,360)end;wind.edited=true;toggle.visualchanged();menuupdate()
-    elseif toggle.visuals.effectfields[inputstate.sliding]then local entry=toggle.visuals.effectfields[inputstate.sliding];entry.effect.values[entry.field.key]=toggle.effectrawvalue(entry.field,value);entry.effect.edited[entry.field.key]=true;toggle.visualchanged();menuupdate()
+    elseif toggle.visuals.effectfields[inputstate.sliding]then local entry=toggle.visuals.effectfields[inputstate.sliding];toggle.setpostvalue(entry.effect,entry.field,value);menuupdate()
     elseif inputstate.sliding=="distancemin"then toggle.distancemin=math.floor(clamp(value,0,100)+0.5);menuupdate()
     elseif inputstate.sliding=="traceropacity"then toggle.tracers.opacity=math.floor(clamp(value,0.1,1)*100+0.5)/100;menuupdate()
     elseif inputstate.sliding=="oofradius"then toggle.extra.radius=math.floor(value);menuupdate()
@@ -8144,7 +8384,7 @@ toggle.worker(function()
 end)
 toggle.renderframe=function(delta)
         local now=tick();local lastframe=toggle.renderlast or now;toggle.renderlast=now;toggle.health.renderat=now;toggle.health.frames=toggle.health.frames+1;if now-lastframe>0.75 then toggle.viewportvalid=false end;toggle.frametime=now;toggle.framedt=clamp(now-lastframe,1/240,0.1);if toggle.viewportvalid==false and now>=toggle.viewportretry then toggle.viewportretry=now+0.25;pcall(toggle.updateviewport)end;toggle.rgbphase=((now*rgbspeed)*(toggle.rgbdirection=="left"and 1 or-1))%1;toggle.chromaphase=(now*toggle.chromaspeed)%1
-        if toggle.viewportvalid~=false then toggle.appearancechanged=toggle.updatetheme();if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;pcall(keys);pcall(mouseinput);pcall(toggle.farmcamera);toggle.health.renderstage="terrain";pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);toggle.health.renderstage="ESP";pcall(toggle.drawesp);pcall(toggle.drawsafetyhud);pcall(toggle.drawfarmvisuals);if not toggle.running or toggle.replacing then return end;toggle.health.renderstage="interface";if now>=(toggle.nextinterfacepaint or 0)then toggle.nextinterfacepaint=now+1/60;pcall(drawrgb)end;toggle.health.renderstage="icons";pcall(toggle.flushicons);pcall(toggle.flushiconblends);pcall(toggle.flushtextinks);pcall(toggle.flushnativereleases,false)end;toggle.health.renderstage="waiting"
+        if toggle.viewportvalid~=false then toggle.appearancechanged=toggle.updatetheme();if now>=(toggle.gradientcache.nextframe or 0)then toggle.gradientcache.frame=toggle.gradientcache.frame+1;toggle.gradientcache.nextframe=now+1/60 end;pcall(keys);pcall(mouseinput);pcall(toggle.farmcamera);toggle.health.renderstage="terrain";pcall(toggle.smoothterrainframe,now);pcall(toggle.applywaterchroma,now);pcall(toggle.smoothpostframe,now);toggle.health.renderstage="ESP";pcall(toggle.drawesp);pcall(toggle.drawsafetyhud);pcall(toggle.drawfarmvisuals);if not toggle.running or toggle.replacing then return end;toggle.health.renderstage="interface";if now>=(toggle.nextinterfacepaint or 0)then toggle.nextinterfacepaint=now+1/60;pcall(drawrgb)end;toggle.health.renderstage="icons";pcall(toggle.flushicons);pcall(toggle.flushiconblends);pcall(toggle.flushtextinks);pcall(toggle.flushnativereleases,false)end;toggle.health.renderstage="waiting"
 end
 toggle.dispatchrender=function(delta)
     if not toggle.running or toggle.replacing or toggle.starting or toggle.loading or toggle.inrenderframe then return end
@@ -8207,9 +8447,8 @@ end
 
 toggle.preparestartup=function()
     toggle.preparing=true
-    if toggle.zoom.thirdperson then toggle.startupstep(toggle.prefetchcamera)end
+    toggle.startupstep(toggle.preloadthirdperson)
     if toggle.shiftlockstate.active then toggle.startupstep(toggle.loadshiftlockoffset,false)end
-    if toggle.zoom.thirdperson and not toggle.offsetloaded then toggle.startupstep(toggle.loadoffsets,false)end
     toggle.startupstep(toggle.avatarcached)
     toggle.startupstep(toggle.refreshplayers,tick(),nil,false)
     toggle.startupstep(toggle.profileidentitystep,tick())
