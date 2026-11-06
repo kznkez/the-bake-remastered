@@ -125,7 +125,7 @@ toggle.clientgc={cache={},bykey={},valid=false,scanning=false,nextapply=0,nextsc
 toggle.nofall={size=Vector3.new(100000,100000,100000),originals={},nextapply=0}
 toggle.towerbarriers={originals={},nextapply=0,applied=false,inv=nil,generation=0}
 toggle.zoom={thirdperson=false,amount=8,min=0,max=0,originalmin=nil,originalmax=nil,memoryvalid=false,directvalid=false,nextapply=0,minoffset=nil,maxoffset=nil,offsetverified=false}
-toggle.shiftlockstate={url="https://offsets.ntgetwritewatch.workers.dev/offsets.hpp",offset=0x3CE,bundledoffset=0x3CE,bundledversion="version-5a21b87bbc2641cf",offsetverified=true,active=false,pending=false,nextapply=0,nextload=0}
+toggle.shiftlockstate={url="https://offsets.ntgetwritewatch.workers.dev/offsets.hpp",offset=0x3CE,offsetverified=true,active=false,pending=false,nextapply=0,nextload=0}
 toggle.instacrate=false;toggle.instacratestate={active=nil,distance=math.huge,collecting=false,collectuntil=0,range=30,patched=setmetatable({},{__mode="k"})};toggle.inventorycache={next=0,items={}}
 toggle.autocollect={enabled=false,selected={},order={{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Tracker",label="tracker"},{name="FirstAidKit",label="medkit"},{name="Vitamins",label="vitamin"}}}
 toggle.prompts=false;toggle.promptsettings={master=false,housedoor=true,houselights=true,houseknock=true,trapdoor=true,forceopen=true,radar=true,towerlights=true};toggle.promptorder={{id="house",label="house controls"},{id="trapdoor",label="tower trapdoor"},{id="release",label="tower release"},{id="radar",label="radar"},{id="towerlights",label="lights"}};toggle.promptoptionorder={{id="housedoor",label="house door",panel="house"},{id="houselights",label="house lights",panel="house"},{id="houseknock",label="house knock",panel="house"},{id="trapdoor",label="tower trapdoor",panel="trapdoor"},{id="forceopen",label="release",panel="release"},{id="radar",label="tower radar",panel="radar"},{id="towerlights",label="tower lights",panel="towerlights"}};toggle.promptstate={records={},active=nil,distance=math.huge,nextresolve=0}
@@ -146,7 +146,7 @@ toggle.shop={
 toggle.playeresp={stacking=false,stackanim=0,enabled=true,distance=200,detaildistance=25,healthcoloring=false,nextscan=0,nextroster=0,nextdraw=0,scanid=0,scancursor=1,selectedcount=0,showusername=false,showavatar=true,showhealth=false,showdistance=false,showscrap=false,background=true,style="fluent",selected={},order={{name="FlareGun",label="flare"},{name="StunStick",label="stun"},{name="UV_Lamp",label="uv"},{name="Vest",label="vest"},{name="Monitor",label="monitor"},{name="RakeTrap",label="trap"},{name="Tracker",label="tracker"},{name="Toolbox",label="toolbox"},{name="Vitamins",label="vitamin"},{name="FirstAidKit",label="medkit"},{name="Voltmeter",label="voltmeter"},{name="Watch",label="watch"},{name="Compass",label="compass"},{name="Map",label="map"}},names={"flare","stun","uv","vest","monitor","trap","tracker","toolbox","vitamin","medkit","voltmeter","watch","compass","map"},records={},scanlist={},visible={}}
 toggle.autorecover=false;toggle.autorecovernext=0;toggle.autorecoverfolder=nil;toggle.recovervalue=0;toggle.recovervaluenext=0;toggle.autosellscrap=false;toggle.autosellnext=0;toggle.autobuyitems={selected={},next=0};toggle.autosellitems={selected={},next=0}
 toggle.borderradius=10
-toggle.offseturl="https://offsets.femboythighs.org/offsets.cs"
+toggle.offseturl="https://offsets.imtheo.lol/offsets.cs"
 toggle.offsettext=nil;toggle.offsetloaded=false;toggle.offsetretry=0;toggle.bundleddisplaynameoffset=0x120;toggle.displaynameoffset=toggle.bundleddisplaynameoffset
 toggle.white=Color3.fromHex("#ffffff");toggle.ringrgbcolor=Color3.fromHex("#d8d8d8");toggle.warningred=Color3.fromHex("#f2c94c");toggle.infoorange=Color3.fromHex("#ffffff");toggle.permissionblue=Color3.fromHex("#ffffff");toggle.permissionpink=Color3.fromHex("#66ccff");toggle.ringunit={}
 toggle.playerdisplayname=lp and type(lp.DisplayName)=="string"and lp.DisplayName~=""and lp.DisplayName~=lp.Name and lp.DisplayName or"User";toggle.localusername=lp and lp.Name or"Player"
@@ -854,7 +854,7 @@ toggle.offsetvalue=function(name)return toggle.offsetstructvalue("Player",name)e
 toggle.loadoffsets=function(force)
     local now=tick();if toggle.offsetloading then return false end;if not force and toggle.offsetloaded then return true end;if not force and now<(toggle.offsetretry or 0)then return false end
     toggle.offsetloading=true;toggle.offsetretry=now+10
-    local ok,source=true,not force and toggle.cameraoffsetsource or nil;toggle.cameraoffsetsource=nil;if type(source)~="string"then ok,source=pcall(toggle.fetchoffset,toggle.offseturl,262144)end;toggle.offsetloading=false
+    local ok,source=true,not force and toggle.cameraoffsetsource or nil;toggle.cameraoffsetsource=nil;if type(source)~="string"then ok,source=pcall(function()return game:HttpGet(toggle.offseturl)end)end;toggle.offsetloading=false
     if not toggle.running or toggle.replacing then return false end
     if not ok or type(source)~="string"or #source<100 or #source>262144 then
         toggle.offsetnotice=true;return false
@@ -875,7 +875,7 @@ end
 toggle.prefetchcamera=function()
     if toggle.offsetloaded or toggle.offsetloading or toggle.offsetqueued or toggle.cameraprefetching or toggle.cameraoffsetsource or tick()<(toggle.offsetretry or 0)then return end
     toggle.cameraprefetching=true
-    local ok,source=pcall(toggle.fetchoffset,toggle.offseturl,262144);toggle.cameraprefetching=false
+    local ok,source=pcall(function()return game:HttpGet(toggle.offseturl)end);toggle.cameraprefetching=false
     if not toggle.running or toggle.replacing then return end
     if ok and type(source)=="string"and #source>=100 and #source<=262144 then toggle.cameraoffsetsource=source;toggle.displaynameoffset=toggle.bundleddisplaynameoffset or toggle.offsetstructvalue("Player","DisplayName",source);toggle.visuals.nextfooter=0 end
 end
@@ -890,7 +890,7 @@ toggle.requestoffsets=function()
     end);return true
 end
 
-toggle.clientgc.characterkey=toggle.instanceaddress(toggle.clientgc.character);toggle.shiftlockstate.offsetverified=type(getrbxversion)=="function"and getrbxversion()==toggle.shiftlockstate.bundledversion
+toggle.clientgc.characterkey=toggle.instanceaddress(toggle.clientgc.character);toggle.shiftlockstate.offsetverified=true
 toggle.validzoom=function(minimum,maximum)
     return type(minimum)=="number"and minimum==minimum and minimum>=0 and minimum<=100000 and type(maximum)=="number"and maximum==maximum and maximum>=minimum and maximum<=100000
 end
@@ -2783,11 +2783,23 @@ toggle.balancecolumns=function(items,tab)
     local groups={};local current;local anchors={};local heights={0,0}
     for _,item in ipairs(items)do if item.kind=="section"then current={items={},weight=0,index=#groups+1,col=item.col or 1};groups[#groups+1]=current end;if current then current.items[#current.items+1]=item;current.weight=current.weight+toggle.rowheight(item)end end
     for _,group in ipairs(groups)do if string.lower(tostring(group.items[1].label))=="fonts"then local sized=false;for _,item in ipairs(group.items)do if item.id=="fonteditsize"then sized=true;break end end;if not sized then group.weight=group.weight+toggle.rowheight({kind="slider"})end end end
+    local sprint,jump,power
+    if tab==1 then
+        for _,group in ipairs(groups)do local name=string.lower(tostring(group.items[1].label));if name=="sprint"then sprint=group elseif name=="jump"then jump=group elseif name=="power station"then power=group end end
+        if sprint and jump then sprint.weight=sprint.weight+jump.weight end
+        if power then power.col=1;heights[1]=heights[1]+power.weight end
+    end
     local pinned;if tab==1 then for _,group in ipairs(groups)do if string.lower(tostring(group.items[1].label))=="spinbot"then pinned=group;pinned.col=1;heights[1]=heights[1]+group.weight;break end end end
-    local pending={};for _,group in ipairs(groups)do local col=group.col;if group~=pinned then if not anchors[col]then anchors[col]=true;heights[col]=heights[col]+group.weight else pending[#pending+1]=group end end end
+    local pending={};for _,group in ipairs(groups)do local col=group.col;if group~=pinned and group~=power and not(group==jump and sprint)then if not anchors[col]then anchors[col]=true;heights[col]=heights[col]+group.weight else pending[#pending+1]=group end end end
     table.sort(pending,function(a,b)return a.weight==b.weight and a.index<b.index or a.weight>b.weight end)
     for _,group in ipairs(pending)do local col=heights[1]<=heights[2]and 1 or 2;group.col=col;heights[col]=heights[col]+group.weight end
-    for _,group in ipairs(groups)do for _,item in ipairs(group.items)do item.col=group.col end end;if pinned then local ordered={};for _,group in ipairs(groups)do if group~=pinned then for _,item in ipairs(group.items)do ordered[#ordered+1]=item end end end;for _,item in ipairs(pinned.items)do ordered[#ordered+1]=item end;return ordered end;return items
+    if sprint and jump then
+        jump.col=sprint.col
+        for index,group in ipairs(groups)do if group==jump then table.remove(groups,index);break end end
+        for index,group in ipairs(groups)do if group==sprint then table.insert(groups,index+1,jump);break end end
+    end
+    local ordereditems={};for _,group in ipairs(groups)do for _,item in ipairs(group.items)do item.col=group.col;ordereditems[#ordereditems+1]=item end end;items=ordereditems
+    if pinned then local ordered={};for _,group in ipairs(groups)do if group~=pinned then for _,item in ipairs(group.items)do ordered[#ordered+1]=item end end end;for _,item in ipairs(pinned.items)do ordered[#ordered+1]=item end;return ordered end;return items
 end
 
 local function currentitems(tab,allpost)
@@ -7468,10 +7480,7 @@ toggle.loadshiftlockoffset=function(force)
     if not toggle.running or toggle.replacing then return false end
     if not ok or type(source)~="string"or #source<100 or #source>1048576 then return false end
     local powerok=toggle.parsepoweroffsets(source)
-    local version=type(getrbxversion)=="function"and getrbxversion()or nil;local sourceversion=source:match("version%-[%da-fA-F]+");local offset=sourceversion and sourceversion==version and toggle.offsetstructvalue("Player","DevEnableMouseLock",source)or version==state.bundledversion and state.bundledoffset or nil
-    if type(offset)~="number"or offset%1~=0 or offset<=0 or offset>=0x10000 then return false end
-    if state.capture and state.capture.offset~=offset then return false end
-    state.offset=offset;state.offsetverified=true;state.nextload=powerok and 0 or now+30;state.nextapply=0;return true
+    state.nextload=powerok and 0 or now+30;return powerok
 end
 toggle.requestshiftlockoffset=function()
     local state=toggle.shiftlockstate;if state.loading or state.queued or state.offsetverified and toggle.powerreading.offsets or tick()<state.nextload then return false end;state.queued=true
